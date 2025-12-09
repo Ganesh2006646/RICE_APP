@@ -1,0 +1,43 @@
+# Start of .gitignore
+
+# Misc
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Node.js / Backend
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+
+# Flutter / Mobile
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+ios/.generated/
+packages
+.pub/
+.pub-cache/
+
+# Android-specific
+**/android/local.properties
+**/android/.gradle
+**/android/*.iml
+
+# Python / ML
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+
+# Agent specific
+.agent/

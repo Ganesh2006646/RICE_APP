@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  shopName  String
+  ownerName String?
+  place     String?
+  tinGst    String?
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+  prices    CustomerPrice[]
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  sku            String?  @unique
+  name           String
+  defaultPrice   Float    // Rate per QTL
+  gstRateDefault Float    @default(0) // 0 or 5
+  unit           String   @default("qtl")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  orderItems     OrderItem[]
+  customerPrices CustomerPrice[]
+}
+
+model CustomerPrice {
+  id         String   @id @default(uuid())
+  customerId String
+  productId  String
+  price      Float
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([customerId, productId])
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  customerId  String
+  agentName   String?
+  loadingDate DateTime
+  emailTo     String?
+  notes       String?
+  totalAmount Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  customer    Customer @relation(fields: [customerId], references: [id])
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  productId   String
+  bags26      Int      @default(0)
+  bags10      Int      @default(0)
+  bags5       Int      @default(0)
+  qtyKg       Float
+  qtyQtl      Float
+  ratePerQtl  Float
+  amcPercent  Float    @default(1.0)
+  gstPercent  Float
+  lineAmount  Float
+  amcAmount   Float
+  gstAmount   Float
+  netAmount   Float
+  remarks     String?
+  order       Order   @relation(fields: [orderId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
+}
+
+model SyncMeta {
+  localId    String   @id
+  remoteId   String?
+  lastSyncAt DateTime @default(now())
+  syncState  String   @default("synced") // synced, pending, conflict
+}
