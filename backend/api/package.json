@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev src/server.js",
+    "dev": "ts-node-dev src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy"
   },
