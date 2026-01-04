@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
 import '../main.dart';
 import '../providers/settings_provider.dart';
+import '../services/translation_service.dart';
+import '../widgets/safe_widgets.dart';
+import '../screens/product_gallery_screen.dart'; // Assuming this path for the new screen
 
 /// Comprehensive Settings Screen
 /// Settings changes now reflect immediately in the app
@@ -13,297 +16,379 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
+    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: SafeText('settings'.tr(ref)),
       ),
-      body: ListView(
+      body: SafePage(
         padding: const EdgeInsets.all(16),
-        children: [
-          // SECTION 1: LANGUAGE & DISPLAY
-          _buildSectionHeader('Language & Display'),
-          _buildSettingsCard(
-            icon: Icons.language,
-            title: 'App Language',
-            children: [
-              _buildDropdown(
-                context: context,
-                label: 'Language',
-                value: settings.language,
-                items: ['English', 'Telugu', 'Tamil', 'Hindi'],
-                onChanged: (value) => notifier.setLanguage(value!),
-              ),
-              const SizedBox(height: 16),
-              _buildDropdown(
-                context: context,
-                label: 'Font Size',
-                value: settings.fontSize,
-                items: ['Small', 'Medium', 'Large'],
-                onChanged: (value) => notifier.setFontSize(value!),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // SECTION 2: MODE & THEME
-          _buildSectionHeader('Mode & Theme'),
-          _buildSettingsCard(
-            icon: Icons.palette_outlined,
-            title: 'Appearance',
-            children: [
-              _buildDropdown(
-                context: context,
-                label: 'App Mode',
-                value: settings.appMode,
-                items: ['Simple Mode', 'Advanced Mode'],
-                onChanged: (value) => notifier.setAppMode(value!),
-                helperText: settings.appMode == 'Simple Mode'
-                    ? 'Only essential buttons and screens'
-                    : 'Shows analytics, export & sync options',
-              ),
-              const SizedBox(height: 16),
-              _buildDropdown(
-                context: context,
-                label: 'Theme',
-                value: settings.theme,
-                items: ['Light', 'Dark'],
-                onChanged: (value) => notifier.setTheme(value!),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // SECTION 3: ORDER & PAYMENT SETTINGS
-          _buildSectionHeader('Order & Payment Settings'),
-          _buildSettingsCard(
-            icon: Icons.receipt_long_outlined,
-            title: 'Business Settings',
-            children: [
-              _buildDropdown(
-                context: context,
-                label: 'Default Payment Due Days',
-                value: settings.defaultDueDays.toString(),
-                items: ['7', '15', '30'],
-                onChanged: (value) =>
-                    notifier.setDefaultDueDays(int.parse(value!)),
-              ),
-              const SizedBox(height: 16),
-              _buildReadOnlyField(
-                context: context,
-                label: 'Currency Symbol',
-                value: '₹ (Indian Rupee)',
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // SECTION 4: DATA & SAFETY
-          _buildSectionHeader('Data & Safety'),
-          _buildSettingsCard(
-            icon: Icons.backup_outlined,
-            title: 'Data Management',
-            children: [
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Backup feature coming soon')),
-                  );
-                },
-                icon: const Icon(Icons.backup),
-                label: const Text('Backup Data'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Restore feature coming soon')),
-                  );
-                },
-                icon: const Icon(Icons.restore),
-                label: const Text('Restore Data'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 16),
-              const Text(
-                'Danger Zone',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.error,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () => _showResetConfirmation(context, ref),
-                icon: const Icon(Icons.delete_forever),
-                label: const Text('Reset App'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.error,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Warning: This will delete all customers, products, and orders.',
-                style: TextStyle(fontSize: 12, color: AppTheme.error),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 32),
-
-          // SECTION 5: ABOUT & SUPPORT
-          _buildSectionHeader('About & Support'),
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppTheme.paleGreen,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
+        child: SafeColumn(
+          children: [
+            // SECTION 1: LANGUAGE & DISPLAY
+            _buildSectionHeader(context, 'language_display'.tr(ref)),
+            _buildSettingsCard(
+              context: context,
+              icon: Icons.language,
+              title: 'app_language'.tr(ref),
               children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  child: Image.asset(
-                    'assets/images/sri_balaji_logo.png',
-                    fit: BoxFit.contain,
-                  ),
+                _buildDropdown(
+                  context: context,
+                  label: 'app_language'.tr(ref),
+                  value: settings.language,
+                  items: ['English', 'Telugu', 'Hindi', 'Tamil'],
+                  onChanged: (value) => notifier.setLanguage(value!),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'RiceAgent',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
-                  ),
+                _buildDropdown(
+                  context: context,
+                  label: 'font_size'.tr(ref),
+                  value: settings.fontSize,
+                  items: ['Small', 'Medium', 'Large'],
+                  onChanged: (value) => notifier.setFontSize(value!),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Version 1.0.0',
-                  style: TextStyle(fontSize: 14, color: AppTheme.grey),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // SECTION 2: MODE & THEME
+            _buildSectionHeader(context, 'mode_theme'.tr(ref)),
+            _buildSettingsCard(
+              context: context,
+              icon: Icons.palette_outlined,
+              title: 'appearance'.tr(ref),
+              children: [
+                _buildDropdown(
+                  context: context,
+                  label: 'app_mode'.tr(ref),
+                  value: settings.appMode,
+                  items: ['Simple Mode', 'Advanced Mode'],
+                  onChanged: (value) => notifier.setAppMode(value!),
+                  helperText: settings.appMode == 'Simple Mode'
+                      ? 'Simple UI'
+                      : 'Advanced UI',
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'This app helps rice agents manage orders and payments easily.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: AppTheme.charcoal),
+                _buildDropdown(
+                  context: context,
+                  label: 'theme'.tr(ref),
+                  value: settings.theme,
+                  items: ['Light', 'Dark'],
+                  onChanged: (value) => notifier.setTheme(value!),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // SECTION 3: ORDER & PAYMENT SETTINGS
+            _buildSectionHeader(context, 'order_payment_settings'.tr(ref)),
+            _buildSettingsCard(
+              context: context,
+              icon: Icons.receipt_long_outlined,
+              title: 'business_settings'.tr(ref),
+              children: [
+                _buildEditableField(
+                  context: context,
+                  label: 'invoice_prefix'.tr(ref),
+                  value: settings.invoicePrefix,
+                  onChanged: (v) => notifier.setInvoicePrefix(v),
+                ),
+                const SizedBox(height: 16),
+                _buildDropdown(
+                  context: context,
+                  label: 'currency_symbol'.tr(ref),
+                  value: settings.currencySymbol,
+                  items: ['₹', '\$', 'QR', 'KD', 'AED', 'SAR'],
+                  onChanged: (v) {
+                    if (v != null) notifier.setCurrencySymbol(v);
+                  },
+                  helperText: 'currency_symbol_desc'.tr(ref),
+                ),
+                const SizedBox(height: 16),
+                _buildEditableField(
+                  context: context,
+                  label: 'mill_contact_phone'.tr(ref),
+                  value: settings.millContactPhone,
+                  onChanged: (value) => notifier.setMillContactPhone(value),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // SECTION 4: DATA & SAFETY
+            _buildSectionHeader(context, 'data_safety'.tr(ref)),
+            _buildSettingsCard(
+              context: context,
+              icon: Icons.backup_outlined,
+              title: 'data_management'.tr(ref),
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('backup_soon'.tr(ref))),
+                    );
+                  },
+                  icon: const Icon(Icons.backup),
+                  label: Text('backup_data'.tr(ref)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    side: BorderSide(color: theme.primaryColor),
+                    foregroundColor: theme.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('restore_soon'.tr(ref))),
+                    );
+                  },
+                  icon: const Icon(Icons.restore),
+                  label: Text('restore_data'.tr(ref)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    side: BorderSide(color: theme.primaryColor),
+                    foregroundColor: theme.primaryColor,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 16),
-                const Text(
-                  'Sri Balaji Boiled and Raw Rice Mill',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
+                SafeText(
+                  'danger_zone'.tr(ref),
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
+                    color: AppTheme.error,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _showResetConfirmation(context, ref),
+                  icon: const Icon(Icons.delete_forever),
+                  label: Text('reset_app'.tr(ref)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.error,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Established 1998 • 45+ Years of Excellence',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.charcoal,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Jaggampeta, East Godavari\nAndhra Pradesh, India',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: AppTheme.grey),
-                ),
-                const SizedBox(height: 12),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.email, size: 16, color: AppTheme.primaryGreen),
-                    SizedBox(width: 8),
-                    Text(
-                      'sbbrrm@gmail.com',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.primaryGreen,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                SafeText(
+                  'reset_warning'.tr(ref),
+                  style: const TextStyle(fontSize: 12, color: AppTheme.error),
                 ),
               ],
             ),
-          ),
 
-          const SizedBox(height: 32),
-        ],
+            const SizedBox(height: 32),
+
+            // SECTION 5: ABOUT & SUPPORT
+            _buildSectionHeader(context, 'about_support'.tr(ref)),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: theme.primaryColor.withValues(alpha: 0.1)),
+              ),
+              child: SafeColumn(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Image.asset(
+                      'assets/images/sri_balaji_logo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.business,
+                          size: 50,
+                          color: theme.primaryColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SafeText(
+                    'RiceAgent Pro',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SafeText(
+                    'app_version'.tr(ref),
+                    style: const TextStyle(fontSize: 14, color: AppTheme.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  SafeText(
+                    'app_desc'.tr(ref),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 14, color: theme.textTheme.bodyMedium?.color),
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  // Link to Product Gallery
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProductGalleryScreen()),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                            color: theme.primaryColor.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.collections_outlined,
+                              size: 20, color: theme.primaryColor),
+                          const SizedBox(width: 8),
+                          SafeText(
+                            'view_products'.tr(ref),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: theme.primaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_ios,
+                              size: 12, color: theme.primaryColor),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                  SafeText(
+                    'mill_full_name'.tr(ref),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SafeText(
+                    'mill_history'.tr(ref),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.bodySmall?.color,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SafeText(
+                    'mill_address'.tr(ref),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: AppTheme.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  SafeRow(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    leading: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.email, size: 16, color: theme.primaryColor),
+                        const SizedBox(width: 8),
+                        SafeText(
+                          'sbbrrm@gmail.com',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
+      child: SafeText(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: AppTheme.charcoal,
+          color: Theme.of(context).textTheme.titleLarge?.color,
         ),
       ),
     );
   }
 
   Widget _buildSettingsCard({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required List<Widget> children,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.lightGrey),
+        border: Border.all(color: AppTheme.lightGrey.withValues(alpha: 0.1)),
       ),
       padding: const EdgeInsets.all(20),
-      child: Column(
+      child: SafeColumn(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: AppTheme.primaryGreen),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryGreen,
+          SafeRow(
+            leading: Row(
+              children: [
+                Icon(icon, color: Theme.of(context).primaryColor),
+                const SizedBox(width: 12),
+                SafeText(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           ...children,
@@ -320,27 +405,27 @@ class SettingsScreen extends ConsumerWidget {
     required ValueChanged<String?> onChanged,
     String? helperText,
   }) {
-    return Column(
+    return SafeColumn(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        SafeText(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.charcoal,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
           ),
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           items: items
               .map((item) => DropdownMenuItem(value: item, child: Text(item)))
               .toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: AppTheme.lightGrey,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -349,7 +434,7 @@ class SettingsScreen extends ConsumerWidget {
         ),
         if (helperText != null) ...[
           const SizedBox(height: 6),
-          Text(
+          SafeText(
             helperText,
             style: const TextStyle(fontSize: 12, color: AppTheme.grey),
           ),
@@ -358,33 +443,34 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildReadOnlyField({
+  Widget _buildEditableField({
     required BuildContext context,
     required String label,
     required String value,
+    required ValueChanged<String> onChanged,
   }) {
-    return Column(
+    return SafeColumn(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        SafeText(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.charcoal,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.lightGrey,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 16, color: AppTheme.charcoal),
+        TextFormField(
+          initialValue: value,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
       ],
@@ -396,54 +482,80 @@ class SettingsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppTheme.error),
-            SizedBox(width: 12),
-            Text('Reset App?'),
-          ],
+        title: SafeRow(
+          leading: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: AppTheme.error),
+              const SizedBox(width: 12),
+              SafeText('reset_confirm_title'.tr(ref)),
+            ],
+          ),
         ),
-        content: const Text(
-          'This will permanently delete all customers, products, and orders. '
-          'This action cannot be undone.',
+        content: SafeText(
+          'reset_confirm_body'.tr(ref),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('cancel'.tr(ref)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Reset Everything'),
+            child: Text('reset_app'.tr(ref)),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      final db = ref.read(databaseProvider);
-      await db.delete(db.orderItems).go();
-      await db.delete(db.orders).go();
-      await db.delete(db.customerPrices).go();
-      await db.delete(db.customers).go();
-      await db.delete(db.products).go();
+      try {
+        final db = ref.read(databaseProvider);
+        // Correct dependency order: Shipments/Payments -> Items -> Orders -> Prices -> Base Tables
+        await db.delete(db.payments).go();
+        await db.delete(db.lorryShipments).go();
+        await db.delete(db.orderItems).go();
+        await db.delete(db.orders).go();
+        await db.delete(db.customerPrices).go();
+        await db.delete(db.syncMeta).go();
+        await db.delete(db.customers).go();
+        await db.delete(db.products).go();
 
-      ref.read(settingsProvider.notifier).resetAll();
+        ref.read(settingsProvider.notifier).resetAll();
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.delete_forever, color: Colors.white),
-                SizedBox(width: 12),
-                Text('All data has been reset'),
-              ],
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: SafeRow(
+                leading: Row(
+                  children: [
+                    const Icon(Icons.delete_forever, color: Colors.white),
+                    const SizedBox(width: 12),
+                    SafeText('deleted_success'.tr(ref)),
+                  ],
+                ),
+              ),
+              backgroundColor: AppTheme.error,
             ),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: SafeRow(
+                leading: Row(
+                  children: [
+                    const Icon(Icons.error, color: Colors.white),
+                    const SizedBox(width: 12),
+                    SafeText('${'failed_to_delete'.tr(ref)}: $e'),
+                  ],
+                ),
+              ),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
       }
     }
   }

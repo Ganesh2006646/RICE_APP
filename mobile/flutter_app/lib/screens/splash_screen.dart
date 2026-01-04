@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'home_screen.dart';
+import '../services/translation_service.dart';
 
 /// Splash screen with animated branding
 /// Auto-navigates to Home after animation completes
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   @override
   void initState() {
@@ -42,70 +42,56 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Sri Balaji Logo
+            // Logo
             Container(
               width: 200,
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.paleGreen.withOpacity(0.3),
+                color: theme.primaryColor.withValues(alpha: 0.1),
               ),
               padding: const EdgeInsets.all(20),
               child: Image.asset(
                 'assets/images/sri_balaji_logo.png',
                 fit: BoxFit.contain,
               ),
-            )
-                .animate()
-                .fadeIn(duration: 600.ms)
-                .scale(begin: const Offset(0.8, 0.8), duration: 600.ms),
+            ),
 
             const SizedBox(height: 40),
 
             // Mill Name
-            Text(
-              'Sri Balaji',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
-                    letterSpacing: 1.5,
-                  ),
-            )
-                .animate()
-                .fadeIn(delay: 300.ms, duration: 600.ms)
-                .slideY(begin: 0.3, end: 0),
-
-            const SizedBox(height: 8),
-
-            Text(
-              'Boiled and Raw Rice Mill',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.charcoal,
-                    fontWeight: FontWeight.w500,
-                  ),
-            )
-                .animate()
-                .fadeIn(delay: 500.ms, duration: 600.ms)
-                .slideY(begin: 0.3, end: 0),
-
-            const SizedBox(height: 40),
-
-            // Loading indicator
-            const SizedBox(
-              width: 40,
-              height: 40,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'mill_full_name'.tr(ref),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.primaryColor,
+                  letterSpacing: 1.1,
+                  height: 1.3,
+                ),
               ),
-            ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
+            ),
+            const SizedBox(
+                height: 60), // Added SizedBox to separate from indicator
+            // Loading indicator
+            SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor
+                    .withOpacity(0.6)), // Changed withValues to withOpacity
+              ),
+            ),
           ],
         ),
       ),

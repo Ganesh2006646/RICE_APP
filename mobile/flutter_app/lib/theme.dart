@@ -15,7 +15,10 @@ class AppTheme {
   static const Color lightGrey = Color(0xFFF5F5F5);
   static const Color grey = Color(0xFF9E9E9E);
   static const Color darkGrey = Color(0xFF616161);
-  static const Color charcoal = Color(0xFF424242);
+  static const Color charcoal =
+      Color(0xFF333333); // Slightly darker for better contrast
+  static const Color deepCharcoal =
+      Color(0xFF1A1A1A); // New color for very dark backgrounds
 
   // Semantic Colors
   static const Color error = Color(0xFFE53935);
@@ -363,7 +366,6 @@ class AppTheme {
     final baseTextTheme = GoogleFonts.interTextTheme();
     const darkBg = Color(0xFF121212);
     const darkSurface = Color(0xFF1E1E1E);
-    const darkCard = Color(0xFF2C2C2C);
 
     return ThemeData(
       useMaterial3: true,
@@ -395,15 +397,18 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: darkCard, width: 1),
+          side: const BorderSide(color: Color(0xFF333333), width: 1),
         ),
-        color: darkCard,
+        color: const Color(0xFF1E1E1E),
         surfaceTintColor: Colors.transparent,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
+
+      // Elevated Button Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: lightGreen,
-          foregroundColor: darkBg,
+          foregroundColor: deepCharcoal,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
@@ -411,9 +416,23 @@ class AppTheme {
           ),
         ),
       ),
+
+      // Filled Button Theme
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: lightGreen,
+          foregroundColor: deepCharcoal,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+
+      // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkCard,
+        fillColor: const Color(0xFF2C2C2C),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
@@ -422,22 +441,22 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: darkCard, width: 1),
+          borderSide: const BorderSide(color: Color(0xFF2C2C2C), width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: lightGreen, width: 2),
+          borderSide: const BorderSide(color: lightGreen, width: 2),
         ),
         labelStyle: GoogleFonts.inter(fontSize: 14, color: grey),
         hintStyle: GoogleFonts.inter(fontSize: 14, color: grey),
       ),
-      drawerTheme: DrawerThemeData(
+      drawerTheme: const DrawerThemeData(
         backgroundColor: darkSurface,
         surfaceTintColor: Colors.transparent,
       ),
       navigationDrawerTheme: NavigationDrawerThemeData(
-        backgroundColor: darkSurface,
-        indicatorColor: primaryGreen.withOpacity(0.3),
+        backgroundColor: const Color(0xFF1A1A1A),
+        indicatorColor: lightGreen.withValues(alpha: 0.2),
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

@@ -5,6 +5,8 @@ import 'package:lottie/lottie.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
+import '../services/translation_service.dart';
+import '../providers/settings_provider.dart';
 
 /// Screen for managing rice varieties (products) with full CRUD operations
 /// Renamed from ProductsScreen to better match domain terminology
@@ -16,13 +18,14 @@ class RiceVarietiesScreen extends ConsumerWidget {
     final db = ref.watch(databaseProvider);
 
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Rice Varieties'),
+        title: Text('rice_varieties'.tr(ref)),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Add Rice Variety',
-            onPressed: () => _showProductDialog(context, db),
+            tooltip: 'add_rice_variety'.tr(ref),
+            onPressed: () => _showProductDialog(context, db, ref),
           ),
         ],
       ),
@@ -35,7 +38,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
           final products = snapshot.data!;
           if (products.isEmpty) {
-            return _buildEmptyState(context, db);
+            return _buildEmptyState(context, db, ref);
           }
 
           return ListView.builder(
@@ -43,20 +46,20 @@ class RiceVarietiesScreen extends ConsumerWidget {
             itemCount: products.length,
             itemBuilder: (context, index) {
               final product = products[index];
-              return _buildProductCard(context, product, db);
+              return _buildProductCard(context, product, db, ref);
             },
           );
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showProductDialog(context, db),
+        onPressed: () => _showProductDialog(context, db, ref),
         icon: const Icon(Icons.add),
-        label: const Text('Add Variety'),
+        label: Text('add_rice'.tr(ref)),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, AppDatabase db) {
+  Widget _buildEmptyState(BuildContext context, AppDatabase db, WidgetRef ref) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -71,23 +74,23 @@ class RiceVarietiesScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'No rice varieties yet',
+            'no_rice_varieties'.tr(ref),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.darkGrey,
+                  color: AppTheme.grey,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Add rice varieties to use in orders',
+            'add_rice_helper'.tr(ref),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.grey,
                 ),
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: () => _showProductDialog(context, db),
+            onPressed: () => _showProductDialog(context, db, ref),
             icon: const Icon(Icons.add),
-            label: const Text('Add First Variety'),
+            label: Text('add_first_variety'.tr(ref)),
           ),
         ],
       ),
@@ -95,7 +98,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
   }
 
   Widget _buildProductCard(
-      BuildContext context, Product product, AppDatabase db) {
+      BuildContext context, Product product, AppDatabase db, WidgetRef ref) {
     final hasGst = product.gstRateDefault > 0;
 
     return Card(
@@ -108,12 +111,12 @@ class RiceVarietiesScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.paleGreen,
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.grass,
-                color: AppTheme.primaryGreen,
+                color: Theme.of(context).primaryColor,
                 size: 24,
               ),
             ),
@@ -141,16 +144,18 @@ class RiceVarietiesScreen extends ConsumerWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                          color: Theme.of(context)
+                              .primaryColor
+                              .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '₹${product.defaultPrice.toStringAsFixed(0)}/QTL',
-                          style: const TextStyle(
-                            color: AppTheme.primaryGreen,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
+                          '${ref.watch(settingsProvider).currencySymbol}${product.defaultPrice.toStringAsFixed(0)} / ${'qtl_short'.tr(ref)}',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                         ),
                       ),
                       Container(
@@ -194,31 +199,32 @@ class RiceVarietiesScreen extends ConsumerWidget {
               onSelected: (value) {
                 switch (value) {
                   case 'edit':
-                    _showProductDialog(context, db, product: product);
+                    _showProductDialog(context, db, ref, product: product);
                     break;
                   case 'delete':
-                    _confirmDelete(context, product, db);
+                    _confirmDelete(context, product, db, ref);
                     break;
                 }
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'edit',
                   child: Row(
                     children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 12),
-                      Text('Edit'),
+                      const Icon(Icons.edit, size: 20),
+                      const SizedBox(width: 12),
+                      Text('edit'.tr(ref)),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
-                      Icon(Icons.delete, size: 20, color: AppTheme.error),
-                      SizedBox(width: 12),
-                      Text('Delete', style: TextStyle(color: AppTheme.error)),
+                      const Icon(Icons.delete, size: 20, color: AppTheme.error),
+                      const SizedBox(width: 12),
+                      Text('delete'.tr(ref),
+                          style: const TextStyle(color: AppTheme.error)),
                     ],
                   ),
                 ),
@@ -234,24 +240,22 @@ class RiceVarietiesScreen extends ConsumerWidget {
     BuildContext context,
     Product product,
     AppDatabase db,
+    WidgetRef ref,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Rice Variety?'),
-        content: Text(
-          'Are you sure you want to delete "${product.name}"? '
-          'This may affect existing orders.',
-        ),
+        title: Text('${'delete'.tr(ref)}?'),
+        content: Text('delete_variety_confirm'.tr(ref)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('cancel'.tr(ref)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Delete'),
+            child: Text('delete'.tr(ref)),
           ),
         ],
       ),
@@ -263,13 +267,13 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Rice variety deleted')),
+          SnackBar(content: Text('rice_variety_deleted'.tr(ref))),
         );
       }
     }
   }
 
-  void _showProductDialog(BuildContext context, AppDatabase db,
+  void _showProductDialog(BuildContext context, AppDatabase db, WidgetRef ref,
       {Product? product}) {
     final isEditing = product != null;
     final nameController = TextEditingController(text: product?.name ?? '');
@@ -283,37 +287,38 @@ class RiceVarietiesScreen extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(isEditing ? 'Edit Rice Variety' : 'Add Rice Variety'),
+          title: Text(isEditing
+              ? 'edit_rice_variety'.tr(ref)
+              : 'add_rice_variety'.tr(ref)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name *',
-                    hintText: 'e.g., Sona Masoori Old',
-                    prefixIcon: Icon(Icons.grass),
+                  decoration: InputDecoration(
+                    labelText: '${'variety_name'.tr(ref)} *',
+                    prefixIcon: const Icon(Icons.grass),
                   ),
                   textCapitalization: TextCapitalization.words,
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: skuController,
-                  decoration: const InputDecoration(
-                    labelText: 'SKU (Optional)',
+                  decoration: InputDecoration(
+                    labelText: '${'short_code'.tr(ref)} (Optional)',
                     hintText: 'e.g., SMO-001',
-                    prefixIcon: Icon(Icons.qr_code),
+                    prefixIcon: const Icon(Icons.qr_code),
                   ),
                   textCapitalization: TextCapitalization.characters,
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Rate per Quintal (₹) *',
-                    hintText: 'e.g., 2200',
-                    prefixIcon: Icon(Icons.currency_rupee),
+                  decoration: InputDecoration(
+                    labelText:
+                        '${'rate'.tr(ref)}/${'qtl_short'.tr(ref)} (${ref.watch(settingsProvider).currencySymbol}) *',
+                    prefixIcon: const Icon(Icons.currency_rupee),
                   ),
                   keyboardType: TextInputType.number,
                 ),
@@ -324,18 +329,16 @@ class RiceVarietiesScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: SwitchListTile(
-                    title: const Text('Default GST Rate'),
+                    title: const Text('GST 5%'),
                     subtitle: Text(
-                      isGst5
-                          ? 'GST 5% (for branded/packed rice)'
-                          : 'GST 0% (for loose rice)',
+                      isGst5 ? 'branded_rice'.tr(ref) : 'loose_rice'.tr(ref),
                       style: TextStyle(
                         color: isGst5 ? Colors.orange.shade700 : AppTheme.grey,
                         fontSize: 12,
                       ),
                     ),
                     value: isGst5,
-                    activeThumbColor: AppTheme.primaryGreen,
+                    activeThumbColor: Theme.of(context).primaryColor,
                     onChanged: (val) => setState(() => isGst5 = val),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -344,10 +347,19 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Note: GST will be 5% if 5kg or 10kg bags are used, regardless of this setting.',
+                  'gst_note'.tr(ref),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.grey,
                         fontStyle: FontStyle.italic,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.orange.shade800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
                       ),
                 ),
               ],
@@ -356,13 +368,13 @@ class RiceVarietiesScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text('cancel'.tr(ref)),
             ),
             FilledButton(
               onPressed: () async {
                 if (nameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Name is required')),
+                    SnackBar(content: Text('name_required'.tr(ref))),
                   );
                   return;
                 }
@@ -370,7 +382,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 final price = double.tryParse(priceController.text.trim());
                 if (price == null || price <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enter a valid price')),
+                    SnackBar(content: Text('valid_price_required'.tr(ref))),
                   );
                   return;
                 }
@@ -404,15 +416,16 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                          isEditing ? 'Variety updated!' : 'Variety added!'),
+                      content: Text(isEditing
+                          ? 'variety_updated'.tr(ref)
+                          : 'variety_added'.tr(ref)),
                       backgroundColor: AppTheme.success,
                     ),
                   );
                   Navigator.pop(context);
                 }
               },
-              child: Text(isEditing ? 'Update' : 'Save'),
+              child: Text(isEditing ? 'update'.tr(ref) : 'save'.tr(ref)),
             ),
           ],
         ),

@@ -16,7 +16,9 @@ class EmailService {
   }) async {
     try {
       // Check if file exists
-      final file = XFile(filePath);
+      final file = XFile(filePath,
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
       // Verify file can be accessed
       final fileLength = await file.length();
@@ -103,6 +105,7 @@ Sri Balaji Rice Mill
     required double totalQtl,
     required double totalAmount,
     required int itemCount,
+    String currencySymbol = '₹',
   }) {
     return '''
 Dear Sir/Madam,
@@ -117,7 +120,7 @@ Customer: $customerName
 Place: $customerPlace
 Items: $itemCount rice varieties
 Total Quantity: ${totalQtl.toStringAsFixed(2)} QTL
-Total Amount: ₹${totalAmount.toStringAsFixed(2)}
+Total Amount: $currencySymbol${totalAmount.toStringAsFixed(2)}
 ----------------------------------------
 
 Kindly arrange for loading as per the attached order sheet.

@@ -11,6 +11,9 @@ import '../services/email_service.dart';
 import '../services/whatsapp_service.dart';
 import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
+import '../services/translation_service.dart';
+import 'package:share_plus/share_plus.dart';
+import '../providers/settings_provider.dart';
 
 /// Orders History Screen with filters and actions
 /// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
@@ -24,30 +27,39 @@ class OrdersScreen extends ConsumerStatefulWidget {
 class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   DateTime? _filterDate;
   Customer? _filterCustomer;
+  String _searchQuery = '';
   final _dateFormat = DateFormat('dd MMM yyyy');
+  final _searchController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.offWhite,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const SafeText('Orders History', style: TextStyle(fontSize: 18)),
+        title: SafeText('order_history'.tr(ref),
+            style: const TextStyle(fontSize: 18)),
         actions: [
           IconButton(
             icon: Icon(
                 _filterDate != null
                     ? Icons.event_available
                     : Icons.calendar_today,
-                color: _filterDate != null ? AppTheme.primaryGreen : null),
+                color: _filterDate != null ? theme.primaryColor : null),
             onPressed: () => _selectDate(context),
           ),
           IconButton(
             icon: Icon(
                 _filterCustomer != null ? Icons.person : Icons.person_search,
-                color: _filterCustomer != null ? AppTheme.primaryGreen : null),
+                color: _filterCustomer != null ? theme.primaryColor : null),
             onPressed: () => _showCustomerFilter(context, db),
+          ),
+          IconButton(
+            icon: const Icon(Icons.description_outlined),
+            tooltip: 'export_all'.tr(ref),
+            onPressed: () => _exportAllOrders(db),
           ),
           if (_filterDate != null || _filterCustomer != null)
             IconButton(
@@ -58,16 +70,15 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     })),
         ],
       ),
-      body: SafeColumn(
+      body: Column(
         children: [
           if (_filterDate != null || _filterCustomer != null)
             Container(
               padding: const EdgeInsets.all(12),
-              color: AppTheme.paleGreen,
+              color: theme.primaryColor.withValues(alpha: 0.1),
               child: SafeWrap(
                 children: [
-                  const Icon(Icons.filter_alt,
-                      size: 16, color: AppTheme.primaryGreen),
+                  Icon(Icons.filter_alt, size: 16, color: theme.primaryColor),
                   if (_filterDate != null)
                     Chip(
                         label: Text(_dateFormat.format(_filterDate!)),
@@ -84,15 +95,52 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             child: StreamBuilder<List<OrderWithDetails>>(
               stream: _buildOrdersQuery(db),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
+                if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
+                }
                 final orders = snapshot.data!;
                 if (orders.isEmpty) return _buildEmptyState();
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) =>
-                      _buildOrderCard(orders[index], db),
+
+                return Column(
+                  children: [
+                    // SEARCH BAR
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'search_orders_hint'.tr(ref),
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 20),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _searchController.clear();
+                                    });
+                                  })
+                              : null,
+                          filled: true,
+                          fillColor: theme.cardColor,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: orders.length,
+                        itemBuilder: (context, index) =>
+                            _buildOrderCard(orders[index], db),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -146,14 +194,25 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 item.customers.any((c) => c.id == _filterCustomer!.id))
             .toList();
       }
+      if (_searchQuery.isNotEmpty) {
+        filtered = filtered.where((item) {
+          final q = _searchQuery.toLowerCase();
+          final orderNo = (item.order.notes ?? '').toLowerCase();
+          final customers =
+              item.customers.map((c) => c.shopName.toLowerCase()).join(' ');
+          return orderNo.contains(q) || customers.contains(q);
+        }).toList();
+      }
       return filtered;
     });
   }
 
   Widget _buildOrderCard(OrderWithDetails item, AppDatabase db) {
+    final theme = Theme.of(context);
     final customer = item.customers.isNotEmpty ? item.customers.first : null;
     return SafeCard(
       padding: EdgeInsets.zero,
+      color: theme.cardColor,
       child: InkWell(
         onTap: () => _showOrderDetails(item, db),
         child: Padding(
@@ -164,15 +223,15 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 leading: SafeRow(
                   leading: CircleAvatar(
                     radius: 20,
-                    backgroundColor: AppTheme.paleGreen,
+                    backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
                     child: Text(customer?.shopName[0] ?? 'L',
-                        style: const TextStyle(
-                            color: AppTheme.primaryGreen,
+                        style: TextStyle(
+                            color: theme.primaryColor,
                             fontWeight: FontWeight.bold)),
                   ),
                   trailing: SafeColumn(
                     children: [
-                      SafeText(customer?.shopName ?? "Multi-Customer Lorry",
+                      SafeText(item.order.notes ?? 'no_order_no'.tr(ref),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 14)),
                       SafeText(_dateFormat.format(item.order.loadingDate),
@@ -184,12 +243,14 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 trailing: SafeColumn(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    SafeText('₹${item.order.totalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                            color: AppTheme.primaryGreen,
+                    SafeText(
+                        '${ref.watch(settingsProvider).currencySymbol}${item.order.totalAmount.toStringAsFixed(0)}',
+                        style: TextStyle(
+                            color: theme.primaryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 16)),
-                    SafeText(item.order.notes ?? 'No #',
+                    SafeText(
+                        customer?.shopName ?? 'multi_customer_lorry'.tr(ref),
                         style: const TextStyle(
                             fontSize: 10, color: AppTheme.grey)),
                   ],
@@ -200,16 +261,15 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _actionBtn(Icons.download, 'Excel',
+                    _actionBtn(Icons.download, 'excel'.tr(ref),
                         () => _downloadExcel(item, db)),
-                    _actionBtn(
-                        Icons.email, 'Email', () => _resendEmail(item, db)),
-                    _actionBtn(
-                        Icons.copy, 'Clone', () => _duplicateOrder(item)),
-                    if (item.customers.length == 1)
-                      _actionBtn(Icons.send, 'WhatsApp',
-                          () => _sendWhatsApp(item, db)),
-                    _actionBtn(Icons.delete_outline, 'Delete',
+                    _actionBtn(Icons.email, 'email'.tr(ref),
+                        () => _resendEmail(item, db)),
+                    _actionBtn(Icons.copy, 'clone'.tr(ref),
+                        () => _duplicateOrder(item)),
+                    _actionBtn(Icons.send, 'whatsapp'.tr(ref),
+                        () => _sendWhatsApp(item, db)),
+                    _actionBtn(Icons.delete_outline, 'delete'.tr(ref),
                         () => _confirmDeleteOrder(item, db),
                         isError: true),
                   ],
@@ -224,7 +284,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
   Widget _actionBtn(IconData icon, String label, VoidCallback onTap,
       {bool isError = false}) {
-    final color = isError ? AppTheme.error : AppTheme.primaryGreen;
+    final theme = Theme.of(context);
+    final color = isError ? AppTheme.error : theme.primaryColor;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -249,17 +310,16 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Order?'),
-        content: Text(
-            'Are you sure you want to delete order "${item.order.notes ?? item.order.id}"? This cannot be undone.'),
+        title: Text('${'delete'.tr(ref)}?'),
+        content: Text('delete_order_confirm'.tr(ref)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: Text('cancel'.tr(ref))),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Delete'),
+            child: Text('delete'.tr(ref)),
           ),
         ],
       ),
@@ -281,9 +341,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 ..where((tbl) => tbl.id.equals(item.order.id)))
               .go();
         });
-        _showSuccess('Order deleted successfully');
+        _showSuccess('deleted_success'.tr(ref));
       } catch (e) {
-        _showError('Failed to delete order: $e');
+        _showError('${'failed_to_delete'.tr(ref)}: $e');
       }
     }
   }
@@ -294,9 +354,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         .get();
     final products = await db.select(db.products).get();
     if (!mounted) return;
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         expand: false,
@@ -306,17 +368,17 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               SafeText(
                   item.customers.isNotEmpty
                       ? item.customers.first.shopName
-                      : 'Lorry Order',
+                      : 'multi_customer_lorry'.tr(ref),
                   style: const TextStyle(
                       fontSize: 20, fontWeight: FontWeight.bold)),
-              SafeText('Order No: ${item.order.notes ?? "N/A"}',
+              SafeText('${'order_no'.tr(ref)}: ${item.order.notes ?? "N/A"}',
                   style: const TextStyle(color: AppTheme.grey)),
               const SizedBox(height: 20),
               ...orderItems.map((oi) {
                 final prod = products.firstWhere((p) => p.id == oi.productId,
                     orElse: () => _fallbackProd());
                 return SafeCard(
-                  color: AppTheme.lightGrey,
+                  color: theme.cardColor,
                   child: SafeRow(
                     leading: SafeColumn(
                       children: [
@@ -334,9 +396,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                         SafeText('${oi.qtyQtl.toStringAsFixed(2)} QTL',
                             style:
                                 const TextStyle(fontWeight: FontWeight.bold)),
-                        SafeText('₹${oi.netAmount.toStringAsFixed(0)}',
-                            style:
-                                const TextStyle(color: AppTheme.primaryGreen)),
+                        SafeText(
+                            '${ref.watch(settingsProvider).currencySymbol}${oi.netAmount.toStringAsFixed(0)}',
+                            style: TextStyle(color: theme.primaryColor)),
                       ],
                     ),
                   ),
@@ -344,22 +406,22 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               }),
               const Divider(height: 32),
               SafeRow(
-                leading: const Text('TOTAL AMOUNT',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                trailing: SafeText(
-                    '₹${item.order.totalAmount.toStringAsFixed(0)}',
+                leading: SafeText('total_value'.tr(ref).toUpperCase(),
                     style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+                trailing: SafeText(
+                    '${ref.watch(settingsProvider).currencySymbol}${item.order.totalAmount.toStringAsFixed(0)}',
+                    style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryGreen)),
+                        color: theme.primaryColor)),
               ),
               const SizedBox(height: 20),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'))),
+                      child: Text('close'.tr(ref)))),
             ],
           ),
         ),
@@ -389,7 +451,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Filter by Customer'),
+        title: Text('filter_by_customer'.tr(ref)),
         content: SizedBox(
           width: double.maxFinite,
           child: StreamBuilder<List<Customer>>(
@@ -426,10 +488,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         products: products,
         orderNumber: item.order.notes ?? 'N/A');
     await ExcelService.copyToDownloads(path);
-    if (mounted)
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Excel saved to Downloads'),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('excel_saved'.tr(ref)),
           backgroundColor: AppTheme.success));
+    }
   }
 
   Future<void> _resendEmail(OrderWithDetails item, AppDatabase db) async {
@@ -451,15 +514,112 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   }
 
   Future<void> _sendWhatsApp(OrderWithDetails item, AppDatabase db) async {
-    final orderItems = await (db.select(db.orderItems)
-          ..where((tbl) => tbl.orderId.equals(item.order.id)))
-        .get();
-    final products = await db.select(db.products).get();
-    await WhatsAppService.sendOrderMessage(
-        customer: item.customers.first,
+    final localization = ref.read(settingsProvider);
+    final currency = localization.currencySymbol;
+
+    if (item.customers.isEmpty) return;
+
+    // Helper to send for a specific customer
+    Future<void> sendForCustomer(Customer customer) async {
+      final customerItems = await (db.select(db.orderItems)
+            ..where((t) =>
+                t.orderId.equals(item.order.id) &
+                t.customerId.equals(customer.id)))
+          .get();
+
+      final allProducts = await db.select(db.products).get();
+
+      WhatsAppService.sendOrderMessage(
+        customer: customer,
+        items: customerItems,
+        products: allProducts,
         order: item.order,
-        items: orderItems,
-        products: products);
+        currencySymbol: currency,
+      );
+    }
+
+    if (item.customers.length == 1) {
+      await sendForCustomer(item.customers.first);
+    } else {
+      // Multi-customer dialog
+      await showDialog(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: Text('whatsapp'.tr(ref)),
+          children: [
+            SimpleDialogOption(
+              onPressed: () async {
+                Navigator.pop(context);
+                final allItems = await (db.select(db.orderItems)
+                      ..where((t) => t.orderId.equals(item.order.id)))
+                    .get();
+                final allProducts = await db.select(db.products).get();
+
+                // Fetch customers explicitly to ensure we have them all
+                final customers = await (db.select(db.customers)
+                      ..where((t) =>
+                          t.id.isIn(item.customers.map((c) => c.id).toList())))
+                    .get();
+
+                WhatsAppService.sendLorrySummaryMessage(
+                  order: item.order,
+                  customers: customers,
+                  allItems: allItems,
+                  allProducts: allProducts,
+                  millContactPhone: '9848135359', // Sri Balaji Mill
+                  currencySymbol: currency,
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.list_alt, color: Colors.blue),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('whatsapp_summary'.tr(ref),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          Text('whatsapp_summary_helper'.tr(ref),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+              child: Text('select_customer'.tr(ref),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.grey)),
+            ),
+            ...item.customers.map((c) => SimpleDialogOption(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    sendForCustomer(c);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person, size: 20),
+                        const SizedBox(width: 12),
+                        Text(c.shopName),
+                      ],
+                    ),
+                  ),
+                )),
+          ],
+        ),
+      );
+    }
   }
 
   void _showError(String msg) {
@@ -485,19 +645,33 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             builder: (_) => NewOrderScreen(duplicateOrderId: item.order.id)));
   }
 
+  Future<void> _exportAllOrders(AppDatabase db) async {
+    try {
+      // Get all current orders in the stream (using the same query filter)
+      final orders = await _buildOrdersQuery(db).first;
+      if (orders.isEmpty) {
+        _showError('No orders to export');
+        return;
+      }
+
+      final products = await db.select(db.products).get();
+      final path = await ExcelService.generateAllOrdersExcel(
+          orders: orders, products: products);
+
+      await Share.shareXFiles([XFile(path)], text: 'orders_statement'.tr(ref));
+      _showSuccess('saved_successfully'.tr(ref));
+    } catch (e) {
+      _showError('${'export_failed'.tr(ref)}: $e');
+    }
+  }
+
   Widget _buildEmptyState() {
     return Center(
         child:
             SafeColumn(mainAxisAlignment: MainAxisAlignment.center, children: [
       Lottie.asset('assets/lottie/empty.json', width: 180),
       const SizedBox(height: 16),
-      const SafeText('No orders found')
+      SafeText('no_orders'.tr(ref))
     ]));
   }
-}
-
-class OrderWithDetails {
-  final Order order;
-  final List<Customer> customers;
-  OrderWithDetails({required this.order, required this.customers});
 }

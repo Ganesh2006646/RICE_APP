@@ -9,7 +9,9 @@ class AppSettings {
   final String theme;
   final int defaultDueDays;
   final String millEmail;
+  final String millContactPhone;
   final String invoicePrefix;
+  final String currencySymbol;
 
   const AppSettings({
     this.language = 'English',
@@ -18,7 +20,9 @@ class AppSettings {
     this.theme = 'Light',
     this.defaultDueDays = 7,
     this.millEmail = 'sbbrrm@gmail.com',
+    this.millContactPhone = '9848012345',
     this.invoicePrefix = 'SBRM-2024-',
+    this.currencySymbol = '₹',
   });
 
   AppSettings copyWith({
@@ -28,7 +32,9 @@ class AppSettings {
     String? theme,
     int? defaultDueDays,
     String? millEmail,
+    String? millContactPhone,
     String? invoicePrefix,
+    String? currencySymbol,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -37,7 +43,9 @@ class AppSettings {
       theme: theme ?? this.theme,
       defaultDueDays: defaultDueDays ?? this.defaultDueDays,
       millEmail: millEmail ?? this.millEmail,
+      millContactPhone: millContactPhone ?? this.millContactPhone,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
+      currencySymbol: currencySymbol ?? this.currencySymbol,
     );
   }
 
@@ -71,7 +79,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       theme: prefs.getString('theme') ?? 'Light',
       defaultDueDays: prefs.getInt('defaultDueDays') ?? 7,
       millEmail: prefs.getString('mill_email') ?? 'sbbrrm@gmail.com',
+      millContactPhone: prefs.getString('mill_contact') ?? '9848012345',
       invoicePrefix: prefs.getString('invoice_prefix') ?? 'SBRM-2024-',
+      currencySymbol: prefs.getString('currency_symbol') ?? '₹',
     );
   }
 
@@ -111,10 +121,22 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = state.copyWith(millEmail: email);
   }
 
+  Future<void> setMillContactPhone(String phone) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('mill_contact', phone);
+    state = state.copyWith(millContactPhone: phone);
+  }
+
   Future<void> setInvoicePrefix(String prefix) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('invoice_prefix', prefix);
     state = state.copyWith(invoicePrefix: prefix);
+  }
+
+  Future<void> setCurrencySymbol(String symbol) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('currency_symbol', symbol);
+    state = state.copyWith(currencySymbol: symbol);
   }
 
   Future<void> resetAll() async {

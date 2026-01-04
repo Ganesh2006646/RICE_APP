@@ -9,6 +9,7 @@ class WhatsAppService {
     required Order order,
     required List<OrderItem> items,
     required List<Product> products,
+    String currencySymbol = '₹',
   }) async {
     final phone = customer.phone;
     if (phone == null || phone.isEmpty) {
@@ -52,12 +53,22 @@ class WhatsAppService {
 
       message.writeln(bags.join(', '));
       message.writeln(
-          '  Qty: ${item.qtyQtl.toStringAsFixed(2)} QTL @ ₹${item.ratePerQtl.toStringAsFixed(0)}');
+          '  Qty: ${item.qtyQtl.toStringAsFixed(2)} QTL @ $currencySymbol${item.ratePerQtl.toStringAsFixed(0)}');
     }
 
     message.writeln('------------------------------------------');
+    final double totalAmount =
+        items.fold<double>(0, (sum, i) => sum + i.netAmount);
+    final double totalQtl = items.fold<double>(0, (sum, i) => sum + i.qtyQtl);
+    final int itemCount = items.length;
+
+    message.writeln('Order Number: ${order.notes ?? 'N/A'}');
+    message.writeln('Customer: ${customer.shopName}');
+    message.writeln('Place: ${customer.place ?? 'N/A'}');
+    message.writeln('Items: $itemCount rice varieties');
+    message.writeln('Total Quantity: ${totalQtl.toStringAsFixed(2)} QTL');
     message.writeln(
-        '*TOTAL AMOUNT: ₹${items.fold<double>(0, (sum, i) => sum + i.netAmount).toStringAsFixed(2)}*');
+        'Total Amount: $currencySymbol${totalAmount.toStringAsFixed(2)}');
     message.writeln('------------------------------------------');
     message.writeln('Regards,');
     message.writeln('Kankatala Narayana Murthy');
@@ -77,6 +88,68 @@ class WhatsAppService {
       }
     } catch (e) {
       throw 'Could not launch WhatsApp: $e';
+    }
+  }
+
+  /// Open WhatsApp with a summary of the ENTIRE lorry load (multi-customer)
+  static Future<void> sendLorrySummaryMessage({
+    required List<Customer> customers,
+    required Order order,
+    required List<OrderItem> allItems,
+    required List<Product> allProducts,
+    required String millContactPhone,
+    String currencySymbol = '₹',
+  }) async {
+    // Format phone number
+    String formattedPhone = millContactPhone.replaceAll(RegExp(r'\s+'), '');
+    if (formattedPhone.length == 10) formattedPhone = '91$formattedPhone';
+
+    final StringBuffer message = StringBuffer();
+    message.writeln('🚚 *Sri Balaji Rice Mill - FULL LORRY SUMMARY* 🚚');
+    message.writeln('------------------------------------------');
+    message.writeln('*Order No:* ${order.notes ?? 'N/A'}');
+    message.writeln('*Date:* ${order.loadingDate.toString().split(' ')[0]}');
+    message.writeln('------------------------------------------');
+
+    double grandTotalQtl = 0;
+    double grandTotalAmount = 0;
+
+    for (var customer in customers) {
+      final customerItems =
+          allItems.where((i) => i.customerId == customer.id).toList();
+      if (customerItems.isEmpty) continue;
+
+      message.writeln('\n👤 *${customer.shopName}* (${customer.place})');
+      for (var item in customerItems) {
+        final product = allProducts.firstWhere((p) => p.id == item.productId,
+            orElse: () => allProducts.first);
+        message.writeln(
+            '• ${product.name}: ${item.qtyQtl.toStringAsFixed(2)} QTL');
+        grandTotalQtl += item.qtyQtl;
+        grandTotalAmount += item.netAmount;
+      }
+    }
+
+    message.writeln('\n------------------------------------------');
+    message.writeln('*GRAND TOTAL QTL: ${grandTotalQtl.toStringAsFixed(2)}*');
+    message.writeln(
+        '*GRAND TOTAL VALUE: $currencySymbol${grandTotalAmount.toStringAsFixed(0)}*');
+    message.writeln('------------------------------------------');
+    message.writeln('Regards, RiceAgent App');
+
+    final encodedMsg = Uri.encodeComponent(message.toString());
+    final url = 'whatsapp://send?phone=$formattedPhone&text=$encodedMsg';
+    final fallbackUrl = 'https://wa.me/$formattedPhone?text=$encodedMsg';
+
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url));
+      } else {
+        await launchUrl(Uri.parse(fallbackUrl),
+            mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      throw 'Could not launch WhatsApp Summary: $e';
     }
   }
 }

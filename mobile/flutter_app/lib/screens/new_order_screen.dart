@@ -9,15 +9,17 @@ import '../db/database.dart';
 import '../services/excel_service.dart';
 import '../services/email_service.dart';
 import '../services/settings_service.dart';
+import '../services/translation_service.dart';
+import '../services/whatsapp_service.dart';
+import '../providers/settings_provider.dart';
 import '../widgets/safe_widgets.dart';
 
-/// Data class for order item in the form
 class OrderItemFormData {
   Product? product;
   int bags26;
   int bags10;
   int bags5;
-  double rate;
+  double rate; // Defined ONLY for 100 KG (1 Quintal)
 
   OrderItemFormData({
     this.product,
@@ -27,19 +29,49 @@ class OrderItemFormData {
     this.rate = 0,
   });
 
-  double get kgTotal => (bags26 * 26.0) + (bags10 * 10.0) + (bags5 * 5.0);
+  // WEIGHTS
+  double get kg26 => bags26 * 26.0;
+  double get kg10 => bags10 * 10.0;
+  double get kg5 => bags5 * 5.0;
+  double get kgTotal => kg26 + kg10 + kg5;
   double get qtlTotal => kgTotal / 100.0;
-  double get baseAmount => qtlTotal * rate;
-  double get amcPercent => 1.0;
-  double get amcAmount => baseAmount * (amcPercent / 100);
 
+  // 26 KG LOGIC: No Packing, No GST, 1% AMC
+  double get value26 => (rate / 100.0) * 26.0 * bags26;
+  double get amc26 => value26 * 0.01;
+  double get total26 => value26 + amc26;
+
+  // 10 KG LOGIC: ₹200 Packing, 1% AMC, 5% GST
+  double get baseValue10 => (rate / 100.0) * 10.0 * bags10;
+  double get packing10 => 200.0 * bags10;
+  double get subtotal10 => baseValue10 + packing10;
+  double get amc10 => subtotal10 * 0.01;
+  double get gst10 => (subtotal10 + amc10) * 0.05;
+  double get total10 => subtotal10 + amc10 + gst10;
+
+  // 5 KG LOGIC: ₹250 Packing, 1% AMC, 5% GST
+  double get baseValue5 => (rate / 100.0) * 5.0 * bags5;
+  double get packing5 => 250.0 * bags5;
+  double get subtotal5 => baseValue5 + packing5;
+  double get amc5 => subtotal5 * 0.01;
+  double get gst5 => (subtotal5 + amc5) * 0.05;
+  double get total5 => subtotal5 + amc5 + gst5;
+
+  // TOTALS for Line Item
+  double get netAmount => total26 + total10 + total5;
+  double get amcAmount => amc26 + amc10 + amc5;
+  double get gstAmount => gst10 + gst5;
+
+  // Percentage Helpers for DB/Legacy UI
+  double get amcPercent => 1.0;
   double get gstPercent {
-    if (bags10 > 0 || bags5 > 0) return 5.0;
-    return product?.gstRateDefault ?? 0.0;
+    double taxableSubtotal = (subtotal10 + amc10) + (subtotal5 + amc5);
+    if (taxableSubtotal == 0) return 0.0;
+    return (gstAmount / taxableSubtotal) * 100.0;
   }
 
-  double get gstAmount => (baseAmount + amcAmount) * (gstPercent / 100);
-  double get netAmount => baseAmount + amcAmount + gstAmount;
+  // Display fields for UI/Excel
+  double get baseAmount => value26 + baseValue10 + baseValue5;
 
   bool get isValid =>
       product != null && (bags26 > 0 || bags10 > 0 || bags5 > 0) && rate > 0;
@@ -62,7 +94,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   int _currentStep = 1;
   DateTime _loadingDate = DateTime.now();
   final TextEditingController _capacityController =
-      TextEditingController(text: '210.0');
+      TextEditingController(text: '110.0');
   final List<CustomerLoadFormData> _customers = [];
   bool _sendEmail = true;
   bool _isSaving = false;
@@ -171,14 +203,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     }
   }
 
-  double get _totalQtl => _customers.fold(0, (sum, c) => sum + c.totalQtl);
+  double get _totalQtl => _customers.fold(0.0, (sum, c) => sum + c.totalQtl);
   double get _totalAmount =>
-      _customers.fold(0, (sum, c) => sum + c.totalAmount);
-  double get _capacity => double.tryParse(_capacityController.text) ?? 210.0;
+      _customers.fold(0.0, (sum, c) => sum + (c.isValid ? c.totalAmount : 0.0));
+  double get _capacity => double.tryParse(_capacityController.text) ?? 110.0;
 
   Future<void> _saveLorryOrder() async {
     if (_customers.every((c) => !c.isValid)) {
-      _showError('Please add at least one customer with valid items');
+      _showError('valid_items_required'.tr(ref));
       return;
     }
 
@@ -253,10 +285,13 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Lorry Order saved successfully!'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('saved_successfully'.tr(ref)),
             backgroundColor: AppTheme.success));
-        Navigator.pop(context);
+
+        // Show success and offering sharing options
+        setState(() => _currentStep = 3); // A final success/share step?
+        // For now let's just go back or stay on review with sharing buttons enabled.
 
         if (_sendEmail) {
           await Future.delayed(const Duration(milliseconds: 300));
@@ -264,16 +299,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             final shouldShare = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
-                title: const Text('Share Order'),
-                content: const Text(
-                    'Would you like to share this order with the mill now?'),
+                title: Text('share'.tr(ref)),
+                content: Text('share_with_mill_confirm'.tr(ref)),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Later')),
+                      child: Text('later'.tr(ref))),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Share Now')),
+                      child: Text('share_now'.tr(ref))),
                 ],
               ),
             );
@@ -281,14 +315,16 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             if (shouldShare == true && context.mounted) {
               await EmailService.shareOrderExcel(
                   filePath: excelPath,
-                  customerName: "Multi-Customer Lorry",
+                  customerName: 'multi_customer_lorry'.tr(ref),
                   orderNumber: _orderNumber ?? lorryId);
             }
           }
         }
+
+        if (mounted) Navigator.pop(context);
       }
     } catch (e) {
-      _showError('Failed to save order: $e');
+      _showError('${'failed_to_save_order'.tr(ref)}: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -299,20 +335,59 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         SnackBar(content: Text(message), backgroundColor: AppTheme.error));
   }
 
+  void _validateAndReview() {
+    // 1. Check for at least one customer
+    if (_customers.isEmpty) {
+      _showError('valid_items_required'.tr(ref));
+      return;
+    }
+
+    for (var c in _customers) {
+      // 2. Check each customer has items
+      if (c.items.isEmpty) {
+        _showError('${c.customer?.shopName}: Add at least one item');
+        return;
+      }
+
+      for (var item in c.items) {
+        // 3. Check for valid Product
+        if (item.product == null) {
+          _showError('Select a product for all items');
+          return;
+        }
+
+        // 4. Check for Rate > 0
+        if (item.rate <= 0) {
+          _showError('Rate must be greater than 0');
+          return;
+        }
+
+        // 5. Check for Bags > 0 (at least one type)
+        if ((item.bags26 + item.bags10 + item.bags5) <= 0) {
+          _showError('Enter quantity for at least one bag type');
+          return;
+        }
+      }
+    }
+
+    setState(() => _currentStep = 2);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppTheme.offWhite,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: SafeText(
-            _currentStep == 1 ? 'Build Lorry Load' : 'Review & Send',
+            _currentStep == 1 ? 'build_lorry'.tr(ref) : 'review_send'.tr(ref),
             style: const TextStyle(fontSize: 18)),
         actions: [
           if (_currentStep == 1)
             TextButton.icon(
-              onPressed: () => setState(() => _currentStep = 2),
+              onPressed: _validateAndReview,
               icon: const Icon(Icons.arrow_forward),
-              label: const Text('Review'),
+              label: Text('review'.tr(ref)),
             )
           else
             FilledButton.icon(
@@ -324,29 +399,44 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.send),
-              label: const Text('Save & Send'),
+              label: Text('save_send'.tr(ref)),
             ),
           const SizedBox(width: 8),
         ],
       ),
-      body: _currentStep == 1 ? _buildLorryBuilder() : _buildReviewPage(),
+      body: _currentStep == 1
+          ? _buildLorryBuilder()
+          : (_currentStep == 2 || _currentStep == 3
+              ? _buildReviewPage()
+              : null),
       bottomNavigationBar:
           _currentStep == 1 ? _buildLorryProgressFooter() : null,
     );
   }
 
   Widget _buildLorryBuilder() {
+    final theme = Theme.of(context);
     return SafePage(
-      backgroundColor: AppTheme.offWhite,
+      backgroundColor: theme.scaffoldBackgroundColor,
       child: SafeColumn(
         children: [
           // Lorry Info Card
           SafeCard(
+            color: theme.cardColor,
             child: SafeColumn(
               children: [
                 SafeRow(
-                  leading: _buildInfoItem(
-                      'Order #', _orderNumber ?? '...', Icons.tag),
+                  leading: Expanded(
+                    child: TextFormField(
+                      initialValue: _orderNumber,
+                      decoration: InputDecoration(
+                        labelText: 'order_no'.tr(ref),
+                        prefixIcon: const Icon(Icons.tag),
+                        border: InputBorder.none,
+                      ),
+                      onChanged: (v) => _orderNumber = v,
+                    ),
+                  ),
                   trailing: InkWell(
                     onTap: () async {
                       final date = await showDatePicker(
@@ -357,7 +447,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                       if (date != null) setState(() => _loadingDate = date);
                     },
                     child: _buildInfoItem(
-                        'Loading Date',
+                        'loading_date'.tr(ref),
                         DateFormat('dd MMM yyyy').format(_loadingDate),
                         Icons.calendar_today),
                   ),
@@ -366,10 +456,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                 TextField(
                   controller: _capacityController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Lorry Capacity (QTL)',
-                    prefixIcon: Icon(Icons.balance),
-                    helperText: 'Used to calculate fill progress',
+                  decoration: InputDecoration(
+                    labelText: 'lorry_capacity'.tr(ref),
+                    prefixIcon: const Icon(Icons.balance),
+                    helperText: 'lorry_capacity_helper'.tr(ref),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -380,12 +470,13 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
           // Customers Header
           SafeRow(
-            leading: const Text('Step 2: Add Customers',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            leading: SafeText('step_2_add_customers'.tr(ref),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             trailing: TextButton.icon(
               onPressed: () => _addCustomer(),
               icon: const Icon(Icons.person_add, size: 20),
-              label: const Text('Add Party'),
+              label: Text('add_party'.tr(ref)),
             ),
           ),
           const SizedBox(height: 12),
@@ -404,23 +495,25 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Widget _buildCustomerCard(int index, CustomerLoadFormData data) {
     final db = ref.watch(databaseProvider);
+    final theme = Theme.of(context);
 
     return SafeCard(
       padding: EdgeInsets.zero,
+      color: theme.cardColor,
       child: SafeColumn(
         children: [
           SafeListTile(
             onTap: () => setState(() => data.isExpanded = !data.isExpanded),
             leading: CircleAvatar(
-              backgroundColor: AppTheme.paleGreen,
+              backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
               radius: 16,
               child: Text('${index + 1}',
-                  style: const TextStyle(
-                      color: AppTheme.primaryGreen,
+                  style: TextStyle(
+                      color: theme.primaryColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 13)),
             ),
-            title: data.customer?.shopName ?? 'Select Customer',
+            title: data.customer?.shopName ?? 'select_customer'.tr(ref),
             subtitle: data.customer?.place,
             trailing:
                 Icon(data.isExpanded ? Icons.expand_less : Icons.expand_more),
@@ -444,7 +537,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                             onTap: () => controller.openView(),
                             onChanged: (_) => controller.openView(),
                             leading: const Icon(Icons.search),
-                            hintText: 'Search Shop or Phone...',
+                            hintText: 'search_hint'.tr(ref),
                           ),
                           suggestionsBuilder: (context, controller) {
                             final keyword = controller.text.toLowerCase();
@@ -470,14 +563,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                     ),
                   if (data.customer != null) ...[
                     SafeRow(
-                      leading: const Text('Rice Varieties',
-                          style: TextStyle(
+                      leading: SafeText('rice_varieties'.tr(ref),
+                          style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 14)),
                       trailing: TextButton.icon(
                         onPressed: () =>
                             setState(() => data.items.add(OrderItemFormData())),
                         icon: const Icon(Icons.add_circle_outline, size: 20),
-                        label: const Text('Add Rice'),
+                        label: Text('add_rice'.tr(ref)),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -499,24 +592,26 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                          color: AppTheme.paleGreen,
+                          color: theme.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8)),
                       child: SafeRow(
-                        leading: const Text('SUB-TOTAL',
+                        leading: SafeText('sub_total'.tr(ref).toUpperCase(),
                             style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryGreen)),
+                                color: theme.primaryColor)),
                         trailing: SafeWrap(
                           children: [
-                            Text('${data.totalQtl.toStringAsFixed(2)} QTL',
+                            SafeText(
+                                '${data.totalQtl.toStringAsFixed(2)} ${'qtl_short'.tr(ref)}',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold)),
                             const SizedBox(width: 8),
-                            Text('₹${data.totalAmount.toStringAsFixed(0)}',
-                                style: const TextStyle(
+                            SafeText(
+                                '${ref.watch(settingsProvider).currencySymbol}${data.totalAmount.toStringAsFixed(0)}',
+                                style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryGreen)),
+                                    color: theme.primaryColor)),
                           ],
                         ),
                       ),
@@ -530,7 +625,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                           TextButton.styleFrom(foregroundColor: AppTheme.error),
                       onPressed: () => _removeCustomer(index),
                       icon: const Icon(Icons.delete_outline, size: 20),
-                      label: const Text('Remove Party'),
+                      label: Text('remove_party'.tr(ref)),
                     ),
                   ),
                 ],
@@ -546,16 +641,17 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       decoration: BoxDecoration(
-          color: AppTheme.lightGrey, borderRadius: BorderRadius.circular(4)),
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(4)),
       child: Row(
         children: [
-          _columnHeader('Rice Variety', 140, align: TextAlign.left),
-          _columnHeader('26kg', 60),
-          _columnHeader('10kg', 60),
-          _columnHeader('5kg', 60),
-          _columnHeader('Rate', 80),
-          _columnHeader('QTL', 60),
-          _columnHeader('Amount', 100, align: TextAlign.right),
+          _columnHeader('rice_variety'.tr(ref), 140, align: TextAlign.left),
+          _columnHeader('26kg'.tr(ref), 60),
+          _columnHeader('10kg'.tr(ref), 60),
+          _columnHeader('5kg'.tr(ref), 60),
+          _columnHeader('rate_100kg'.tr(ref), 80),
+          _columnHeader('qtl'.tr(ref), 60),
+          _columnHeader('amount'.tr(ref), 100, align: TextAlign.right),
           const SizedBox(width: 40),
         ],
       ),
@@ -573,13 +669,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Widget _buildItemRow(
       CustomerLoadFormData data, int index, OrderItemFormData item) {
-    final products = ref
+    final theme = Theme.of(context);
+    final productsStream = ref
         .read(databaseProvider)
         .select(ref.read(databaseProvider).products)
         .get();
 
     return FutureBuilder<List<Product>>(
-        future: products,
+        future: productsStream,
         builder: (context, snapshot) {
           final list = snapshot.data ?? [];
           return Padding(
@@ -590,12 +687,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                   width: 140,
                   child: DropdownButtonHideUnderline(
                     child: DropdownButtonFormField<Product>(
-                      value: item.product,
+                      initialValue: item.product,
                       isExpanded: true,
                       decoration: const InputDecoration(
                           contentPadding: EdgeInsets.zero,
                           border: InputBorder.none),
-                      style: const TextStyle(fontSize: 13, color: Colors.black),
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: theme.textTheme.bodyLarge?.color),
                       items: list
                           .map((p) => DropdownMenuItem(
                               value: p,
@@ -625,7 +724,8 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                         textAlign: TextAlign.center)),
                 SizedBox(
                     width: 100,
-                    child: Text('₹${item.netAmount.toStringAsFixed(0)}',
+                    child: Text(
+                        '${ref.watch(settingsProvider).currencySymbol}${item.netAmount.toStringAsFixed(0)}',
                         style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.bold),
                         textAlign: TextAlign.right)),
@@ -644,6 +744,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Widget _itemInput(double width, num value, Function(String) onChanged,
       {bool isDouble = false}) {
+    final theme = Theme.of(context);
     final initial = value == 0
         ? ''
         : (isDouble ? value.toStringAsFixed(0) : value.toString());
@@ -658,7 +759,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
           contentPadding: const EdgeInsets.symmetric(vertical: 8),
           isDense: true,
           filled: true,
-          fillColor: Colors.white,
+          fillColor: theme.inputDecorationTheme.fillColor ?? Colors.white,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
               borderSide: const BorderSide(color: AppTheme.lightGrey)),
@@ -671,9 +772,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   }
 
   Widget _buildLorryProgressFooter() {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: const Border(top: BorderSide(color: AppTheme.lightGrey)),
         boxShadow: [
           BoxShadow(
@@ -686,13 +788,13 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: SafeProgress(
-            label: 'Lorry Fill Progress',
+            label: 'lorry_fill'.tr(ref),
             value: _totalQtl,
             max: _capacity,
             suffix: 'QTL',
             color: _totalQtl / _capacity > 0.9
                 ? Colors.orange
-                : AppTheme.primaryGreen,
+                : theme.primaryColor,
           ),
         ),
       ),
@@ -700,86 +802,173 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   }
 
   Widget _buildReviewPage() {
+    final theme = Theme.of(context);
     return SafePage(
+      backgroundColor: theme.scaffoldBackgroundColor,
       child: SafeColumn(
         children: [
           SafeCard(
+            color: theme.cardColor,
             child: SafeColumn(
               children: [
-                _summaryRow('Total Customers',
+                _summaryRow('total_customers'.tr(ref),
                     '${_customers.where((c) => c.isValid).length}'),
-                _summaryRow(
-                    'Total Weight', '${_totalQtl.toStringAsFixed(2)} QTL'),
-                _summaryRow(
-                    'Total Value', '₹${_totalAmount.toStringAsFixed(0)}',
-                    isPrimary: true),
+                _summaryRow('total_weight'.tr(ref),
+                    '${_totalQtl.toStringAsFixed(2)} QTL'),
+                _summaryRow('total_value'.tr(ref),
+                    '${ref.watch(settingsProvider).currencySymbol}${_totalAmount.toStringAsFixed(0)}',
+                    isTotal: true),
                 const Divider(height: 32),
                 SwitchListTile(
-                  title: const Text('Send Email to Mill'),
+                  title: Text('send_to_mill'.tr(ref)),
                   value: _sendEmail,
                   onChanged: (v) => setState(() => _sendEmail = v),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          const Text('Customer Breakdown',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          ..._customers.where((c) => c.isValid).map((c) => SafeCard(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: EdgeInsets.zero,
-                child: SafeListTile(
-                  title: c.customer!.shopName,
-                  subtitle:
-                      '${c.items.length} Varieties - ${c.totalQtl.toStringAsFixed(2)} QTL',
-                  trailing: SafeText('₹${c.totalAmount.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryGreen)),
+          const SizedBox(height: 24),
+
+          // WhatsApp Summary Action
+          SafeCard(
+            color: theme.primaryColor.withValues(alpha: 0.1),
+            child: SafeColumn(
+              children: [
+                FilledButton.icon(
+                  onPressed: _sendWhatsAppSummary,
+                  icon: const Icon(Icons.chat),
+                  label: Text('whatsapp_summary'.tr(ref)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
                 ),
-              )),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => setState(() => _currentStep = 1),
-              child: const Text('Back to Editing'),
+                const SizedBox(height: 12),
+                SafeText('whatsapp_summary_helper'.tr(ref),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: AppTheme.grey)),
+              ],
             ),
           ),
+
+          const SizedBox(height: 24),
+          TextButton.icon(
+            onPressed: () => setState(() => _currentStep = 1),
+            icon: const Icon(Icons.edit),
+            label: Text('back_to_editing'.tr(ref)),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  Widget _summaryRow(String label, String value, {bool isPrimary = false}) {
+  void _sendWhatsAppSummary() {
+    try {
+      final settings = ref.read(settingsProvider);
+      final validCustomers = _customers
+          .where((c) => c.customer != null)
+          .map((c) => c.customer!)
+          .toList();
+
+      final List<OrderItem> allItems = [];
+      for (var cLoad in _customers) {
+        if (cLoad.customer == null) continue;
+        for (var item in cLoad.items) {
+          if (item.isValid) {
+            allItems.add(OrderItem(
+              id: '',
+              orderId: '',
+              productId: item.product!.id,
+              customerId: cLoad.customer!.id,
+              bags26: item.bags26,
+              bags10: item.bags10,
+              bags5: item.bags5,
+              qtyKg: item.kgTotal,
+              qtyQtl: item.qtlTotal,
+              ratePerQtl: item.rate,
+              amcAmount: item.amcAmount,
+              amcPercent: item.amcPercent,
+              gstPercent: item.gstPercent,
+              gstAmount: item.gstAmount,
+              lineAmount: item.baseAmount,
+              netAmount: item.netAmount,
+            ));
+          }
+        }
+      }
+
+      final products = <Product>[];
+      for (var cLoad in _customers) {
+        for (var item in cLoad.items) {
+          if (item.product != null &&
+              !products.any((p) => p.id == item.product!.id)) {
+            products.add(item.product!);
+          }
+        }
+      }
+
+      final orderStub = Order(
+        id: '',
+        loadingDate: _loadingDate,
+        totalAmount: _totalAmount,
+        notes: _orderNumber,
+        lorryCapacity: _capacity,
+        amountPaid: 0,
+        paymentStatus: 'UNPAID',
+        isSynced: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        customerId: null,
+      );
+
+      WhatsAppService.sendLorrySummaryMessage(
+        customers: validCustomers,
+        order: orderStub,
+        allItems: allItems,
+        allProducts: products,
+        millContactPhone: settings.millContactPhone,
+        currencySymbol: settings.currencySymbol,
+      );
+    } catch (e) {
+      _showError('Error: $e');
+    }
+  }
+
+  Widget _summaryRow(String label, String value, {bool isTotal = false}) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: SafeRow(
-        leading: Text(label, style: const TextStyle(color: AppTheme.grey)),
+        leading: SafeText(label,
+            style: TextStyle(
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                fontSize: isTotal ? 16 : 14)),
         trailing: SafeText(value,
             style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: isPrimary ? 20 : 16,
-                color: isPrimary ? AppTheme.primaryGreen : AppTheme.charcoal)),
+                fontSize: isTotal ? 16 : 14,
+                color: isTotal ? theme.primaryColor : null)),
       ),
     );
   }
 
   Widget _buildInfoItem(String label, String value, IconData icon) {
-    return SafeColumn(
+    final theme = Theme.of(context);
+    return Row(
       children: [
-        SafeText(label,
-            style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.grey,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        SafeRow(
-          leading: Icon(icon, size: 14, color: AppTheme.primaryGreen),
-          trailing: SafeText(value,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Icon(icon, size: 16, color: theme.primaryColor),
+        const SizedBox(width: 8),
+        SafeColumn(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SafeText(label,
+                style: const TextStyle(fontSize: 10, color: AppTheme.grey)),
+            SafeText(value,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ],
         ),
       ],
     );

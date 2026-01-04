@@ -1,139 +1,194 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
+import '../services/translation_service.dart';
+import '../widgets/safe_widgets.dart';
 
 /// Product Gallery Screen - Showcases Sri Balaji Rice Mill Products
 /// Displays official product packaging and branding
-class ProductGalleryScreen extends StatelessWidget {
+class ProductGalleryScreen extends ConsumerWidget {
   const ProductGalleryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Our Products'),
-        backgroundColor: AppTheme.primaryGreen,
+        title: SafeText('our_products'.tr(ref)),
       ),
-      body: ListView(
+      body: SafePage(
         padding: const EdgeInsets.all(16),
-        children: [
-          // Header
-          const Text(
-            'Sri Balaji Rice Mill',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryGreen,
+        child: SafeColumn(
+          children: [
+            // Header
+            SafeText(
+              'mill_name'.tr(ref),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: theme.primaryColor,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Premium Quality Rice Products',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: AppTheme.grey,
+            const SizedBox(height: 8),
+            SafeText(
+              'premium_rice'.tr(ref),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppTheme.grey,
+              ),
             ),
-          ),
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-          // Product Lineup Banner
-          _buildProductCard(
-            title: 'Complete Product Range',
-            description:
-                'Galaxy, Gold Crop & Amaravathi brands offering premium quality rice varieties',
-            imagePath: 'assets/images/product_lineup_full.png',
-            height: 200,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Premium Galaxy Trio
-          _buildProductCard(
-            title: 'Galaxy Premium Collection',
-            description: 'HMT Jeera Rice • Sona Rice • Brown Rice',
-            imagePath: 'assets/images/galaxy_trio_premium.png',
-            height: 250,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Individual Products
-          const Text(
-            'Featured Products',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.charcoal,
+            // Product Lineup Banner
+            _buildProductCard(
+              context: context,
+              ref: ref,
+              title: 'complete_range'.tr(ref),
+              description: 'lineup_desc'.tr(ref),
+              imagePath: 'assets/images/product_lineup_full.png',
+              height: 200,
             ),
-          ),
-          const SizedBox(height: 16),
 
-          _buildProductGrid(context),
+            const SizedBox(height: 24),
 
-          const SizedBox(height: 32),
-
-          // Quality Assurance
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppTheme.paleGreen,
-              borderRadius: BorderRadius.circular(16),
+            // Premium Galaxy Trio
+            _buildProductCard(
+              context: context,
+              ref: ref,
+              title: 'premium_collection'.tr(ref),
+              description: 'premium_desc'.tr(ref),
+              imagePath: 'assets/images/galaxy_trio_premium.png',
+              height: 250,
             ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.verified,
-                  size: 48,
-                  color: AppTheme.primaryGreen,
+
+            const SizedBox(height: 24),
+
+            // Individual Products
+            SafeText(
+              'featured_products'.tr(ref),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: theme.textTheme.titleLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _buildProductGrid(context, ref),
+
+            const SizedBox(height: 32),
+
+            // Quality Assurance
+            // Quality Assurance - Premium Design
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.teal.shade50,
+                    Colors.white,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Quality Assurance',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '✓ FSSAI Certified\n✓ Japan Technology\n✓ Premium Quality Rice\n✓ Product of India',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.charcoal,
-                    height: 1.5,
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.verified, size: 32, color: Colors.teal),
+                      const SizedBox(width: 12),
+                      Text(
+                        'quality_assurance'.tr(ref),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal.shade800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _buildQualityBadge(
+                        context,
+                        icon: Icons.security,
+                        label: 'fssai_certified'.tr(ref),
+                        color: Colors.green,
+                      ),
+                      _buildQualityBadge(
+                        context,
+                        icon: Icons.precision_manufacturing,
+                        label: 'japan_technology'.tr(ref),
+                        color: Colors.blue,
+                      ),
+                      _buildQualityBadge(
+                        context,
+                        icon: Icons.diamond_outlined,
+                        label: 'premium_rice'.tr(ref),
+                        color: Colors.purple,
+                      ),
+                      _buildQualityBadge(
+                        context,
+                        icon: Icons.flag,
+                        label: 'product_of_india'.tr(ref),
+                        color: Colors.orange,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProductCard({
+    required BuildContext context,
+    required WidgetRef ref,
     required String title,
     required String description,
     required String imagePath,
     required double height,
   }) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: theme.brightness == Brightness.light
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeColumn(
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -142,23 +197,27 @@ class ProductGalleryScreen extends StatelessWidget {
               height: height,
               width: double.infinity,
               fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: height,
+                color: theme.primaryColor.withValues(alpha: 0.05),
+                child: const Icon(Icons.image, size: 48, color: AppTheme.grey),
+              ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: SafeColumn(
               children: [
-                Text(
+                SafeText(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.charcoal,
+                    color: theme.textTheme.titleMedium?.color,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                SafeText(
                   description,
                   style: const TextStyle(
                     fontSize: 14,
@@ -173,27 +232,28 @@ class ProductGalleryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProductGrid(BuildContext context) {
+  Widget _buildProductGrid(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final products = [
       {
-        'name': 'Galaxy Sona Rice',
+        'name': 'galaxy_sona'.tr(ref),
         'image': 'assets/images/galaxy_sona_rice.png',
-        'description': 'Premium Quality Sona Rice',
+        'description': 'sona_desc'.tr(ref),
       },
       {
-        'name': 'Galaxy HMT Jeera Rice',
+        'name': 'galaxy_hmt'.tr(ref),
         'image': 'assets/images/galaxy_hmt_jeera_yellow.png',
-        'description': 'Japan Technology',
+        'description': 'japan_tech'.tr(ref),
       },
       {
-        'name': 'Amaravathi HMT Jeera',
+        'name': 'amaravathi_hmt'.tr(ref),
         'image': 'assets/images/hmt_jeera_rice.png',
-        'description': 'Premium Quality',
+        'description': 'premium_quality'.tr(ref),
       },
       {
-        'name': 'Galaxy Brown Rice',
+        'name': 'galaxy_brown'.tr(ref),
         'image': 'assets/images/brown_rice.png',
-        'description': 'Healthy & Nutritious',
+        'description': 'healthy_nutritious'.tr(ref),
       },
     ];
 
@@ -211,15 +271,16 @@ class ProductGalleryScreen extends StatelessWidget {
         final product = products[index];
         return GestureDetector(
           onTap: () {
-            _showProductDetail(context, product);
+            _showProductDetail(context, product, ref);
           },
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.lightGrey),
+              border:
+                  Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
             ),
-            child: Column(
+            child: SafeColumn(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
@@ -229,33 +290,35 @@ class ProductGalleryScreen extends StatelessWidget {
                     child: Image.asset(
                       product['image']!,
                       fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: theme.primaryColor.withValues(alpha: 0.05),
+                        child: const Icon(Icons.image,
+                            size: 24, color: AppTheme.grey),
+                      ),
                     ),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: SafeColumn(
                     children: [
-                      Text(
+                      SafeText(
                         product['name']!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.charcoal,
+                          color: theme.textTheme.bodyLarge?.color,
                         ),
                         maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
+                      SafeText(
                         product['description']!,
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.grey,
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -268,20 +331,34 @@ class ProductGalleryScreen extends StatelessWidget {
     );
   }
 
-  void _showProductDetail(BuildContext context, Map<String, String> product) {
+  void _showProductDetail(
+      BuildContext context, Map<String, String> product, WidgetRef ref) {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (context) => Dialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               children: [
-                Image.asset(
-                  product['image']!,
-                  height: 400,
-                  width: double.infinity,
-                  fit: BoxFit.contain,
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.asset(
+                    product['image']!,
+                    height: 350,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 350,
+                      color: theme.primaryColor.withValues(alpha: 0.05),
+                      child: const Icon(Icons.image,
+                          size: 64, color: AppTheme.grey),
+                    ),
+                  ),
                 ),
                 Positioned(
                   top: 8,
@@ -298,19 +375,20 @@ class ProductGalleryScreen extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(
+              child: SafeColumn(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
+                  SafeText(
                     product['name']!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryGreen,
+                      color: theme.primaryColor,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  SafeText(
                     product['description']!,
                     style: const TextStyle(
                       fontSize: 14,
@@ -319,11 +397,11 @@ class ProductGalleryScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Sri Balaji Boiled and Raw Rice Mill',
-                    style: TextStyle(
+                  SafeText(
+                    'mill_full_name'.tr(ref),
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: AppTheme.charcoal,
+                      color: AppTheme.grey,
                       fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.center,
@@ -333,6 +411,55 @@ class ProductGalleryScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQualityBadge(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 24, color: color),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

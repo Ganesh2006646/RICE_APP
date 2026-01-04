@@ -55,9 +55,15 @@ class RiceAgentApp extends ConsumerWidget {
     );
 
     return MaterialApp(
-      title: 'RiceAgent',
+      title: 'RiceAgent Pro',
       debugShowCheckedModeBanner: false,
       theme: scaledTheme,
+      // Pass language to locale for system components (though manual translation is used primary)
+      locale: Locale(settings.language == 'Telugu'
+          ? 'te'
+          : (settings.language == 'Hindi'
+              ? 'hi'
+              : (settings.language == 'Tamil' ? 'ta' : 'en'))),
       home: const SplashScreen(),
     );
   }

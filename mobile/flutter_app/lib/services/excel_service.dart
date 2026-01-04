@@ -78,10 +78,10 @@ class ExcelService {
     cellM3.cellStyle =
         CellStyle(fontSize: 10, horizontalAlign: HorizontalAlign.Right);
 
-    // --- TABLE HEADERS (13 Columns mapped to indices 0-12) ---
+    // --- TABLE HEADERS (14 Columns mapped to indices 0-13) ---
     // Column Index Mapping:
     // 0: SL | 1: PARTY NAME | 2: PLACE | 3: TIN / GST | 4: CELL | 5: TYPE OF RICE
-    // 6: 26 KG BAGS | 7: 26 KG QTL | 8: 10 KG QTL | 9: 5 KG QTL | 10: TOTAL QTL | 11: RATE | 12: AMC (1%) | 13: GST | 14: EX INFO
+    // 6: 26 KG | 7: 10 KG | 8: 5 KG | 9: QTL | 10: RATE | 11: AMC | 12: GST | 13: EX INFO
 
     // Row 4: Main Header
     final mainHeaders = [
@@ -92,15 +92,14 @@ class ExcelService {
       'CELL',
       'TYPE OF RICE',
       '26 KG',
-      '26 KG',
       '10 KG',
       '5 KG',
-      'QTL',
+      'TOTAL',
+      'BASE RATE',
       'AMC',
       'GST',
       'EX INFO'
     ];
-    // Note: We'll actually use 14 columns to satisfy the "2 sub-columns for 26kg" requirement.
 
     for (int i = 0; i < mainHeaders.length; i++) {
       final cell =
@@ -108,8 +107,6 @@ class ExcelService {
       cell.value = TextCellValue(mainHeaders[i]);
       cell.cellStyle = headerStyle;
     }
-    sheet.merge(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 3),
-        CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 3));
 
     // Row 5: Sub Header
     final subHeaders = [
@@ -123,10 +120,10 @@ class ExcelService {
       'QTL',
       'QTL',
       'QTL',
-      'RATE',
+      'PER 100 KG',
       '1%',
-      '5%',
-      ''
+      'TAX',
+      'TOTAL'
     ];
     for (int i = 0; i < subHeaders.length; i++) {
       final cell =
@@ -149,7 +146,7 @@ class ExcelService {
       10.0,
       10.0,
       10.0,
-      10.0,
+      12.0,
       8.0,
       8.0,
       15.0
@@ -178,14 +175,10 @@ class ExcelService {
 
         final isFirstRow = i == 0;
 
-        // Calculations
-        final qtl26 = (item.bags26 * 26) / 100.0;
+        // Calculations (Strict Mill Logic)
         final qtl10 = (item.bags10 * 10) / 100.0;
         final qtl5 = (item.bags5 * 5) / 100.0;
-
-        // AMC is 1% fixed as per provided logic
-        final gstRate = item.gstPercent;
-        final exInfo = item.netAmount;
+        final totalQtl = item.qtyQtl;
 
         final rowData = [
           isFirstRow ? slNo.toString() : '-', // 0: SL
@@ -195,17 +188,21 @@ class ExcelService {
           isFirstRow ? (customer.phone ?? '-') : '-', // 4: CELL
           product.name, // 5: TYPE OF RICE
           item.bags26 > 0 ? item.bags26.toString() : '-', // 6: 26 KG BAGS
-          qtl26 > 0 ? qtl26.toStringAsFixed(2) : '-', // 7: 26 KG QTL
-          qtl10 > 0 ? qtl10.toStringAsFixed(2) : '-', // 8: 10 KG QTL
-          qtl5 > 0 ? qtl5.toStringAsFixed(2) : '-', // 9: 5 KG QTL
+          qtl10 > 0 ? qtl10.toStringAsFixed(2) : '-', // 7: 10 KG QTL
+          qtl5 > 0 ? qtl5.toStringAsFixed(2) : '-', // 8: 5 KG QTL
+          totalQtl > 0 ? totalQtl.toStringAsFixed(2) : '-', // 9: TOTAL QTL
           item.ratePerQtl > 0
-              ? item.ratePerQtl.toStringAsFixed(0)
-              : '-', // 10: RATE (Under QTL header)
-          '1%', // 11: AMC (Under AMC header)
-          '${gstRate.toStringAsFixed(0)}%', // 12: GST (Under GST header)
-          exInfo.toStringAsFixed(2), // 13: EX INFO
+              ? item.ratePerQtl.toStringAsFixed(2)
+              : '-', // 10: BASE RATE
+          item.amcAmount > 0
+              ? item.amcAmount.toStringAsFixed(2)
+              : '-', // 11: AMC (1%)
+          item.gstAmount > 0
+              ? item.gstAmount.toStringAsFixed(2)
+              : '-', // 12: GST
+          item.netAmount
+              .toStringAsFixed(2), // 13: EX INFO (Grand Total for line)
         ];
-
         for (int j = 0; j < rowData.length; j++) {
           final cell = sheet.cell(
               CellIndex.indexByColumnRow(columnIndex: j, rowIndex: rowIndex));
@@ -253,5 +250,102 @@ class ExcelService {
 
     await sourceFile.copy(destPath);
     return destPath;
+  }
+
+  /// Generate a summary Excel for ALL orders (Statement)
+  static Future<String> generateAllOrdersExcel({
+    required List<OrderWithDetails> orders,
+    required List<Product> products,
+  }) async {
+    final excel = Excel.createExcel();
+    final sheet = excel['Orders Summary'];
+    excel.rename('Sheet1', 'Orders Summary');
+
+    final headerStyle = CellStyle(
+        bold: true,
+        horizontalAlign: HorizontalAlign.Center,
+        bottomBorder: Border(borderStyle: BorderStyle.Thin));
+    final moneyStyle = CellStyle(horizontalAlign: HorizontalAlign.Right);
+
+    // Headers
+    final headers = [
+      'DATE',
+      'ORDER #',
+      'CUSTOMERS',
+      'B10',
+      'B26',
+      'B5',
+      'QTL',
+      'TOTAL AMT'
+    ];
+    for (int i = 0; i < headers.length; i++) {
+      final cell =
+          sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+    }
+
+    double grandTotalQtl = 0;
+    double grandTotalAmt = 0;
+
+    for (int i = 0; i < orders.length; i++) {
+      final item = orders[i];
+      final row = i + 1;
+
+      final custNames = item.customers.map((c) => c.shopName).join(', ');
+      final date = DateFormat('dd-MM-yyyy').format(item.order.loadingDate);
+
+      // Sum items
+      double orderQtl = 0;
+      int b10 = 0, b26 = 0, b5 = 0;
+      for (var oi in item.items) {
+        b10 += oi.bags10;
+        b26 += oi.bags26;
+        b5 += oi.bags5;
+        orderQtl += oi.qtyQtl;
+      }
+
+      final data = [
+        date,
+        item.order.notes ?? item.order.id,
+        custNames,
+        b10.toString(),
+        b26.toString(),
+        b5.toString(),
+        orderQtl.toStringAsFixed(2),
+        item.order.totalAmount.toStringAsFixed(2)
+      ];
+
+      for (int j = 0; j < data.length; j++) {
+        final cell = sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: j, rowIndex: row));
+        cell.value = TextCellValue(data[j]);
+        if (j >= 6) cell.cellStyle = moneyStyle;
+      }
+
+      grandTotalQtl += orderQtl;
+      grandTotalAmt += item.order.totalAmount;
+    }
+
+    // Totals Row
+    final totalRowIdx = orders.length + 1;
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: totalRowIdx))
+        .value = TextCellValue('GRAND TOTAL:');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: totalRowIdx))
+        .value = TextCellValue(grandTotalQtl.toStringAsFixed(2));
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: totalRowIdx))
+        .value = TextCellValue(grandTotalAmt.toStringAsFixed(2));
+
+    final directory = await getApplicationDocumentsDirectory();
+    final fileName =
+        'All_Orders_Statement_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+    final filePath = '${directory.path}/$fileName';
+
+    final bytes = excel.save();
+    if (bytes != null) await File(filePath).writeAsBytes(bytes);
+    return filePath;
   }
 }

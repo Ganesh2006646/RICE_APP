@@ -187,6 +187,19 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
+class OrderWithDetails {
+  final Order order;
+  final List<Customer> customers;
+  final List<OrderItem> items;
+  final List<LorryShipment> shipments;
+
+  OrderWithDetails(
+      {required this.order,
+      required this.customers,
+      this.items = const [],
+      this.shipments = const []});
+}
+
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();

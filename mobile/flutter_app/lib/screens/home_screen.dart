@@ -11,6 +11,9 @@ import 'rice_varieties_screen.dart';
 import 'new_order_screen.dart';
 import 'orders_screen.dart';
 import 'settings_screen.dart';
+import 'product_gallery_screen.dart';
+import '../services/translation_service.dart';
+import '../providers/settings_provider.dart';
 
 /// Main Home Screen - Daily Order Dashboard for Rice Agent
 /// FOCUS: Order Creation + Excel Export Only
@@ -54,33 +57,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: _selectedIndex == 0
-            ? const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('RiceAgent',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis),
-                  Text('Lorry Order & Excel Export',
-                      style: TextStyle(fontSize: 11),
-                      overflow: TextOverflow.ellipsis),
-                ],
-              )
-            : Text(_getTitle(), overflow: TextOverflow.ellipsis),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => setState(() => _selectedIndex = 5),
-          ),
-        ],
-      ),
+      appBar: _selectedIndex == 0
+          ? null // No AppBar for Dashboard (Custom Header)
+          : AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
+              title: Text(_getTitle(), overflow: TextOverflow.ellipsis),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  onPressed: () => setState(() => _selectedIndex = 5),
+                ),
+              ],
+            ),
       drawer: _buildNavigationDrawer(),
       body: _getCurrentScreen(),
     );
@@ -89,23 +80,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _getTitle() {
     switch (_selectedIndex) {
       case 0:
-        return 'Dashboard';
+        return 'dashboard'.tr(ref);
       case 1:
-        return 'New Order';
+        return 'new_order'.tr(ref);
       case 2:
-        return 'Customers';
+        return 'customers'.tr(ref);
       case 3:
-        return 'Rice Varieties';
+        return 'rice_varieties'.tr(ref);
       case 4:
-        return 'Orders';
+        return 'orders'.tr(ref);
       case 5:
-        return 'Settings';
+        return 'settings'.tr(ref);
       default:
-        return 'Dashboard';
+        return 'dashboard'.tr(ref);
     }
   }
 
   Widget _buildNavigationDrawer() {
+    // ... (existing drawer code) ...
+    // Just omitting here for brevity in replacement, but ensure it matches original lines if not changing
+    // actually, replace_file_content needs exact match.
+    // Since I am modifying the build method to remove AppBar for dashboard, I need to be careful.
+    // Let's just modify the build method and the DailyDashboard.
+
+    // Actually, user wants "in main page rice agent asnd somthing remove it say good moring".
+    // So distinct header is better.
+
+    final theme = Theme.of(context);
     return NavigationDrawer(
       selectedIndex: _selectedIndex,
       onDestinationSelected: _onMenuTap,
@@ -122,7 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
-                  border: Border.all(color: AppTheme.primaryGreen, width: 2),
+                  border: Border.all(color: theme.primaryColor, width: 2),
                 ),
                 padding: const EdgeInsets.all(4),
                 child: ClipOval(
@@ -133,19 +134,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Sri Balaji Mill',
+              Text(
+                'mill_name'.tr(ref),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryGreen,
+                  color: theme.primaryColor,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const Text(
-                'Order & Excel Tool',
-                style: TextStyle(fontSize: 13, color: AppTheme.charcoal),
+              Text(
+                'mill_description'.tr(ref),
+                style: const TextStyle(fontSize: 13, color: AppTheme.grey),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -153,123 +154,236 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          label: Text('Dashboard'),
+        NavigationDrawerDestination(
+          icon: const Icon(Icons.dashboard_outlined),
+          label: Text('dashboard'.tr(ref)),
         ),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.add_shopping_cart_outlined),
-          label: Text('New Order'),
+        NavigationDrawerDestination(
+          icon: const Icon(Icons.add_shopping_cart_outlined),
+          label: Text('new_order'.tr(ref)),
         ),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.people_outline),
-          label: Text('Customers'),
+        NavigationDrawerDestination(
+          icon: const Icon(Icons.people_outline),
+          label: Text('customers'.tr(ref)),
         ),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.grass_outlined),
-          label: Text('Rice Varieties'),
+        NavigationDrawerDestination(
+          icon: const Icon(Icons.grass_outlined),
+          label: Text('rice_varieties'.tr(ref)),
         ),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.history_outlined),
-          label: Text('Orders'),
+        NavigationDrawerDestination(
+          icon: const Icon(Icons.history_outlined),
+          label: Text('orders'.tr(ref)),
         ),
         const Divider(indent: 20, endIndent: 20, height: 24),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.settings_outlined),
-          label: Text('Settings'),
+        NavigationDrawerDestination(
+          icon: const Icon(Icons.settings_outlined),
+          label: Text('settings'.tr(ref)),
         ),
       ],
     );
   }
 }
 
-/// Daily Dashboard - Simple Order Stats + Quick Actions
-/// USES SafePage for scrollable, overflow-free layout
 class DailyDashboard extends ConsumerWidget {
   const DailyDashboard({super.key});
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
+    final theme = Theme.of(context);
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
 
     return SafePage(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // TODAY'S ORDER STATS
-          _buildTodayStats(context, db, startOfDay),
-          const SizedBox(height: 24),
-
-          // QUICK ACTIONS
-          const Text(
-            'Quick Actions',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.charcoal,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // CUSTOM HEADER with Gradient & Dynamic Greeting
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.primaryColor,
+                    theme.primaryColor.withValues(alpha: 0.8)
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.primaryColor.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_getGreeting()},',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Narendra',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.menu, color: Colors.white),
+                          onPressed: () => Scaffold.of(context).openDrawer(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_user,
+                            color: Colors.white, size: 16),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            "ఒకసారి రుచి చూస్తే జీవిత కాలం వాడలేరు",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          _buildQuickActions(context),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // RECENT ORDERS
-          const Text(
-            'Recent Orders',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.charcoal,
+            // TODAY'S ORDER STATS
+            _buildTodayStats(context, ref, db, startOfDay),
+            const SizedBox(height: 24),
+
+            // QUICK ACTIONS
+            Text(
+              'quick_actions'.tr(ref),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          _buildRecentOrders(context, db),
-        ],
+            const SizedBox(height: 12),
+            _buildQuickActions(context, ref),
+
+            const SizedBox(height: 24),
+
+            // RECENT ORDERS
+            Text(
+              'recent_orders'.tr(ref),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            _buildRecentOrders(context, ref, db),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTodayStats(
-      BuildContext context, AppDatabase db, DateTime startOfDay) {
+  // ... _buildTodayStats ...
+  Widget _buildTodayStats(BuildContext context, WidgetRef ref, AppDatabase db,
+      DateTime startOfDay) {
     return StreamBuilder<List<Order>>(
       stream: (db.select(db.orders)
             ..where((tbl) => tbl.loadingDate.isBiggerOrEqualValue(startOfDay)))
           .watch(),
       builder: (context, snapshot) {
-        final todayOrders = snapshot.data ?? [];
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final todayOrders = snapshot.data!;
         final ordersCount = todayOrders.length;
 
-        return FutureBuilder<double>(
-          future: _getTodayTotalQtl(db, startOfDay),
-          builder: (context, qtlSnapshot) {
-            final totalQtl = qtlSnapshot.data ?? 0.0;
+        // Compute total QTL reactively from items associated with today's orders
+        return StreamBuilder<List<OrderItem>>(
+          stream: (db.select(db.orderItems)
+                ..where((tbl) =>
+                    tbl.orderId.isIn(todayOrders.map((o) => o.id).toList())))
+              .watch(),
+          builder: (context, itemsSnapshot) {
+            final items = itemsSnapshot.data ?? [];
+            final totalQtl = items.fold(0.0, (sum, item) => sum + item.qtyQtl);
 
-            // Use Wrap instead of Row to prevent overflow
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            return Row(
               children: [
-                _buildStatCard(
-                  context: context,
-                  icon: Icons.local_shipping_outlined,
-                  label: 'Orders Today',
-                  value: ordersCount.toString(),
-                  color: Colors.blue,
+                Expanded(
+                  child: _buildStatCard(
+                    context: context,
+                    icon: Icons.local_shipping_outlined,
+                    label: 'orders_today'.tr(ref),
+                    value: ordersCount.toString(),
+                    color: Colors.blueAccent,
+                  ),
                 ),
-                _buildStatCard(
-                  context: context,
-                  icon: Icons.scale_outlined,
-                  label: 'Total QTL',
-                  value: totalQtl.toStringAsFixed(1),
-                  color: AppTheme.primaryGreen,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    context: context,
+                    icon: Icons.scale_outlined,
+                    label: 'total_qtl'.tr(ref),
+                    value: totalQtl.toStringAsFixed(1),
+                    color: Colors.orange,
+                  ),
                 ),
               ],
             );
@@ -279,27 +393,6 @@ class DailyDashboard extends ConsumerWidget {
     );
   }
 
-  Future<double> _getTodayTotalQtl(AppDatabase db, DateTime startOfDay) async {
-    try {
-      final orders = await (db.select(db.orders)
-            ..where((tbl) => tbl.loadingDate.isBiggerOrEqualValue(startOfDay)))
-          .get();
-
-      double totalQtl = 0.0;
-      for (final order in orders) {
-        final items = await (db.select(db.orderItems)
-              ..where((tbl) => tbl.orderId.equals(order.id)))
-            .get();
-        for (final item in items) {
-          totalQtl += item.qtyQtl;
-        }
-      }
-      return totalQtl;
-    } catch (e) {
-      return 0.0;
-    }
-  }
-
   Widget _buildStatCard({
     required BuildContext context,
     required IconData icon,
@@ -307,107 +400,119 @@ class DailyDashboard extends ConsumerWidget {
     required String value,
     required Color color,
   }) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardWidth = (screenWidth - 48) / 2; // Account for padding and gap
-
+    final theme = Theme.of(context);
     return Container(
-      width: cardWidth.clamp(120.0, 180.0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 32, color: color),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppTheme.grey),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+        ],
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Icon(icon, size: 48, color: color.withValues(alpha: 0.1)),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 24, color: color),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.headlineSmall?.color,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: AppTheme.grey),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActions(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    // First 4 items in Grid
+    final gridActions = [
+      (
+        Icons.add_circle_outline,
+        'new_order'.tr(ref),
+        theme.primaryColor,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const NewOrderScreen()))
+      ),
+      (
+        Icons.history,
+        'orders'.tr(ref),
+        Colors.orange,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const OrdersScreen()))
+      ),
+      (
+        Icons.people_outline,
+        'customers'.tr(ref),
+        Colors.purple,
+        () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const CustomersScreen()))
+      ),
+      (
+        Icons.collections_outlined,
+        'our_products'.tr(ref),
+        Colors.teal,
+        () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const ProductGalleryScreen()))
+      ),
+    ];
+
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                context: context,
-                icon: Icons.add_circle_outline,
-                label: 'New Order',
-                color: AppTheme.primaryGreen,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NewOrderScreen()),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionButton(
-                context: context,
-                icon: Icons.history,
-                label: 'Orders',
-                color: Colors.orange,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const OrdersScreen()),
-                ),
-              ),
-            ),
-          ],
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.3, // Taller tiles to prevent overflow
+          children: gridActions.map((a) {
+            return _buildActionButton(
+              context: context,
+              icon: a.$1,
+              label: a.$2,
+              color: a.$3,
+              onTap: a.$4 as VoidCallback,
+            );
+          }).toList(),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                context: context,
-                icon: Icons.people_outline,
-                label: 'Customers',
-                color: Colors.purple,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CustomersScreen()),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionButton(
-                context: context,
-                icon: Icons.settings_outlined,
-                label: 'Settings',
-                color: Colors.blueGrey,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-            ),
-          ],
+        // Settings as Full Width (Row Span 2 equivalent)
+        _buildActionButton(
+          context: context,
+          icon: Icons.settings_outlined,
+          label: 'settings'.tr(ref),
+          color: Colors.blueGrey,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          isFullWidth: true,
         ),
       ],
     );
@@ -419,39 +524,71 @@ class DailyDashboard extends ConsumerWidget {
     required String label,
     required Color color,
     required VoidCallback onTap,
+    bool isFullWidth = false,
   }) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        width: isFullWidth ? double.infinity : null,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 28, color: color),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
+          border: Border.all(color: color.withValues(alpha: 0.1)),
         ),
+        child: isFullWidth
+            ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(icon, size: 24, color: color),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: theme.textTheme.bodyLarge?.color,
+                  ),
+                ),
+              ])
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 28, color: color),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.bodyLarge?.color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
       ),
     );
   }
 
-  Widget _buildRecentOrders(BuildContext context, AppDatabase db) {
+  Widget _buildRecentOrders(
+      BuildContext context, WidgetRef ref, AppDatabase db) {
+    final theme = Theme.of(context);
     return StreamBuilder<List<Order>>(
       stream: (db.select(db.orders)
             ..orderBy([
@@ -467,21 +604,23 @@ class DailyDashboard extends ConsumerWidget {
 
         if (recentOrders.isEmpty) {
           return SafeCard(
+            color: theme.cardColor,
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.inbox_outlined, size: 40, color: AppTheme.grey),
-                SizedBox(height: 12),
+              children: [
+                const Icon(Icons.inbox_outlined,
+                    size: 40, color: AppTheme.grey),
+                const SizedBox(height: 12),
                 Text(
-                  'No orders yet',
-                  style: TextStyle(fontSize: 15, color: AppTheme.grey),
+                  'no_orders'.tr(ref),
+                  style: const TextStyle(fontSize: 15, color: AppTheme.grey),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Tap "New Order" to create your first order',
-                  style: TextStyle(fontSize: 12, color: AppTheme.grey),
+                  'no_orders_helper'.tr(ref),
+                  style: const TextStyle(fontSize: 12, color: AppTheme.grey),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -497,7 +636,7 @@ class DailyDashboard extends ConsumerWidget {
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppTheme.lightGrey),
               ),
@@ -508,11 +647,11 @@ class DailyDashboard extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppTheme.paleGreen,
+                    color: theme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.local_shipping,
-                      color: AppTheme.primaryGreen, size: 20),
+                  child: Icon(Icons.local_shipping,
+                      color: theme.primaryColor, size: 20),
                 ),
                 title: Text(
                   order.notes ?? 'Order',
@@ -521,22 +660,31 @@ class DailyDashboard extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                subtitle: Text(
-                  DateFormat('dd MMM yyyy').format(order.loadingDate),
-                  style: const TextStyle(fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('dd MMM yyyy').format(order.loadingDate),
+                      style: const TextStyle(fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (order.notes != null)
+                      Text(
+                        order.notes!,
+                        style:
+                            const TextStyle(fontSize: 12, color: AppTheme.grey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
-                trailing: Text(
-                  '₹${_formatAmount(order.totalAmount)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: AppTheme.primaryGreen,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                trailing: SafeText(
+                    '${ref.watch(settingsProvider).currencySymbol}${order.totalAmount.toStringAsFixed(0)}',
+                    style: TextStyle(
+                        color: theme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16)),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const OrdersScreen()),
@@ -547,14 +695,5 @@ class DailyDashboard extends ConsumerWidget {
         );
       },
     );
-  }
-
-  String _formatAmount(double amount) {
-    if (amount >= 100000) {
-      return '${(amount / 100000).toStringAsFixed(1)}L';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(0)}K';
-    }
-    return amount.toStringAsFixed(0);
   }
 }
