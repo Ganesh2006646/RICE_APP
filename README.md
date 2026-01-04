@@ -47,19 +47,42 @@ chmod +x build_release.sh
 ./build_release.sh
 ```
 
-**Manual Build:**
+**Manual Build (Universal APK):**
 ```bash
-cd mobile/flutter_app
 flutter build apk --release
 ```
 
-**Build Optimization:**
-- Material Icons font is automatically tree-shaken during release builds
-- Reduces font size from ~1.6MB to ~10KB (99.4% reduction)
-- Only icons actually used in the app are included
-- This optimization is enabled by default in Flutter release builds
+**Optimized Build (Split per ABI - Recommended):**
+```bash
+flutter build apk --release --split-per-abi
+```
 
-**Output:** `build/app/outputs/flutter-apk/app-release.apk` (~63MB)
+### APK Size Optimization
+
+The app is optimized for smaller APK size with:
+- **Code shrinking (R8/ProGuard)** - Removes unused code
+- **Resource shrinking** - Removes unused resources
+- **Split APKs per architecture** - Each device downloads only what it needs
+
+| APK Type | Size |
+|----------|------|
+| Universal APK | ~63MB |
+| **arm64-v8a** (most devices) | **~25MB** |
+| armeabi-v7a (older devices) | ~23MB |
+| x86_64 (emulators) | ~26MB |
+
+**Output Location:** `build/app/outputs/flutter-apk/`
+
+## Adding Data (Customers & Rice Varieties)
+
+The app stores data locally in SQLite. Add data using the built-in screens:
+
+| Data Type | How to Add |
+|-----------|------------|
+| **Customers** | Home → Customers → (+) Add Customer |
+| **Rice Varieties** | Home → Rice Varieties → (+) Add Variety |
+
+No database editing required - everything is managed through the app UI!
 
 ## ML Service
 - Endpoint: `GET /recommend?customerId=...`

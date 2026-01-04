@@ -282,14 +282,11 @@ class DailyDashboard extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.verified_user,
-                            color: Colors.white, size: 16),
-                        const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             "ఒక్కసారి రుచిచూస్తే జీవితకాలం వదల్లేరు",
                             style: GoogleFonts.notoSerifTelugu(
-                              fontSize: 13,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                               fontStyle: FontStyle.italic,
