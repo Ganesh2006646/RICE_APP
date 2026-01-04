@@ -55,7 +55,7 @@ class RiceAgentApp extends ConsumerWidget {
     );
 
     return MaterialApp(
-      title: 'RiceAgent Pro',
+      title: 'Galaxy E-Orders',
       debugShowCheckedModeBanner: false,
       theme: scaledTheme,
       // Pass language to locale for system components (though manual translation is used primary)
