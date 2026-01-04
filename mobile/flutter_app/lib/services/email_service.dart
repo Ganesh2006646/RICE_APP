@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'settings_service.dart';
 
 /// Service for sending order emails via Gmail
 /// Uses share_plus for file attachment support
@@ -26,8 +25,6 @@ class EmailService {
         debugPrint('Error: File is empty');
         return false;
       }
-
-      final millEmail = recipientEmail ?? await SettingsService.getMillEmail();
 
       final subject = 'Order $orderNumber - $customerName';
       final body = '''

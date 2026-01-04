@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:drift/drift.dart' hide Column;
 import '../theme.dart';
@@ -278,16 +279,16 @@ class DailyDashboard extends ConsumerWidget {
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.verified_user,
+                        const Icon(Icons.verified_user,
                             color: Colors.white, size: 16),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            "ఒకసారి రుచి చూస్తే జీవిత కాలం వాడలేరు",
-                            style: TextStyle(
+                            "ఒక్కసారి రుచిచూస్తే జీవితకాలం వదల్లేరు",
+                            style: GoogleFonts.notoSerifTelugu(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,

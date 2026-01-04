@@ -295,7 +295,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
         if (_sendEmail) {
           await Future.delayed(const Duration(milliseconds: 300));
-          if (context.mounted) {
+          if (mounted) {
             final shouldShare = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
@@ -312,7 +312,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               ),
             );
 
-            if (shouldShare == true && context.mounted) {
+            if (shouldShare == true && mounted) {
               await EmailService.shareOrderExcel(
                   filePath: excelPath,
                   customerName: 'multi_customer_lorry'.tr(ref),
