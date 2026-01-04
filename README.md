@@ -26,13 +26,40 @@ Full-stack agent app for rice-mill orders.
    - Postgres: localhost:5432
 
 ## Mobile App Setup
-> **Note**: The APK was not built because the `flutter` tool was not available in the generation environment. Follow these steps to build it:
 
 1. Navigate to `mobile/flutter_app`.
-2. Run `flutter create .` to generate platform-specific files (android, ios, etc.).
-3. Run `flutter pub get`.
-4. Run `dart run build_runner build` to generate Drift database code (`database.g.dart`).
-5. Run `flutter run` to start the app on an emulator/device.
+2. Run `flutter pub get` to install dependencies.
+3. Run `dart run build_runner build` to generate Drift database code (`database.g.dart`).
+4. Run `flutter run` to start the app on an emulator/device.
+
+### Building Release APK
+
+**Windows:**
+```bash
+cd mobile/flutter_app
+build_release.bat
+```
+
+**Linux/Mac:**
+```bash
+cd mobile/flutter_app
+chmod +x build_release.sh
+./build_release.sh
+```
+
+**Manual Build:**
+```bash
+cd mobile/flutter_app
+flutter build apk --release
+```
+
+**Build Optimization:**
+- Material Icons font is automatically tree-shaken during release builds
+- Reduces font size from ~1.6MB to ~10KB (99.4% reduction)
+- Only icons actually used in the app are included
+- This optimization is enabled by default in Flutter release builds
+
+**Output:** `build/app/outputs/flutter-apk/app-release.apk` (~63MB)
 
 ## ML Service
 - Endpoint: `GET /recommend?customerId=...`
