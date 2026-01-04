@@ -386,7 +386,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Container(
                         width: 100,
                         height: 100,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white,
                         ),
@@ -436,11 +436,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Owner: Kankatala Narayana Murthy',
+                        'Established 1998 • 45+ Years of Excellence',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                           color: AppTheme.charcoal,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Jaggampeta, East Godavari\nAndhra Pradesh, India',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.email,
+                              size: 16, color: AppTheme.primaryGreen),
+                          SizedBox(width: 8),
+                          Text(
+                            'sbbrrm@gmail.com',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Part of Balaji Group of Industries',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: AppTheme.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Founded by Kotha Veerabhadra Rao & Kotha Narasimha Rao (Mohan Rao)\nContinued by Kotha Bhyarava Krishna, Kotha Sree Rama Krishna, Kotha Sudhir',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.grey,
                         ),
                       ),
                     ],

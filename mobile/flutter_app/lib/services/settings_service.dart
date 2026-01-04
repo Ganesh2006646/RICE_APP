@@ -7,10 +7,10 @@ class SettingsService {
   static const String _keyInvoicePrefix = 'invoice_prefix';
   static const String _keyAgentName = 'agent_name';
 
-  // Default values
-  static const String defaultMillEmail = 'mill@example.com';
-  static const String defaultInvoicePrefix = 'RA-2024-';
-  static const String defaultAgentName = 'Agent';
+  // Default values - Official Sri Balaji Rice Mill
+  static const String defaultMillEmail = 'sbbrrm@gmail.com';
+  static const String defaultInvoicePrefix = 'SBRM-2024-';
+  static const String defaultAgentName = 'Kankatala Narayana Murthy';
 
   /// Get the default mill email for sending orders
   static Future<String> getMillEmail() async {
