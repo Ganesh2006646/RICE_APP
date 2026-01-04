@@ -10,6 +10,7 @@ import 'rice_varieties_screen.dart';
 import 'new_order_screen.dart';
 import 'orders_screen.dart';
 import 'settings_screen.dart';
+import 'product_gallery_screen.dart';
 
 /// Main Home Screen - Daily Dashboard for Rice Agent
 class HomeScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 4:
         return const OrdersScreen();
       case 5:
+        return const ProductGalleryScreen();
+      case 6:
         return const SettingsScreen();
       default:
         return const DailyDashboard();
@@ -105,6 +108,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 4:
         return 'Orders';
       case 5:
+        return 'Product Gallery';
+      case 6:
         return 'Settings';
       default:
         return 'Dashboard';
@@ -181,6 +186,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         const NavigationDrawerDestination(
           icon: Icon(Icons.history_outlined),
           label: Text('Orders'),
+        ),
+        const NavigationDrawerDestination(
+          icon: Icon(Icons.photo_library_outlined),
+          label: Text('Product Gallery'),
         ),
         const Divider(indent: 20, endIndent: 20, height: 24),
         const NavigationDrawerDestination(

@@ -454,9 +454,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
+                      const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
+                        children: [
                           Icon(Icons.email,
                               size: 16, color: AppTheme.primaryGreen),
                           SizedBox(width: 8),
