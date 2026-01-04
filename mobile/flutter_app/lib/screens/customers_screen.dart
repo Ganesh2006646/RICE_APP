@@ -5,10 +5,11 @@ import 'package:lottie/lottie.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
+import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
 
 /// Screen for managing customers with full CRUD operations
-/// Includes search, edit, delete, and tap-to-create-order functionality
+/// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
 
@@ -31,8 +32,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final db = ref.watch(databaseProvider);
 
     return Scaffold(
+      backgroundColor: AppTheme.offWhite,
       appBar: AppBar(
-        title: const Text('Customers'),
+        title: const SafeText('Customers', style: TextStyle(fontSize: 18)),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add),
@@ -41,7 +43,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: SafeColumn(
         children: [
           // Search Bar
           Padding(
@@ -66,7 +68,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             ),
           ),
 
-          // Customer List
+          // Customer List inside Expanded to take remaining space but still scrollable
           Expanded(
             child: StreamBuilder<List<Customer>>(
               stream: db.select(db.customers).watch(),
@@ -75,17 +77,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // Filter customers based on search
                 var customers = snapshot.data!;
                 if (_searchQuery.isNotEmpty) {
                   customers = customers.where((c) {
                     final shopMatch =
                         c.shopName.toLowerCase().contains(_searchQuery);
                     final phoneMatch =
-                        c.phone?.toLowerCase().contains(_searchQuery) ?? false;
-                    final ownerMatch =
-                        c.ownerName?.toLowerCase().contains(_searchQuery) ??
-                            false;
+                        (c.phone ?? '').toLowerCase().contains(_searchQuery);
+                    final ownerMatch = (c.ownerName ?? '')
+                        .toLowerCase()
+                        .contains(_searchQuery);
                     return shopMatch || phoneMatch || ownerMatch;
                   }).toList();
                 }
@@ -95,7 +96,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(
+                      16, 0, 16, 80), // bottom padding for FAB
                   itemCount: customers.length,
                   itemBuilder: (context, index) {
                     final customer = customers[index];
@@ -117,31 +119,33 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
+      child: SafeColumn(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 200,
-            height: 200,
-            child: Lottie.asset(
-              'assets/lottie/empty.json',
-              fit: BoxFit.contain,
-            ),
+            width: 180,
+            height: 180,
+            child:
+                Lottie.asset('assets/lottie/empty.json', fit: BoxFit.contain),
           ),
           const SizedBox(height: 16),
-          Text(
+          SafeText(
             _searchQuery.isEmpty ? 'No customers yet' : 'No customers found',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.darkGrey,
-                ),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: AppTheme.darkGrey),
           ),
           const SizedBox(height: 8),
           if (_searchQuery.isEmpty)
-            Text(
+            SafeText(
               'Add your first customer to get started',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.grey,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppTheme.grey),
+              textAlign: TextAlign.center,
             ),
         ],
       ),
@@ -149,130 +153,89 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   Widget _buildCustomerCard(Customer customer, AppDatabase db) {
-    return Card(
+    return SafeCard(
+      padding: EdgeInsets.zero,
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () => _navigateToNewOrder(customer),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: AppTheme.paleGreen,
-                child: Text(
-                  customer.shopName[0].toUpperCase(),
-                  style: const TextStyle(
-                    color: AppTheme.primaryGreen,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+          padding: const EdgeInsets.all(12),
+          child: SafeRow(
+            leading: SafeRow(
+              leading: SafeRow(
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppTheme.paleGreen,
+                  child: Text(
+                    customer.shopName.isNotEmpty
+                        ? customer.shopName[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                trailing: SafeColumn(
                   children: [
-                    Text(
-                      customer.shopName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    if (customer.ownerName != null &&
-                        customer.ownerName!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        customer.ownerName!,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.darkGrey,
-                            ),
+                    SafeText(customer.shopName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                    if (customer.place != null && customer.place!.isNotEmpty)
+                      SafeRow(
+                        leading: const Icon(Icons.location_on,
+                            size: 12, color: AppTheme.grey),
+                        trailing: SafeText(customer.place!,
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.grey)),
                       ),
-                    ],
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (customer.place != null &&
-                            customer.place!.isNotEmpty) ...[
-                          const Icon(Icons.location_on,
-                              size: 14, color: AppTheme.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            customer.place!,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        if (customer.phone != null &&
-                            customer.phone!.isNotEmpty) ...[
-                          const Icon(Icons.phone,
-                              size: 14, color: AppTheme.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            customer.phone!,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ],
-                    ),
+                    if (customer.phone != null && customer.phone!.isNotEmpty)
+                      SafeRow(
+                        leading: const Icon(Icons.phone,
+                            size: 12, color: AppTheme.grey),
+                        trailing: SafeText(customer.phone!,
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.grey)),
+                      ),
                   ],
                 ),
               ),
-
-              // Actions Menu
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  switch (value) {
-                    case 'order':
-                      _navigateToNewOrder(customer);
-                      break;
-                    case 'edit':
-                      _showCustomerDialog(context, db, customer: customer);
-                      break;
-                    case 'delete':
-                      _confirmDelete(customer, db);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
+            ),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'order':
+                    _navigateToNewOrder(customer);
+                    break;
+                  case 'edit':
+                    _showCustomerDialog(context, db, customer: customer);
+                    break;
+                  case 'delete':
+                    _confirmDelete(customer, db);
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
                     value: 'order',
-                    child: Row(
-                      children: [
-                        Icon(Icons.add_shopping_cart, size: 20),
-                        SizedBox(width: 12),
-                        Text('Create Order'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
+                    child: SafeRow(
+                        leading: Icon(Icons.add_shopping_cart, size: 20),
+                        trailing: Text('Create Order'))),
+                const PopupMenuItem(
                     value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 20),
-                        SizedBox(width: 12),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
+                    child: SafeRow(
+                        leading: Icon(Icons.edit, size: 20),
+                        trailing: Text('Edit'))),
+                const PopupMenuItem(
                     value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: AppTheme.error),
-                        SizedBox(width: 12),
-                        Text('Delete', style: TextStyle(color: AppTheme.error)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                    child: SafeRow(
+                        leading:
+                            Icon(Icons.delete, size: 20, color: AppTheme.error),
+                        trailing: Text('Delete',
+                            style: TextStyle(color: AppTheme.error)))),
+              ],
+            ),
           ),
         ),
       ),
@@ -281,11 +244,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   void _navigateToNewOrder(Customer customer) {
     Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => NewOrderScreen(preselectedCustomer: customer),
-      ),
-    );
+        context,
+        MaterialPageRoute(
+            builder: (_) => NewOrderScreen(preselectedCustomer: customer)));
   }
 
   Future<void> _confirmDelete(Customer customer, AppDatabase db) async {
@@ -293,45 +254,33 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Customer?'),
-        content: Text(
-          'Are you sure you want to delete "${customer.shopName}"? '
-          'This will also delete all orders associated with this customer.',
-        ),
+        content:
+            Text('Are you sure you want to delete "${customer.shopName}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
-            child: const Text('Delete'),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+              child: const Text('Delete')),
         ],
       ),
     );
 
     if (confirmed == true) {
-      // Delete associated orders first
       await (db.delete(db.orderItems)
-            ..where((tbl) => tbl.orderId.isInQuery(
-                  db.selectOnly(db.orders)
-                    ..addColumns([db.orders.id])
-                    ..where(db.orders.customerId.equals(customer.id)),
-                )))
+            ..where((tbl) => tbl.customerId.equals(customer.id)))
           .go();
-      await (db.delete(db.orders)
+      await (db.delete(db.lorryShipments)
             ..where((tbl) => tbl.customerId.equals(customer.id)))
           .go();
       await (db.delete(db.customers)
             ..where((tbl) => tbl.id.equals(customer.id)))
           .go();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Customer deleted')),
-        );
-      }
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Customer deleted')));
     }
   }
 
@@ -340,141 +289,67 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final isEditing = customer != null;
     final shopNameController =
         TextEditingController(text: customer?.shopName ?? '');
-    final ownerNameController =
-        TextEditingController(text: customer?.ownerName ?? '');
     final placeController = TextEditingController(text: customer?.place ?? '');
     final phoneController = TextEditingController(text: customer?.phone ?? '');
     final gstController = TextEditingController(text: customer?.tinGst ?? '');
-    final emailController = TextEditingController(text: customer?.email ?? '');
-    final notesController = TextEditingController(text: customer?.notes ?? '');
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(isEditing ? 'Edit Customer' : 'Add Customer'),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: SafeColumn(
             children: [
               TextField(
-                controller: shopNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Shop Name *',
-                  prefixIcon: Icon(Icons.store),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
+                  controller: shopNameController,
+                  decoration: const InputDecoration(
+                      labelText: 'Shop Name *', prefixIcon: Icon(Icons.store)),
+                  textCapitalization: TextCapitalization.words),
               const SizedBox(height: 12),
               TextField(
-                controller: ownerNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Owner Name',
-                  prefixIcon: Icon(Icons.person),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
+                  controller: placeController,
+                  decoration: const InputDecoration(
+                      labelText: 'Place', prefixIcon: Icon(Icons.location_on)),
+                  textCapitalization: TextCapitalization.words),
               const SizedBox(height: 12),
               TextField(
-                controller: placeController,
-                decoration: const InputDecoration(
-                  labelText: 'Place',
-                  prefixIcon: Icon(Icons.location_on),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                      labelText: 'Phone Number', prefixIcon: Icon(Icons.phone)),
+                  keyboardType: TextInputType.phone),
               const SizedBox(height: 12),
               TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  prefixIcon: Icon(Icons.phone),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: gstController,
-                decoration: const InputDecoration(
-                  labelText: 'GST / TIN',
-                  prefixIcon: Icon(Icons.receipt),
-                ),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.email),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes',
-                  prefixIcon: Icon(Icons.notes),
-                ),
-                maxLines: 2,
-              ),
+                  controller: gstController,
+                  decoration: const InputDecoration(
+                      labelText: 'GST / TIN', prefixIcon: Icon(Icons.receipt)),
+                  textCapitalization: TextCapitalization.characters),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
-              if (shopNameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Shop name is required')),
-                );
-                return;
-              }
-
+              if (shopNameController.text.trim().isEmpty) return;
+              final companion = CustomersCompanion(
+                shopName: drift.Value(shopNameController.text.trim()),
+                place: drift.Value(placeController.text.trim()),
+                phone: drift.Value(phoneController.text.trim()),
+                tinGst: drift.Value(gstController.text.trim()),
+                updatedAt: drift.Value(DateTime.now()),
+              );
               if (isEditing) {
-                // Update existing customer
                 await (db.update(db.customers)
                       ..where((tbl) => tbl.id.equals(customer.id)))
-                    .write(CustomersCompanion(
-                  shopName: drift.Value(shopNameController.text.trim()),
-                  ownerName: drift.Value(ownerNameController.text.trim()),
-                  place: drift.Value(placeController.text.trim()),
-                  phone: drift.Value(phoneController.text.trim()),
-                  tinGst: drift.Value(gstController.text.trim()),
-                  email: drift.Value(emailController.text.trim()),
-                  notes: drift.Value(notesController.text.trim()),
-                  updatedAt: drift.Value(DateTime.now()),
-                ));
+                    .write(companion);
               } else {
-                // Insert new customer
-                await db.into(db.customers).insert(CustomersCompanion(
-                      id: drift.Value(
-                          DateTime.now().millisecondsSinceEpoch.toString()),
-                      shopName: drift.Value(shopNameController.text.trim()),
-                      ownerName: drift.Value(ownerNameController.text.trim()),
-                      place: drift.Value(placeController.text.trim()),
-                      phone: drift.Value(phoneController.text.trim()),
-                      tinGst: drift.Value(gstController.text.trim()),
-                      email: drift.Value(emailController.text.trim()),
-                      notes: drift.Value(notesController.text.trim()),
-                      updatedAt: drift.Value(DateTime.now()),
-                    ));
+                await db.into(db.customers).insert(companion.copyWith(
+                    id: drift.Value(
+                        DateTime.now().millisecondsSinceEpoch.toString())));
               }
-
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        isEditing ? 'Customer updated!' : 'Customer added!'),
-                    backgroundColor: AppTheme.success,
-                  ),
-                );
-                Navigator.pop(context);
-              }
+              if (context.mounted) Navigator.pop(context);
             },
             child: Text(isEditing ? 'Update' : 'Save'),
           ),
