@@ -4,6 +4,7 @@ import 'screens/splash_screen.dart';
 import 'db/database.dart';
 import 'services/seed_service.dart';
 import 'theme.dart';
+import 'providers/settings_provider.dart';
 
 /// Global database provider for Drift/SQLite access
 final databaseProvider = Provider<AppDatabase>((ref) => AppDatabase());
@@ -34,16 +35,29 @@ void main() async {
   }
 }
 
-/// Root application widget
-class RiceAgentApp extends StatelessWidget {
+/// Root application widget - now responds to settings changes
+class RiceAgentApp extends ConsumerWidget {
   const RiceAgentApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+
+    // Build theme based on settings
+    final baseTheme =
+        settings.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme;
+
+    // Apply font scaling
+    final scaledTheme = baseTheme.copyWith(
+      textTheme: baseTheme.textTheme.apply(
+        fontSizeFactor: settings.fontScale,
+      ),
+    );
+
     return MaterialApp(
       title: 'RiceAgent',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: scaledTheme,
       home: const SplashScreen(),
     );
   }

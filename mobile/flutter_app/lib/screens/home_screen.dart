@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:drift/drift.dart' as drift;
+import 'package:drift/drift.dart' hide Column;
 import '../theme.dart';
 import '../main.dart';
 import '../db/database.dart';
@@ -10,9 +10,10 @@ import 'rice_varieties_screen.dart';
 import 'new_order_screen.dart';
 import 'orders_screen.dart';
 import 'settings_screen.dart';
-import 'product_gallery_screen.dart';
 
-/// Main Home Screen - Daily Dashboard for Rice Agent
+/// Main Home Screen - Daily Order Dashboard for Rice Agent
+/// FOCUS: Order Creation + Excel Export Only
+/// NO: Payment tracking, due dates, accounting
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -37,8 +38,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 4:
         return const OrdersScreen();
       case 5:
-        return const ProductGalleryScreen();
-      case 6:
         return const SettingsScreen();
       default:
         return const DailyDashboard();
@@ -47,7 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _onMenuTap(int index) {
     setState(() => _selectedIndex = index);
-    Navigator.pop(context); // Close drawer
+    Navigator.pop(context);
   }
 
   @override
@@ -66,17 +65,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text('RiceAgent',
                       style:
                           TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text('Daily Order & Payment Tracker',
+                  Text('Lorry Order & Excel Export',
                       style: TextStyle(fontSize: 12)),
                 ],
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.language),
-                  onPressed: () {
-                    // TODO: Language toggle
-                  },
-                ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   onPressed: () => setState(() => _selectedIndex = 5),
@@ -108,8 +101,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 4:
         return 'Orders';
       case 5:
-        return 'Product Gallery';
-      case 6:
         return 'Settings';
       default:
         return 'Dashboard';
@@ -121,14 +112,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       selectedIndex: _selectedIndex,
       onDestinationSelected: _onMenuTap,
       children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(20, 50, 20, 30),
-          decoration: const BoxDecoration(
-            color: AppTheme.paleGreen,
-            borderRadius: BorderRadius.only(
-              bottomRight: Radius.circular(32),
-            ),
-          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -157,10 +142,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
               ),
               Text(
-                'Narayana Murthy',
+                'Order & Excel Tool',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppTheme.charcoal,
-                      fontWeight: FontWeight.w500,
                     ),
               ),
             ],
@@ -187,10 +171,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           icon: Icon(Icons.history_outlined),
           label: Text('Orders'),
         ),
-        const NavigationDrawerDestination(
-          icon: Icon(Icons.photo_library_outlined),
-          label: Text('Product Gallery'),
-        ),
         const Divider(indent: 20, endIndent: 20, height: 24),
         const NavigationDrawerDestination(
           icon: Icon(Icons.settings_outlined),
@@ -201,7 +181,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// Daily Dashboard Widget
+/// Daily Dashboard - Simple Order Stats + Quick Actions
+/// NO PAYMENT INFO - ORDER TOOL ONLY
 class DailyDashboard extends ConsumerWidget {
   const DailyDashboard({super.key});
 
@@ -213,27 +194,17 @@ class DailyDashboard extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        // Refresh data
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 300));
       },
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // SECTION 1: TODAY'S STATUS
-          const Text(
-            "Today's Status",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.charcoal,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildTodayStats(db, startOfDay),
+          // TODAY'S ORDER STATS
+          _buildTodayStats(context, db, startOfDay),
 
           const SizedBox(height: 32),
 
-          // SECTION 2: QUICK ACTIONS
+          // QUICK ACTIONS
           const Text(
             'Quick Actions',
             style: TextStyle(
@@ -247,21 +218,7 @@ class DailyDashboard extends ConsumerWidget {
 
           const SizedBox(height: 32),
 
-          // SECTION 3: PAYMENT ALERTS
-          const Text(
-            'Payment Follow-ups',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.charcoal,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildPaymentAlerts(db),
-
-          const SizedBox(height: 32),
-
-          // SECTION 4: RECENT ACTIVITY
+          // RECENT ORDERS
           const Text(
             'Recent Orders',
             style: TextStyle(
@@ -271,13 +228,14 @@ class DailyDashboard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildRecentOrders(db),
+          _buildRecentOrders(context, db),
         ],
       ),
     );
   }
 
-  Widget _buildTodayStats(AppDatabase db, DateTime startOfDay) {
+  Widget _buildTodayStats(
+      BuildContext context, AppDatabase db, DateTime startOfDay) {
     return StreamBuilder<List<Order>>(
       stream: (db.select(db.orders)
             ..where((tbl) => tbl.loadingDate.isBiggerOrEqualValue(startOfDay)))
@@ -285,48 +243,59 @@ class DailyDashboard extends ConsumerWidget {
       builder: (context, snapshot) {
         final todayOrders = snapshot.data ?? [];
         final ordersCount = todayOrders.length;
-        final totalValue =
-            todayOrders.fold<double>(0, (sum, o) => sum + o.totalAmount);
-        final amountReceived =
-            todayOrders.fold<double>(0, (sum, o) => sum + o.amountPaid);
-        final amountPending = totalValue - amountReceived;
 
-        return GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.3,
-          children: [
-            _buildStatCard(
-              icon: Icons.local_shipping_outlined,
-              label: 'Orders Today',
-              value: ordersCount.toString(),
-              color: Colors.blue,
-            ),
-            _buildStatCard(
-              icon: Icons.currency_rupee,
-              label: 'Total Value',
-              value: '₹${_formatAmount(totalValue)}',
-              color: AppTheme.primaryGreen,
-            ),
-            _buildStatCard(
-              icon: Icons.check_circle_outline,
-              label: 'Received',
-              value: '₹${_formatAmount(amountReceived)}',
-              color: Colors.green,
-            ),
-            _buildStatCard(
-              icon: Icons.pending_outlined,
-              label: 'Pending',
-              value: '₹${_formatAmount(amountPending)}',
-              color: amountPending > 0 ? Colors.orange : Colors.grey,
-            ),
-          ],
+        // Calculate total QTL from lorry shipments
+        return FutureBuilder<double>(
+          future: _getTodayTotalQtl(db, startOfDay),
+          builder: (context, qtlSnapshot) {
+            final totalQtl = qtlSnapshot.data ?? 0.0;
+
+            return Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    icon: Icons.local_shipping_outlined,
+                    label: 'Orders Today',
+                    value: ordersCount.toString(),
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
+                    icon: Icons.scale_outlined,
+                    label: 'Total QTL',
+                    value: totalQtl.toStringAsFixed(2),
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
+
+  Future<double> _getTodayTotalQtl(AppDatabase db, DateTime startOfDay) async {
+    try {
+      final orders = await (db.select(db.orders)
+            ..where((tbl) => tbl.loadingDate.isBiggerOrEqualValue(startOfDay)))
+          .get();
+
+      double totalQtl = 0.0;
+      for (final order in orders) {
+        final items = await (db.select(db.orderItems)
+              ..where((tbl) => tbl.orderId.equals(order.id)))
+            .get();
+        for (final item in items) {
+          totalQtl += item.qtyQtl;
+        }
+      }
+      return totalQtl;
+    } catch (e) {
+      return 0.0;
+    }
   }
 
   Widget _buildStatCard({
@@ -336,42 +305,31 @@ class DailyDashboard extends ConsumerWidget {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 32, color: color),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.grey,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
+          Icon(icon, size: 40, color: color),
+          const SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: color,
             ),
-            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppTheme.grey,
+            ),
           ),
         ],
       ),
@@ -397,31 +355,11 @@ class DailyDashboard extends ConsumerWidget {
                 },
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: _buildActionButton(
                 context: context,
-                icon: Icons.payment_outlined,
-                label: 'Add Payment',
-                color: Colors.blue,
-                onTap: () {
-                  // TODO: Navigate to payment screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Payment feature coming soon')),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                context: context,
-                icon: Icons.receipt_long_outlined,
+                icon: Icons.history,
                 label: 'Orders',
                 color: Colors.orange,
                 onTap: () {
@@ -432,7 +370,11 @@ class DailyDashboard extends ConsumerWidget {
                 },
               ),
             ),
-            const SizedBox(width: 12),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
             Expanded(
               child: _buildActionButton(
                 context: context,
@@ -443,6 +385,21 @@ class DailyDashboard extends ConsumerWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const CustomersScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildActionButton(
+                context: context,
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                color: Colors.blueGrey,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
               ),
@@ -460,20 +417,20 @@ class DailyDashboard extends ConsumerWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 24),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 36, color: color),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               label,
               style: TextStyle(
@@ -489,306 +446,104 @@ class DailyDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaymentAlerts(AppDatabase db) {
-    return StreamBuilder<List<Order>>(
-      stream: (db.select(db.orders)
-            ..where((tbl) =>
-                tbl.paymentStatus.equals('UNPAID') |
-                tbl.paymentStatus.equals('PARTIAL'))
-            ..orderBy([(tbl) => drift.OrderingTerm(expression: tbl.dueDate)]))
-          .watch(),
-      builder: (context, snapshot) {
-        final pendingOrders = snapshot.data ?? [];
-
-        if (pendingOrders.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.green.withOpacity(0.3)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 32),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    'All payments are clear today.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: pendingOrders.take(5).map((order) {
-            return FutureBuilder<List<Customer>>(
-              future: (db.select(db.lorryShipments).join([
-                drift.innerJoin(db.customers,
-                    db.customers.id.equalsExp(db.lorryShipments.customerId)),
-              ])
-                    ..where(db.lorryShipments.orderId.equals(order.id)))
-                  .get()
-                  .then((rows) =>
-                      rows.map((r) => r.readTable(db.customers)).toList()),
-              builder: (context, customerSnapshot) {
-                final customers = customerSnapshot.data ?? [];
-                final customerName =
-                    customers.isNotEmpty ? customers.first.shopName : 'Unknown';
-
-                return _buildPaymentAlertCard(
-                  customerName: customerName,
-                  amount: order.totalAmount - order.amountPaid,
-                  dueDate: order.dueDate,
-                  status: order.paymentStatus,
-                );
-              },
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildPaymentAlertCard({
-    required String customerName,
-    required double amount,
-    required DateTime? dueDate,
-    required String status,
-  }) {
-    final now = DateTime.now();
-    final isOverdue = dueDate != null && dueDate.isBefore(now);
-    final isDueToday = dueDate != null &&
-        dueDate.year == now.year &&
-        dueDate.month == now.month &&
-        dueDate.day == now.day;
-
-    Color statusColor = Colors.orange;
-    String statusText = 'UPCOMING';
-
-    if (isOverdue) {
-      statusColor = Colors.red;
-      statusText = 'OVERDUE';
-    } else if (isDueToday) {
-      statusColor = Colors.orange;
-      statusText = 'DUE TODAY';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customerName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '₹${_formatAmount(amount)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: statusColor,
-                  ),
-                ),
-                if (dueDate != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Due: ${DateFormat('dd MMM yyyy').format(dueDate)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.grey,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              statusText,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: statusColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentOrders(AppDatabase db) {
+  Widget _buildRecentOrders(BuildContext context, AppDatabase db) {
     return StreamBuilder<List<Order>>(
       stream: (db.select(db.orders)
             ..orderBy([
-              (tbl) => drift.OrderingTerm(
-                  expression: tbl.createdAt, mode: drift.OrderingMode.desc)
+              (tbl) => OrderingTerm(
+                    expression: tbl.createdAt,
+                    mode: OrderingMode.desc,
+                  )
             ])
-            ..limit(3))
+            ..limit(5))
           .watch(),
       builder: (context, snapshot) {
         final recentOrders = snapshot.data ?? [];
 
         if (recentOrders.isEmpty) {
           return Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
               color: AppTheme.lightGrey,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
-              child: Text(
-                'No orders yet. Create your first order!',
-                style: TextStyle(color: AppTheme.grey),
-              ),
+            child: const Column(
+              children: [
+                Icon(Icons.inbox_outlined, size: 48, color: AppTheme.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No orders yet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppTheme.grey,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Tap "New Lorry Order" to create your first order',
+                  style: TextStyle(fontSize: 13, color: AppTheme.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           );
         }
 
         return Column(
           children: recentOrders.map((order) {
-            return FutureBuilder<int>(
-              future: (db.select(db.lorryShipments)
-                    ..where((tbl) => tbl.orderId.equals(order.id)))
-                  .get()
-                  .then((shipments) => shipments.length),
-              builder: (context, customerCountSnapshot) {
-                final customerCount = customerCountSnapshot.data ?? 0;
-
-                return _buildRecentOrderCard(
-                  orderNo: order.notes ?? 'N/A',
-                  date: order.loadingDate,
-                  customerCount: customerCount,
-                  totalAmount: order.totalAmount,
-                  paymentStatus: order.paymentStatus,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const OrdersScreen()),
-                    );
-                  },
-                );
-              },
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.lightGrey),
+              ),
+              child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.paleGreen,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.local_shipping,
+                      color: AppTheme.primaryGreen),
+                ),
+                title: Text(
+                  order.notes ?? 'Order',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  DateFormat('dd MMM yyyy').format(order.loadingDate),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${_formatAmount(order.totalAmount)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                  );
+                },
+              ),
             );
           }).toList(),
         );
       },
-    );
-  }
-
-  Widget _buildRecentOrderCard({
-    required String orderNo,
-    required DateTime date,
-    required int customerCount,
-    required double totalAmount,
-    required String paymentStatus,
-    required VoidCallback onTap,
-  }) {
-    Color statusColor = AppTheme.primaryGreen;
-    if (paymentStatus == 'UNPAID') statusColor = Colors.red;
-    if (paymentStatus == 'PARTIAL') statusColor = Colors.orange;
-
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.lightGrey),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.paleGreen,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.receipt_long,
-                color: AppTheme.primaryGreen,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Order #$orderNo',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${DateFormat('dd MMM yyyy').format(date)} • $customerCount customers',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '₹${_formatAmount(totalAmount)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryGreen,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                paymentStatus,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: statusColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
