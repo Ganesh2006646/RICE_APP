@@ -15,7 +15,16 @@ class EmailService {
     String? recipientEmail,
   }) async {
     try {
+      // Check if file exists
       final file = XFile(filePath);
+
+      // Verify file can be accessed
+      final fileLength = await file.length();
+      if (fileLength == 0) {
+        debugPrint('Error: File is empty');
+        return false;
+      }
+
       final millEmail = recipientEmail ?? await SettingsService.getMillEmail();
 
       final subject = 'Order $orderNumber - $customerName';
@@ -35,15 +44,26 @@ Kankatala Narayana Murthy
 Sri Balaji Rice Mill
 ''';
 
-      await Share.shareXFiles(
+      final result = await Share.shareXFiles(
         [file],
         subject: subject,
         text: body,
       );
 
-      return true;
-    } catch (e) {
+      // Check if sharing was successful
+      if (result.status == ShareResultStatus.success) {
+        debugPrint('File shared successfully');
+        return true;
+      } else if (result.status == ShareResultStatus.dismissed) {
+        debugPrint('Share dismissed by user');
+        return false;
+      } else {
+        debugPrint('Share failed with status: ${result.status}');
+        return false;
+      }
+    } catch (e, stackTrace) {
       debugPrint('Error sharing file: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }

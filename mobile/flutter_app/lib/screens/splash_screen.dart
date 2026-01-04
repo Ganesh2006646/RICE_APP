@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme.dart';
 import 'home_screen.dart';
@@ -44,56 +43,69 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.white,
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Lottie Animation
-            SizedBox(
+            // Sri Balaji Logo
+            Container(
               width: 200,
               height: 200,
-              child: Lottie.asset(
-                'assets/lottie/splash.json',
-                fit: BoxFit.contain,
-                repeat: true,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.paleGreen.withOpacity(0.3),
               ),
-            ),
-            const SizedBox(height: 32),
-            // App Name with fade animation
+              padding: const EdgeInsets.all(20),
+              child: Image.asset(
+                'assets/images/sri_balaji_logo.png',
+                fit: BoxFit.contain,
+              ),
+            )
+                .animate()
+                .fadeIn(duration: 600.ms)
+                .scale(begin: const Offset(0.8, 0.8), duration: 600.ms),
+
+            const SizedBox(height: 40),
+
+            // Mill Name
             Text(
-              'RiceAgent',
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: AppTheme.primaryGreen,
+              'Sri Balaji',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryGreen,
                     letterSpacing: 1.5,
                   ),
             )
                 .animate()
-                .fadeIn(duration: 600.ms, delay: 300.ms)
-                .slideY(begin: 0.3, end: 0, duration: 600.ms, delay: 300.ms),
+                .fadeIn(delay: 300.ms, duration: 600.ms)
+                .slideY(begin: 0.3, end: 0),
+
             const SizedBox(height: 8),
-            // Tagline
+
             Text(
-              'Professional Rice Mill Agent',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppTheme.darkGrey,
+              'Boiled and Raw Rice Mill',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.charcoal,
+                    fontWeight: FontWeight.w500,
                   ),
             )
                 .animate()
-                .fadeIn(duration: 600.ms, delay: 600.ms)
-                .slideY(begin: 0.3, end: 0, duration: 600.ms, delay: 600.ms),
-            const SizedBox(height: 48),
+                .fadeIn(delay: 500.ms, duration: 600.ms)
+                .slideY(begin: 0.3, end: 0),
+
+            const SizedBox(height: 40),
+
             // Loading indicator
             const SizedBox(
-              width: 24,
-              height: 24,
+              width: 40,
+              height: 40,
               child: CircularProgressIndicator(
-                strokeWidth: 2.5,
+                strokeWidth: 3,
                 valueColor:
                     AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
               ),
-            ).animate().fadeIn(duration: 400.ms, delay: 900.ms),
+            ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
           ],
         ),
       ),

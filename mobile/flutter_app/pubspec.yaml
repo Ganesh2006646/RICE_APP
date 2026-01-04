@@ -33,6 +33,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/lottie/
+    - assets/images/
 
 dev_dependencies:
   flutter_test:

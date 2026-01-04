@@ -316,24 +316,72 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         orderNumber: _orderNumber ?? lorryId,
       );
 
-      // 4. Send Email
-      if (_sendEmail) {
-        await EmailService.shareOrderExcel(
-          filePath: excelPath,
-          customerName: "Multi-Customer Lorry",
-          orderNumber: _orderNumber ?? lorryId,
-        );
-      }
-
       if (mounted) {
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(_sendEmail
-                  ? 'Lorry Order saved & shared!'
-                  : 'Lorry Order saved!'),
+          const SnackBar(
+              content: Text('Lorry Order saved successfully!'),
               backgroundColor: AppTheme.success),
         );
+
+        // Navigate back first
         Navigator.pop(context);
+
+        // 4. Optionally share via email if toggle was on
+        if (_sendEmail) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (context.mounted) {
+            final shouldShare = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Share Order'),
+                content: const Text(
+                    'Would you like to share this order with the mill now?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Later'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Share Now'),
+                  ),
+                ],
+              ),
+            );
+
+            if (shouldShare == true && context.mounted) {
+              try {
+                final success = await EmailService.shareOrderExcel(
+                  filePath: excelPath,
+                  customerName: "Multi-Customer Lorry",
+                  orderNumber: _orderNumber ?? lorryId,
+                );
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(success
+                          ? 'Order shared successfully!'
+                          : 'Failed to share order'),
+                      backgroundColor:
+                          success ? AppTheme.success : AppTheme.error,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error sharing: $e'),
+                      backgroundColor: AppTheme.error,
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        }
       }
     } catch (e, stack) {
       debugPrint('SAVE ERROR: $e\n$stack');
@@ -520,9 +568,8 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                               SearchController controller) {
                             return SearchBar(
                               controller: controller,
-                              padding:
-                                  const MaterialStatePropertyAll<EdgeInsets>(
-                                      EdgeInsets.symmetric(horizontal: 16.0)),
+                              padding: const WidgetStatePropertyAll<EdgeInsets>(
+                                  EdgeInsets.symmetric(horizontal: 16.0)),
                               onTap: () {
                                 controller.openView();
                               },
@@ -781,12 +828,19 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Lorry Fill Progress',
-                    style: Theme.of(context).textTheme.labelMedium),
-                Text(
-                    '${_totalQtl.toStringAsFixed(2)} / ${_capacity.toStringAsFixed(0)} QTL',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 13)),
+                Flexible(
+                  child: Text('Lorry Fill Progress',
+                      style: Theme.of(context).textTheme.labelMedium,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                      '${_totalQtl.toStringAsFixed(2)} / ${_capacity.toStringAsFixed(0)} QTL',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13),
+                      overflow: TextOverflow.ellipsis),
+                ),
               ],
             ),
             const SizedBox(height: 8),

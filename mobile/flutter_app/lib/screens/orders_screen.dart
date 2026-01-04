@@ -62,11 +62,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                         child: StreamBuilder<List<Customer>>(
                             stream: db.select(db.customers).watch(),
                             builder: (context, snapshot) {
-                              if (!snapshot.hasData)
+                              if (!snapshot.hasData) {
                                 return const SizedBox(
                                     height: 100,
                                     child: Center(
                                         child: CircularProgressIndicator()));
+                              }
                               final customers = snapshot.data!;
 
                               return Column(

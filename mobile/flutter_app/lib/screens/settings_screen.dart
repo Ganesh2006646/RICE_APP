@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 import '../services/settings_service.dart';
 import '../main.dart';
 
-/// Settings screen for app configuration
-/// Matches the provided mockup design exactly
+/// Comprehensive Settings Screen
+/// Supports: Language, Display, Mode, Theme, Order settings, Data & Safety, About
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -16,8 +17,16 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _millEmailController = TextEditingController();
   final _invoicePrefixController = TextEditingController();
+
   bool _isLoading = true;
   bool _hasChanges = false;
+
+  // Settings state
+  String _selectedLanguage = 'English';
+  String _selectedFontSize = 'Medium';
+  String _selectedMode = 'Simple Mode';
+  String _selectedTheme = 'Light';
+  int _defaultDueDays = 7;
 
   @override
   void initState() {
@@ -33,20 +42,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
     final millEmail = await SettingsService.getMillEmail();
     final invoicePrefix = await SettingsService.getInvoicePrefix();
 
     setState(() {
       _millEmailController.text = millEmail;
       _invoicePrefixController.text = invoicePrefix;
+      _selectedLanguage = prefs.getString('language') ?? 'English';
+      _selectedFontSize = prefs.getString('fontSize') ?? 'Medium';
+      _selectedMode = prefs.getString('appMode') ?? 'Simple Mode';
+      _selectedTheme = prefs.getString('theme') ?? 'Light';
+      _defaultDueDays = prefs.getInt('defaultDueDays') ?? 7;
       _isLoading = false;
     });
   }
 
   Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
     await SettingsService.setMillEmail(_millEmailController.text.trim());
     await SettingsService.setInvoicePrefix(
         _invoicePrefixController.text.trim());
+
+    await prefs.setString('language', _selectedLanguage);
+    await prefs.setString('fontSize', _selectedFontSize);
+    await prefs.setString('appMode', _selectedMode);
+    await prefs.setString('theme', _selectedTheme);
+    await prefs.setInt('defaultDueDays', _defaultDueDays);
 
     setState(() => _hasChanges = false);
 
@@ -61,7 +84,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -75,7 +97,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             Icon(Icons.warning_amber_rounded, color: AppTheme.error),
             SizedBox(width: 12),
-            Text('Reset All Data?'),
+            Text('Reset App?'),
           ],
         ),
         content: const Text(
@@ -106,8 +128,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _resetAllData() async {
     final db = ref.read(databaseProvider);
 
-    // Delete all data from all tables
+    // Delete all data
     await db.delete(db.orderItems).go();
+    await db.delete(db.lorryShipments).go();
+    await db.delete(db.payments).go();
     await db.delete(db.orders).go();
     await db.delete(db.customerPrices).go();
     await db.delete(db.customers).go();
@@ -116,6 +140,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     // Reset settings
     await SettingsService.resetAllSettings();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
     await _loadSettings();
 
     if (mounted) {
@@ -129,7 +156,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -148,160 +174,296 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
         actions: [
-          FilledButton.icon(
-            onPressed: _hasChanges ? _saveSettings : null,
-            icon: const Icon(Icons.save, size: 18),
-            label: const Text('Save Settings'),
-            style: FilledButton.styleFrom(
-              backgroundColor:
-                  _hasChanges ? AppTheme.primaryGreen : AppTheme.grey,
+          if (_hasChanges)
+            FilledButton.icon(
+              onPressed: _saveSettings,
+              icon: const Icon(Icons.save, size: 18),
+              label: const Text('Save'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+              ),
             ),
-          ),
           const SizedBox(width: 16),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : ListView(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Configure application preferences.',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.darkGrey,
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Email Settings Card
-                  _buildSettingsCard(
-                    icon: Icons.email_outlined,
-                    title: 'Email Settings',
-                    children: [
-                      _buildTextField(
-                        label: 'Default Mill Email',
-                        controller: _millEmailController,
-                        hint: 'mill@example.com',
-                        keyboardType: TextInputType.emailAddress,
-                        helperText:
-                            'This email will be pre-filled when sending order sheets.',
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Invoice Settings Card
-                  _buildSettingsCard(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'Invoice Settings',
-                    children: [
-                      _buildTextField(
-                        label: 'Invoice Prefix',
-                        controller: _invoicePrefixController,
-                        hint: 'RA-2024-',
-                        helperText:
-                            'Prefix for order numbers (e.g., RA-2024-0001)',
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Danger Zone Card
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.errorLight,
-                      borderRadius: BorderRadius.circular(16),
-                      border:
-                          Border.all(color: AppTheme.error.withOpacity(0.3)),
+              children: [
+                // SECTION 1: LANGUAGE & DISPLAY
+                _buildSectionHeader('Language & Display'),
+                _buildSettingsCard(
+                  icon: Icons.language,
+                  title: 'App Language',
+                  children: [
+                    _buildDropdown(
+                      label: 'Language',
+                      value: _selectedLanguage,
+                      items: ['English', 'Telugu', 'Tamil', 'Hindi'],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedLanguage = value!;
+                          _markChanged();
+                        });
+                      },
                     ),
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.delete_forever, color: AppTheme.error),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Danger Zone',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: AppTheme.error,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _showResetConfirmation,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.error,
-                            foregroundColor: Colors.white,
+                    const SizedBox(height: 16),
+                    _buildDropdown(
+                      label: 'Font Size',
+                      value: _selectedFontSize,
+                      items: ['Small', 'Medium', 'Large'],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedFontSize = value!;
+                          _markChanged();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // SECTION 2: MODE & THEME
+                _buildSectionHeader('Mode & Theme'),
+                _buildSettingsCard(
+                  icon: Icons.palette_outlined,
+                  title: 'Appearance',
+                  children: [
+                    _buildDropdown(
+                      label: 'App Mode',
+                      value: _selectedMode,
+                      items: ['Simple Mode', 'Advanced Mode'],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedMode = value!;
+                          _markChanged();
+                        });
+                      },
+                      helperText: _selectedMode == 'Simple Mode'
+                          ? 'Only essential buttons and screens'
+                          : 'Shows analytics, export & sync options',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDropdown(
+                      label: 'Theme',
+                      value: _selectedTheme,
+                      items: ['Light', 'Dark'],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedTheme = value!;
+                          _markChanged();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // SECTION 3: ORDER & PAYMENT SETTINGS
+                _buildSectionHeader('Order & Payment Settings'),
+                _buildSettingsCard(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Business Settings',
+                  children: [
+                    _buildTextField(
+                      label: 'Default Mill Email',
+                      controller: _millEmailController,
+                      hint: 'mill@example.com',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDropdown(
+                      label: 'Default Payment Due Days',
+                      value: _defaultDueDays.toString(),
+                      items: ['7', '15', '30'],
+                      onChanged: (value) {
+                        setState(() {
+                          _defaultDueDays = int.parse(value!);
+                          _markChanged();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      label: 'Invoice Prefix',
+                      controller: _invoicePrefixController,
+                      hint: 'RA-2024-',
+                      helperText: 'Example: RA-2024-0001',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildReadOnlyField(
+                      label: 'Currency Symbol',
+                      value: '₹ (Indian Rupee)',
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // SECTION 4: DATA & SAFETY
+                _buildSectionHeader('Data & Safety'),
+                _buildSettingsCard(
+                  icon: Icons.backup_outlined,
+                  title: 'Data Management',
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Backup feature coming soon'),
                           ),
-                          child: const Text('Reset All Application Data'),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Warning: This will delete all customers, products, and orders.',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.error,
-                                  ),
-                        ),
-                      ],
+                        );
+                      },
+                      icon: const Icon(Icons.backup),
+                      label: const Text('Backup Data'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // About Section
-                  Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          'Sri Balaji Rice Mill',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    color: AppTheme.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Owner: Kankatala Narayana Murthy',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Version 1.0.0',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: AppTheme.grey,
-                                  ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Professional Rice Mill Management',
-                          style:
-                              TextStyle(color: AppTheme.darkGrey, fontSize: 13),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Restore feature coming soon'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.restore),
+                      label: const Text('Restore Data'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                     ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Danger Zone',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showResetConfirmation,
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('Reset App'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.error,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Warning: This will delete all customers, products, and orders.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 32),
+
+                // SECTION 5: ABOUT & SUPPORT
+                _buildSectionHeader('About & Support'),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.paleGreen,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: Image.asset(
+                          'assets/images/sri_balaji_logo.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'RiceAgent',
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: AppTheme.primaryGreen,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Version 1.0.0',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'This app helps rice agents manage orders and payments easily.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.charcoal,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Sri Balaji Boiled and Raw Rice Mill',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Owner: Kankatala Narayana Murthy',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.charcoal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+              ],
             ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.charcoal,
+        ),
+      ),
     );
   }
 
@@ -312,7 +474,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.lightGrey),
       ),
@@ -326,10 +488,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(width: 12),
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.primaryGreen,
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryGreen,
+                ),
               ),
             ],
           ),
@@ -352,9 +515,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppTheme.charcoal,
-              ),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.charcoal,
+          ),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -364,6 +529,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             hintText: hint,
             filled: true,
             fillColor: AppTheme.lightGrey,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
           ),
           onChanged: (_) => _markChanged(),
         ),
@@ -371,11 +540,98 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 6),
           Text(
             helperText,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.grey,
-                ),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.grey,
+            ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    String? helperText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.charcoal,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: value,
+          items: items
+              .map((item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item),
+                  ))
+              .toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppTheme.lightGrey,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            helperText,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.grey,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.charcoal,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.lightGrey,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppTheme.charcoal,
+            ),
+          ),
+        ),
       ],
     );
   }
