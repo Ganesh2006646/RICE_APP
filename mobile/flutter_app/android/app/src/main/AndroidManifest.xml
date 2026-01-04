@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="rice_agent"
+        android:label="RiceAgent"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
