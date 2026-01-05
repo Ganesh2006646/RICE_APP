@@ -3,27 +3,12 @@
 Full-stack agent app for rice-mill orders.
 
 ## Structure
-- `mobile/flutter_app`: Flutter Android app
-- `backend/api`: Node.js + Fastify + Prisma backend
-- `ml`: Python FastAPI ML microservice
+- `mobile/flutter_app`: Flutter Android app (Offline-first)
 
 ## Prerequisites
-- Docker & Docker Compose
-- Flutter SDK (for mobile app)
-- Node.js 20+ (for local backend dev)
+- Flutter SDK
+- Android Studio / Android SDK
 
-## Quick Start (Backend & ML)
-1. Create a `.env` file in `backend/api` with:
-   ```
-   DATABASE_URL="postgresql://user:password@postgres:5432/riceagent?schema=public"
-   GMAIL_OAUTH_CLIENT_ID="your_client_id"
-   GMAIL_OAUTH_CLIENT_SECRET="your_client_secret"
-   GMAIL_OAUTH_REFRESH_TOKEN="your_refresh_token"
-   ```
-2. Run `docker-compose up --build` from the root directory.
-   - Backend: http://localhost:3000
-   - ML: http://localhost:8000
-   - Postgres: localhost:5432
 
 ## Mobile App Setup
 
@@ -84,9 +69,4 @@ The app stores data locally in SQLite. Add data using the built-in screens:
 
 No database editing required - everything is managed through the app UI!
 
-## ML Service
-- Endpoint: `GET /recommend?customerId=...`
-- Training: `POST /train`
 
-## Backend API
-- Import `postman_collection.json` into Postman to test endpoints.
