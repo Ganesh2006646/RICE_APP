@@ -4,6 +4,7 @@ import '../theme.dart';
 import '../main.dart';
 import '../providers/settings_provider.dart';
 import '../services/translation_service.dart';
+import '../services/backup_service.dart';
 import '../widgets/safe_widgets.dart';
 import '../screens/product_gallery_screen.dart'; // Assuming this path for the new screen
 
@@ -128,10 +129,20 @@ class SettingsScreen extends ConsumerWidget {
               title: 'data_management'.tr(ref),
               children: [
                 OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('backup_soon'.tr(ref))),
-                    );
+                  onPressed: () async {
+                    final result = await BackupService.backupDatabase();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result != null
+                              ? 'backup_success'.tr(ref)
+                              : 'backup_failed'.tr(ref)),
+                          backgroundColor: result != null
+                              ? AppTheme.success
+                              : AppTheme.error,
+                        ),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.backup),
                   label: Text('backup_data'.tr(ref)),
@@ -143,10 +154,62 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('restore_soon'.tr(ref))),
+                  onPressed: () async {
+                    // Show confirmation dialog
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('restore_data'.tr(ref)),
+                        content: Text('restore_warning'.tr(ref)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text('cancel'.tr(ref)),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text('restore'.tr(ref)),
+                          ),
+                        ],
+                      ),
                     );
+
+                    if (confirmed == true) {
+                      final result = await BackupService.restoreDatabase();
+                      if (context.mounted) {
+                        if (result) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('restore_success'.tr(ref)),
+                              backgroundColor: AppTheme.success,
+                            ),
+                          );
+                          // Prompt to restart app
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => AlertDialog(
+                              title: Text('restart_required'.tr(ref)),
+                              content: Text('restart_message'.tr(ref)),
+                              actions: [
+                                FilledButton(
+                                  onPressed: () => Navigator.of(context)
+                                      .popUntil((route) => route.isFirst),
+                                  child: Text('ok'.tr(ref)),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('restore_failed'.tr(ref)),
+                              backgroundColor: AppTheme.error,
+                            ),
+                          );
+                        }
+                      }
+                    }
                   },
                   icon: const Icon(Icons.restore),
                   label: Text('restore_data'.tr(ref)),

@@ -7,7 +7,6 @@ import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
 import '../services/excel_service.dart';
-import '../services/email_service.dart';
 import '../services/settings_service.dart';
 import '../services/translation_service.dart';
 import '../services/whatsapp_service.dart';
@@ -95,6 +94,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   DateTime _loadingDate = DateTime.now();
   final TextEditingController _capacityController =
       TextEditingController(text: '110.0');
+  final TextEditingController _orderNumberController = TextEditingController();
   final List<CustomerLoadFormData> _customers = [];
   bool _sendEmail = true;
   bool _isSaving = false;
@@ -109,6 +109,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   @override
   void dispose() {
     _capacityController.dispose();
+    _orderNumberController.dispose();
     super.dispose();
   }
 
@@ -117,7 +118,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     final orderCount = await db.select(db.orders).get();
     final nextNum =
         await SettingsService.generateOrderNumber(orderCount.length);
-    setState(() => _orderNumber = nextNum);
+    setState(() {
+      _orderNumber = nextNum;
+      _orderNumberController.text = nextNum;
+    });
 
     if (widget.duplicateOrderId != null) {
       await _loadDuplicateData(widget.duplicateOrderId!, db);
@@ -276,7 +280,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ..where((t) => t.id.equals(lorryId)))
           .getSingle();
 
-      final excelPath = await ExcelService.generateLorryExcel(
+      await ExcelService.generateLorryExcel(
         order: lorryOrder,
         items: allItems,
         customers: validCustomers,
@@ -288,38 +292,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('saved_successfully'.tr(ref)),
             backgroundColor: AppTheme.success));
-
-        // Show success and offering sharing options
-        setState(() => _currentStep = 3); // A final success/share step?
-        // For now let's just go back or stay on review with sharing buttons enabled.
-
-        if (_sendEmail) {
-          await Future.delayed(const Duration(milliseconds: 300));
-          if (mounted) {
-            final shouldShare = await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text('share'.tr(ref)),
-                content: Text('share_with_mill_confirm'.tr(ref)),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: Text('later'.tr(ref))),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: Text('share_now'.tr(ref))),
-                ],
-              ),
-            );
-
-            if (shouldShare == true && mounted) {
-              await EmailService.shareOrderExcel(
-                  filePath: excelPath,
-                  customerName: 'multi_customer_lorry'.tr(ref),
-                  orderNumber: _orderNumber ?? lorryId);
-            }
-          }
-        }
 
         if (mounted) Navigator.pop(context);
       }
@@ -428,7 +400,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                 SafeRow(
                   leading: Expanded(
                     child: TextFormField(
-                      initialValue: _orderNumber,
+                      controller: _orderNumberController,
                       decoration: InputDecoration(
                         labelText: 'order_no'.tr(ref),
                         prefixIcon: const Icon(Icons.tag),

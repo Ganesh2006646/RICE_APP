@@ -26,10 +26,11 @@ class OrdersScreen extends ConsumerStatefulWidget {
 
 class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   DateTime? _filterDate;
-  Customer? _filterCustomer;
   String _searchQuery = '';
   final _dateFormat = DateFormat('dd MMM yyyy');
   final _searchController = TextEditingController();
+  bool _isProcessing = false;
+  String? _processingOrderId;
 
   @override
   Widget build(BuildContext context) {
@@ -51,28 +52,21 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             onPressed: () => _selectDate(context),
           ),
           IconButton(
-            icon: Icon(
-                _filterCustomer != null ? Icons.person : Icons.person_search,
-                color: _filterCustomer != null ? theme.primaryColor : null),
-            onPressed: () => _showCustomerFilter(context, db),
-          ),
-          IconButton(
             icon: const Icon(Icons.description_outlined),
             tooltip: 'export_all'.tr(ref),
             onPressed: () => _exportAllOrders(db),
           ),
-          if (_filterDate != null || _filterCustomer != null)
+          if (_filterDate != null)
             IconButton(
                 icon: const Icon(Icons.clear_all),
                 onPressed: () => setState(() {
                       _filterDate = null;
-                      _filterCustomer = null;
                     })),
         ],
       ),
       body: Column(
         children: [
-          if (_filterDate != null || _filterCustomer != null)
+          if (_filterDate != null)
             Container(
               padding: const EdgeInsets.all(12),
               color: theme.primaryColor.withValues(alpha: 0.1),
@@ -83,11 +77,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     Chip(
                         label: Text(_dateFormat.format(_filterDate!)),
                         onDeleted: () => setState(() => _filterDate = null)),
-                  if (_filterCustomer != null)
-                    Chip(
-                        label: Text(_filterCustomer!.shopName),
-                        onDeleted: () =>
-                            setState(() => _filterCustomer = null)),
                 ],
               ),
             ),
@@ -188,12 +177,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 item.order.loadingDate.year == _filterDate!.year)
             .toList();
       }
-      if (_filterCustomer != null) {
-        filtered = filtered
-            .where((item) =>
-                item.customers.any((c) => c.id == _filterCustomer!.id))
-            .toList();
-      }
       if (_searchQuery.isNotEmpty) {
         filtered = filtered.where((item) {
           final q = _searchQuery.toLowerCase();
@@ -261,16 +244,24 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
+                    _actionBtn(Icons.edit, 'edit'.tr(ref),
+                        _isProcessing ? null : () => _duplicateOrder(item)),
                     _actionBtn(Icons.download, 'excel'.tr(ref),
-                        () => _downloadExcel(item, db)),
+                        _isProcessing ? null : () => _downloadExcel(item, db),
+                        isLoading:
+                            _processingOrderId == '${item.order.id}_excel'),
                     _actionBtn(Icons.email, 'email'.tr(ref),
-                        () => _resendEmail(item, db)),
-                    _actionBtn(Icons.copy, 'clone'.tr(ref),
-                        () => _duplicateOrder(item)),
+                        _isProcessing ? null : () => _resendEmail(item, db),
+                        isLoading:
+                            _processingOrderId == '${item.order.id}_email'),
                     _actionBtn(Icons.send, 'whatsapp'.tr(ref),
-                        () => _sendWhatsApp(item, db)),
-                    _actionBtn(Icons.delete_outline, 'delete'.tr(ref),
-                        () => _confirmDeleteOrder(item, db),
+                        _isProcessing ? null : () => _sendWhatsApp(item, db)),
+                    _actionBtn(
+                        Icons.delete_outline,
+                        'delete'.tr(ref),
+                        _isProcessing
+                            ? null
+                            : () => _confirmDeleteOrder(item, db),
                         isError: true),
                   ],
                 ),
@@ -282,10 +273,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     );
   }
 
-  Widget _actionBtn(IconData icon, String label, VoidCallback onTap,
-      {bool isError = false}) {
+  Widget _actionBtn(IconData icon, String label, VoidCallback? onTap,
+      {bool isError = false, bool isLoading = false}) {
     final theme = Theme.of(context);
-    final color = isError ? AppTheme.error : theme.primaryColor;
+    final color = onTap == null
+        ? AppTheme.grey
+        : (isError ? AppTheme.error : theme.primaryColor);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -294,7 +287,17 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         child: SafeColumn(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 18),
+            if (isLoading)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.primaryColor,
+                ),
+              )
+            else
+              Icon(icon, color: color, size: 18),
             const SizedBox(height: 4),
             SafeText(label,
                 style: TextStyle(
@@ -355,62 +358,109 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final products = await db.select(db.products).get();
     if (!mounted) return;
     final theme = Theme.of(context);
+    final currency = ref.read(settingsProvider).currencySymbol;
+
+    // Group items by customer
+    final groupedItems = <String, List<OrderItem>>{};
+    for (var oi in orderItems) {
+      groupedItems.putIfAbsent(oi.customerId, () => []).add(oi);
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
+        initialChildSize: 0.8,
         expand: false,
         builder: (context, controller) => SafePage(
-          child: SafeColumn(
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(16),
             children: [
-              SafeText(
-                  item.customers.isNotEmpty
-                      ? item.customers.first.shopName
-                      : 'multi_customer_lorry'.tr(ref),
+              // Header
+              SafeText('${'order_no'.tr(ref)}: ${item.order.notes ?? "N/A"}',
                   style: const TextStyle(
                       fontSize: 20, fontWeight: FontWeight.bold)),
-              SafeText('${'order_no'.tr(ref)}: ${item.order.notes ?? "N/A"}',
+              SafeText(_dateFormat.format(item.order.loadingDate),
                   style: const TextStyle(color: AppTheme.grey)),
               const SizedBox(height: 20),
-              ...orderItems.map((oi) {
-                final prod = products.firstWhere((p) => p.id == oi.productId,
-                    orElse: () => _fallbackProd());
-                return SafeCard(
-                  color: theme.cardColor,
-                  child: SafeRow(
-                    leading: SafeColumn(
-                      children: [
-                        SafeText(prod.name,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                        SafeText(
-                            '26kg: ${oi.bags26} | 10kg: ${oi.bags10} | 5kg: ${oi.bags5}',
-                            style: const TextStyle(fontSize: 11)),
-                      ],
+
+              // For each customer
+              ...item.customers.map((customer) {
+                final customerItems = groupedItems[customer.id] ?? [];
+                final customerTotal = customerItems.fold<double>(
+                    0, (sum, oi) => sum + oi.netAmount);
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Customer Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SafeRow(
+                        leading: SafeText(customer.shopName,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16)),
+                        trailing: SafeText(
+                            '$currency${customerTotal.toStringAsFixed(0)}',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor)),
+                      ),
                     ),
-                    trailing: SafeColumn(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        SafeText('${oi.qtyQtl.toStringAsFixed(2)} QTL',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                        SafeText(
-                            '${ref.watch(settingsProvider).currencySymbol}${oi.netAmount.toStringAsFixed(0)}',
-                            style: TextStyle(color: theme.primaryColor)),
-                      ],
-                    ),
-                  ),
+                    const SizedBox(height: 8),
+
+                    // Customer Items
+                    ...customerItems.map((oi) {
+                      final prod = products.firstWhere(
+                          (p) => p.id == oi.productId,
+                          orElse: () => _fallbackProd());
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 12, bottom: 8),
+                        child: SafeRow(
+                          leading: SafeColumn(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SafeText(prod.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w500)),
+                              SafeText(
+                                  '26kg: ${oi.bags26} | 10kg: ${oi.bags10} | 5kg: ${oi.bags5}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: AppTheme.grey)),
+                            ],
+                          ),
+                          trailing: SafeColumn(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              SafeText('${oi.qtyQtl.toStringAsFixed(2)} QTL',
+                                  style: const TextStyle(fontSize: 12)),
+                              SafeText(
+                                  '$currency${oi.netAmount.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 12),
+                  ],
                 );
               }),
+
               const Divider(height: 32),
               SafeRow(
                 leading: SafeText('total_value'.tr(ref).toUpperCase(),
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 16)),
                 trailing: SafeText(
-                    '${ref.watch(settingsProvider).currencySymbol}${item.order.totalAmount.toStringAsFixed(0)}',
+                    '$currency${item.order.totalAmount.toStringAsFixed(0)}',
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -447,70 +497,68 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     if (picked != null) setState(() => _filterDate = picked);
   }
 
-  void _showCustomerFilter(BuildContext context, AppDatabase db) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('filter_by_customer'.tr(ref)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: StreamBuilder<List<Customer>>(
-            stream: db.select(db.customers).watch(),
-            builder: (context, snapshot) {
-              final customers = snapshot.data ?? [];
-              return ListView.builder(
-                shrinkWrap: true,
-                itemCount: customers.length,
-                itemBuilder: (context, index) => ListTile(
-                  title: Text(customers[index].shopName),
-                  onTap: () {
-                    setState(() => _filterCustomer = customers[index]);
-                    Navigator.pop(context);
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _downloadExcel(OrderWithDetails item, AppDatabase db) async {
-    final orderItems = await (db.select(db.orderItems)
-          ..where((tbl) => tbl.orderId.equals(item.order.id)))
-        .get();
-    final products = await db.select(db.products).get();
-    final path = await ExcelService.generateLorryExcel(
-        order: item.order,
-        customers: item.customers,
-        items: orderItems,
-        products: products,
-        orderNumber: item.order.notes ?? 'N/A');
-    await ExcelService.copyToDownloads(path);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('excel_saved'.tr(ref)),
-          backgroundColor: AppTheme.success));
+    setState(() {
+      _isProcessing = true;
+      _processingOrderId = '${item.order.id}_excel';
+    });
+    try {
+      final orderItems = await (db.select(db.orderItems)
+            ..where((tbl) => tbl.orderId.equals(item.order.id)))
+          .get();
+      final products = await db.select(db.products).get();
+      final path = await ExcelService.generateLorryExcel(
+          order: item.order,
+          customers: item.customers,
+          items: orderItems,
+          products: products,
+          orderNumber: item.order.notes ?? 'N/A');
+      await ExcelService.copyToDownloads(path);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('excel_saved'.tr(ref)),
+            backgroundColor: AppTheme.success));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingOrderId = null;
+        });
+      }
     }
   }
 
   Future<void> _resendEmail(OrderWithDetails item, AppDatabase db) async {
-    final orderItems = await (db.select(db.orderItems)
-          ..where((tbl) => tbl.orderId.equals(item.order.id)))
-        .get();
-    final products = await db.select(db.products).get();
-    final path = await ExcelService.generateLorryExcel(
-        order: item.order,
-        customers: item.customers,
-        items: orderItems,
-        products: products,
-        orderNumber: item.order.notes ?? 'N/A');
-    await EmailService.shareOrderExcel(
-        filePath: path,
-        customerName:
-            item.customers.isNotEmpty ? item.customers.first.shopName : 'Lorry',
-        orderNumber: item.order.notes ?? 'N/A');
+    setState(() {
+      _isProcessing = true;
+      _processingOrderId = '${item.order.id}_email';
+    });
+    try {
+      final orderItems = await (db.select(db.orderItems)
+            ..where((tbl) => tbl.orderId.equals(item.order.id)))
+          .get();
+      final products = await db.select(db.products).get();
+      final path = await ExcelService.generateLorryExcel(
+          order: item.order,
+          customers: item.customers,
+          items: orderItems,
+          products: products,
+          orderNumber: item.order.notes ?? 'N/A');
+      await EmailService.shareOrderExcel(
+          filePath: path,
+          customerName: item.customers.isNotEmpty
+              ? item.customers.first.shopName
+              : 'Lorry',
+          orderNumber: item.order.notes ?? 'N/A');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingOrderId = null;
+        });
+      }
+    }
   }
 
   Future<void> _sendWhatsApp(OrderWithDetails item, AppDatabase db) async {

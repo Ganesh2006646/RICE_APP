@@ -18,7 +18,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _navigateToHome();
+    // Use addPostFrameCallback to ensure splash content is rendered
+    // before starting the navigation timer
+    WidgetsBinding.instance.addPostFrameCallback((_) => _navigateToHome());
   }
 
   /// Navigate to home screen after a delay
@@ -97,7 +99,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                       fontStyle: FontStyle.italic,
-                     color: theme.primaryColor.withValues(alpha: 0.8),
+                      color: theme.primaryColor.withValues(alpha: 0.8),
                       height: 1.4,
                     ),
                   ),
