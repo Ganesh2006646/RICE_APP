@@ -122,7 +122,14 @@ class WhatsAppService {
       message.writeln('\n👤 *${customer.shopName}* (${customer.place})');
       for (var item in customerItems) {
         final product = allProducts.firstWhere((p) => p.id == item.productId,
-            orElse: () => allProducts.first);
+            orElse: () => Product(
+                id: '',
+                name: 'Rice',
+                defaultPrice: 0,
+                gstRateDefault: 0,
+                unit: 'qtl',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now()));
         message.writeln(
             '• ${product.name}: ${item.qtyQtl.toStringAsFixed(2)} QTL');
         grandTotalQtl += item.qtyQtl;

@@ -6,7 +6,10 @@ import '../providers/settings_provider.dart';
 import '../services/translation_service.dart';
 import '../services/backup_service.dart';
 import '../widgets/safe_widgets.dart';
-import '../screens/product_gallery_screen.dart'; // Assuming this path for the new screen
+import '../screens/product_gallery_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 
 /// Comprehensive Settings Screen
 /// Settings changes now reflect immediately in the app
@@ -117,6 +120,79 @@ class SettingsScreen extends ConsumerWidget {
                   onChanged: (value) => notifier.setMillContactPhone(value),
                 ),
               ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // SECTION: STORAGE SETTINGS
+            _buildSectionHeader(context, 'storage_settings'.tr(ref)),
+            SafeCard(
+              color: theme.cardColor,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: SafeColumn(
+                  children: [
+                    SafeRow(
+                      leading: Row(
+                        children: [
+                          Icon(Icons.folder_outlined,
+                              color: theme.primaryColor),
+                          const SizedBox(width: 12),
+                          SafeText('excel_settings'.tr(ref),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.primaryColor)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SafeText(
+                      'excel_save_location'.tr(ref),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    // Unified "One Div" style picker
+                    InkWell(
+                      onTap: () => _pickExcelPath(context, ref),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.lightGrey),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.folder_open,
+                                color: theme.primaryColor, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                settings.excelSavePath.isEmpty
+                                    ? 'default_downloads'.tr(ref)
+                                    : settings.excelSavePath,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: settings.excelSavePath.isEmpty
+                                      ? AppTheme.grey
+                                      : theme.textTheme.bodyMedium?.color,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(Icons.edit, size: 16, color: AppTheme.grey),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
 
             const SizedBox(height: 24),
@@ -377,7 +453,7 @@ class SettingsScreen extends ConsumerWidget {
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 13, color: AppTheme.grey),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   SafeRow(
                     mainAxisAlignment: MainAxisAlignment.center,
                     leading: Row(
@@ -399,8 +475,7 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-
-            const SizedBox(height: 32),
+            const SizedBox(height: 48),
           ],
         ),
       ),
@@ -481,7 +556,7 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          value: value,
           items: items
               .map((item) => DropdownMenuItem(value: item, child: Text(item)))
               .toList(),
@@ -540,6 +615,117 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _pickExcelPath(BuildContext context, WidgetRef ref) async {
+    try {
+      if (Platform.isAndroid) {
+        // Robust Permission Check
+        var status = await Permission.manageExternalStorage.status;
+
+        if (!status.isGranted) {
+          status = await Permission.manageExternalStorage.request();
+        }
+
+        if (!status.isGranted) {
+          if (context.mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('permission_required'.tr(ref)),
+                content: Text(
+                    'To save files in custom folders, this app needs "All Files Access".\n\nPlease grant this permission in the next screen (App Settings).',
+                    style: const TextStyle(fontSize: 14)),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('cancel'.tr(ref))),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      openAppSettings();
+                    },
+                    child: Text('open_settings'.tr(ref)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+
+      if (selectedDirectory != null) {
+        // Quick verification
+        final testFile = File('$selectedDirectory/test_write.txt');
+        try {
+          // Try writing
+          await testFile.writeAsString('test');
+          await testFile.delete();
+
+          ref
+              .read(settingsProvider.notifier)
+              .setExcelSavePath(selectedDirectory);
+        } catch (e) {
+          if (context.mounted) {
+            _showError(context,
+                'Write failed: Permission denied for this specific folder.\nTry "Internal Storage" root or standard "Downloads".');
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showPathInputDialog(
+            context, ref, ref.read(settingsProvider).excelSavePath);
+      }
+    }
+  }
+
+  void _showPathInputDialog(
+      BuildContext context, WidgetRef ref, String? currentPath) {
+    final controller = TextEditingController(text: currentPath ?? '');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('enter_path'.tr(ref)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('manual_path_helper'.tr(ref),
+                style: const TextStyle(fontSize: 13, color: AppTheme.grey)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: '/storage/emulated/0/Download',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('cancel'.tr(ref))),
+          FilledButton(
+            onPressed: () {
+              ref
+                  .read(settingsProvider.notifier)
+                  .setExcelSavePath(controller.text);
+              Navigator.pop(context);
+            },
+            child: Text('save'.tr(ref)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppTheme.error));
+  }
+
   Future<void> _showResetConfirmation(
       BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
@@ -574,7 +760,6 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed == true) {
       try {
         final db = ref.read(databaseProvider);
-        // Correct dependency order: Shipments/Payments -> Items -> Orders -> Prices -> Base Tables
         await db.delete(db.payments).go();
         await db.delete(db.lorryShipments).go();
         await db.delete(db.orderItems).go();

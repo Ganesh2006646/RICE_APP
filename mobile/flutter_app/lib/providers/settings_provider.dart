@@ -12,6 +12,7 @@ class AppSettings {
   final String millContactPhone;
   final String invoicePrefix;
   final String currencySymbol;
+  final String excelSavePath;
 
   const AppSettings({
     this.language = 'English',
@@ -23,6 +24,7 @@ class AppSettings {
     this.millContactPhone = '9848012345',
     this.invoicePrefix = 'SBRM-2024-',
     this.currencySymbol = '₹',
+    this.excelSavePath = '',
   });
 
   AppSettings copyWith({
@@ -35,6 +37,7 @@ class AppSettings {
     String? millContactPhone,
     String? invoicePrefix,
     String? currencySymbol,
+    String? excelSavePath,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -46,6 +49,7 @@ class AppSettings {
       millContactPhone: millContactPhone ?? this.millContactPhone,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       currencySymbol: currencySymbol ?? this.currencySymbol,
+      excelSavePath: excelSavePath ?? this.excelSavePath,
     );
   }
 
@@ -82,6 +86,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       millContactPhone: prefs.getString('mill_contact') ?? '9848012345',
       invoicePrefix: prefs.getString('invoice_prefix') ?? 'SBRM-2024-',
       currencySymbol: prefs.getString('currency_symbol') ?? '₹',
+      excelSavePath: prefs.getString('excel_save_path') ?? '',
     );
   }
 
@@ -137,6 +142,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('currency_symbol', symbol);
     state = state.copyWith(currencySymbol: symbol);
+  }
+
+  Future<void> setExcelSavePath(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('excel_save_path', path);
+    state = state.copyWith(excelSavePath: path);
   }
 
   Future<void> resetAll() async {

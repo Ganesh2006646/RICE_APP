@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/splash_screen.dart';
 import 'db/database.dart';
-import 'services/seed_service.dart';
 import 'theme.dart';
 import 'providers/settings_provider.dart';
 
@@ -21,15 +20,6 @@ void main() async {
       ],
       child: const RiceAgentApp(),
     ));
-
-    // Seed sample data in the background after app starts to ensure speed
-    Future(() async {
-      try {
-        await SeedService.seedDatabase(db);
-      } catch (e) {
-        debugPrint('Background seeding failed: $e');
-      }
-    });
   } catch (e) {
     debugPrint('Fatal Startup Error: $e');
   }

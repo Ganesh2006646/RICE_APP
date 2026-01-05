@@ -8,6 +8,8 @@ import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
+import '../services/backup_service.dart';
+import '../services/excel_service.dart';
 
 /// Screen for managing customers with full CRUD operations
 /// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
@@ -39,6 +41,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         title:
             SafeText('customers'.tr(ref), style: const TextStyle(fontSize: 18)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'import_excel'.tr(ref),
+            onPressed: () => _importExcel(db),
+          ),
           IconButton(
             icon: const Icon(Icons.person_add),
             tooltip: 'add_customer'.tr(ref),
@@ -286,6 +293,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     );
 
     if (confirmed == true) {
+      await BackupService.backupDatabase();
       await (db.delete(db.orderItems)
             ..where((tbl) => tbl.customerId.equals(customer.id)))
           .go();
@@ -378,5 +386,25 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _importExcel(AppDatabase db) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    final result = await ExcelService.importCustomersFromExcel(db);
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      scaffold.showSnackBar(SnackBar(
+        content: Text(result['message']),
+        backgroundColor: AppTheme.success,
+      ));
+    } else {
+      if (result['message'] != 'No file selected') {
+        scaffold.showSnackBar(SnackBar(
+          content: Text(result['message']),
+          backgroundColor: AppTheme.error,
+        ));
+      }
+    }
   }
 }

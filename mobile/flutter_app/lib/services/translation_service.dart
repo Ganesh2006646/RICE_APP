@@ -179,6 +179,23 @@ class TranslationService {
       'orders_statement': 'RiceAgent Orders Statement',
       'gst_note':
           'Note: GST will be 5% if 5kg or 10kg bags are used, regardless of this setting.',
+      'storage_settings': 'Storage Settings',
+      'excel_save_location': 'Excel Save Location',
+      'default_downloads': 'Default (Downloads Folder)',
+      'change_location': 'Change Location',
+      'excel_settings': 'Excel Settings',
+      'enter_path': 'Enter Path',
+      'manual_path_helper': 'Enter custom path if folder picker doesn\'t work',
+      'party_wise_summary': 'Party-wise Summary',
+      'confirm_save': 'Confirm Save',
+      'confirm_save_desc': 'Are you sure you want to save this lorry order?',
+      'discard_changes': 'Discard Changes',
+      'discard_changes_desc': 'You have unsaved changes. Discard them?',
+      'discard': 'Discard',
+      'restart_required': 'Restart Required',
+      'restart_message':
+          'Please restart the app for the restored data to take effect.',
+      'restore_warning': 'This will overwrite all current data. Are you sure?',
     },
     'Telugu': {
       'dashboard': 'డ్యాష్‌బోర్డ్',
@@ -354,6 +371,26 @@ class TranslationService {
       'orders_statement': 'రైస్‌ఏజెంట్ ఆర్డర్ల స్టేట్‌మెంట్',
       'gst_note':
           'గమనిక: ఈ సెట్టింగ్‌తో సంబంధం లేకుండా 5కేజీ లేదా 10కేజీ బ్యాగులు ఉపయోగిస్తే GST 5% ఉంటుంది.',
+      'storage_settings': 'స్టోరేజ్ సెట్టింగ్స్',
+      'excel_save_location': 'ఎక్సెల్ సేవ్ లొకేషన్',
+      'default_downloads': 'డిఫాల్ట్ (డౌన్‌లోడ్స్ ఫోల్డర్)',
+      'change_location': 'లొకేషన్ మార్చండి',
+      'excel_settings': 'ఎక్సెల్ సెట్టింగ్స్',
+      'enter_path': 'పాత్ నమోదు చేయండి',
+      'manual_path_helper':
+          'ఫోల్డర్ పిక్కర్ పనిచేయకపోతే పాత్ మాన్యువల్‌గా ఇవ్వండి',
+      'party_wise_summary': 'పార్టీ వారీ సారాంశం',
+      'confirm_save': 'సేవ్ ఖాయం చేయండి',
+      'confirm_save_desc': 'మీరు ఈ లారీ ఆర్డర్‌ను సేవ్ చేయాలనుకుంటున్నారా?',
+      'discard_changes': 'మార్పులను రద్దు చేయండి',
+      'discard_changes_desc':
+          'మీ దగ్గర సేవ్ చేయని మార్పులు ఉన్నాయి. వాటిని రద్దు చేయాలా?',
+      'discard': 'రద్దు చేయి',
+      'restart_required': 'రీస్టార్ట్ అవసరం',
+      'restart_message':
+          'డేటా పునరుద్ధరణ అమలు కావడానికి దయచేసి యాప్‌ను రీస్టార్ట్ చేయండి.',
+      'restore_warning':
+          'ఇది ప్రస్తుత డేటా మొత్తాన్ని తొలగిస్తుంది. ఖచ్చితంగా కొనసాగించాలా?',
     },
     'Hindi': {
       'dashboard': 'डैशबोर्ड',
@@ -529,6 +566,26 @@ class TranslationService {
       'orders_statement': 'राइसएजेंट ऑर्डर स्टेटमेंट',
       'gst_note':
           'नोट: यदि 5 किलो या 10 किलो के बैग का उपयोग किया जाता है, तो इस सेटिंग के बावजूद जीएसटी 5% होगा।',
+      'storage_settings': 'स्टोरेज सेटिंग्स',
+      'excel_save_location': 'एक्सेल सेव लोकेशन',
+      'default_downloads': 'डिफ़ॉल्ट (डाउनलोड फ़ोल्डर)',
+      'change_location': 'स्थान बदलें',
+      'excel_settings': 'एक्सेल सेटिंग्स',
+      'enter_path': 'पाथ दर्ज करें',
+      'manual_path_helper':
+          'यदि फ़ोल्डर पिकर काम नहीं करता है तो कस्टम पाथ दर्ज करें',
+      'party_wise_summary': 'पार्टी-वार सारांश',
+      'confirm_save': 'सेव की पुष्टि करें',
+      'confirm_save_desc': 'क्या आप वाकई इस लॉरी ऑर्डर को सेव करना चाहते हैं?',
+      'discard_changes': 'बदलावों को त्यागें',
+      'discard_changes_desc':
+          'आपके पास सहेजे नहीं गए बदलाव हैं। क्या उन्हें त्याग दें?',
+      'discard': 'त्यागें',
+      'restart_required': 'रीस्टार्ट आवश्यक',
+      'restart_message':
+          'पुनर्स्थापित डेटा को प्रभावी बनाने के लिए कृपया ऐप को रीस्टार्ट करें।',
+      'restore_warning':
+          'यह सभी वर्तमान डेटा को मिटा देगा। क्या आप सुनिश्चित हैं?',
     },
     'Tamil': {
       'dashboard': 'டாஷ்போர்டு',
@@ -706,6 +763,26 @@ class TranslationService {
       'orders_statement': 'ரைஸ்ஏஜென்ட் ஆர்டர்கள் அறிக்கை',
       'gst_note':
           'குறிப்பு: இந்த அமைப்பைப் பொருட்படுத்தாமல் 5கிகி அல்லது 10கிகி பைகள் பயன்படுத்தப்பட்டால் ஜிஎஸ்டி 5% இருக்கும்.',
+      'storage_settings': 'சேமிப்பக அமைப்புகள்',
+      'excel_save_location': 'எக்செல் சேமிப்பு இடம்',
+      'default_downloads': 'இயல்புநிலை (பதிவிறக்கங்கள் கோப்புறை)',
+      'change_location': 'இடத்தை மாற்றவும்',
+      'excel_settings': 'எக்செல் அமைப்புகள்',
+      'enter_path': 'பாதையை உள்ளிடவும்',
+      'manual_path_helper':
+          'ஃபোল்டர் பிக்கர் வேலை செய்யவில்லை என்றால் பாதையை உள்ளிடவும்',
+      'party_wise_summary': 'பார்ட்டி வாரியான சுருக்கம்',
+      'confirm_save': 'சேமிப்பை உறுதிசெய்',
+      'confirm_save_desc': 'இந்த லாரி ஆர்டரை நிச்சயமாகச் சேமிக்க வேண்டுமா?',
+      'discard_changes': 'மாற்றங்களைக் கைவிடு',
+      'discard_changes_desc':
+          'சேமிக்கப்படாத மாற்றங்கள் உள்ளன. அவற்றைக் கைவிடவா?',
+      'discard': 'கைவிடு',
+      'restart_required': 'மீண்டும் தொடங்க வேண்டும்',
+      'restart_message':
+          'மீட்கப்பட்ட தரவு நடைமுறைக்கு வர செயலியை மீண்டும் தொடங்கவும்.',
+      'restore_warning':
+          'இது தற்போதைய தரவு அனைத்தையும் அழிக்கும். நிச்சயமாகத் தொடர வேண்டுமா?',
     },
   };
 

@@ -14,6 +14,7 @@ import 'new_order_screen.dart';
 import '../services/translation_service.dart';
 import 'package:share_plus/share_plus.dart';
 import '../providers/settings_provider.dart';
+import '../services/backup_service.dart';
 
 /// Orders History Screen with filters and actions
 /// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
@@ -143,7 +144,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final ordersStream = (db.select(db.orders)
           ..orderBy([
             (t) => drift.OrderingTerm(
-                expression: t.loadingDate, mode: drift.OrderingMode.desc)
+                expression: t.createdAt, mode: drift.OrderingMode.desc)
           ]))
         .watch();
     return ordersStream.asyncMap((orders) async {
@@ -192,7 +193,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
   Widget _buildOrderCard(OrderWithDetails item, AppDatabase db) {
     final theme = Theme.of(context);
-    final customer = item.customers.isNotEmpty ? item.customers.first : null;
     return SafeCard(
       padding: EdgeInsets.zero,
       color: theme.cardColor,
@@ -203,25 +203,25 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           child: SafeColumn(
             children: [
               SafeRow(
-                leading: SafeRow(
-                  leading: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
-                    child: Text(customer?.shopName[0] ?? 'L',
-                        style: TextStyle(
-                            color: theme.primaryColor,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                  trailing: SafeColumn(
-                    children: [
-                      SafeText(item.order.notes ?? 'no_order_no'.tr(ref),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 14)),
-                      SafeText(_dateFormat.format(item.order.loadingDate),
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.grey)),
-                    ],
-                  ),
+                leading: SafeColumn(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SafeText(
+                        '${'order_no'.tr(ref)}: ${item.order.notes ?? 'no_order_no'.tr(ref)}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today,
+                            size: 14, color: AppTheme.grey),
+                        const SizedBox(width: 6),
+                        SafeText(_dateFormat.format(item.order.loadingDate),
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.grey)),
+                      ],
+                    ),
+                  ],
                 ),
                 trailing: SafeColumn(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -231,11 +231,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                         style: TextStyle(
                             color: theme.primaryColor,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16)),
-                    SafeText(
-                        customer?.shopName ?? 'multi_customer_lorry'.tr(ref),
-                        style: const TextStyle(
-                            fontSize: 10, color: AppTheme.grey)),
+                            fontSize: 18)),
+                    if (item.customers.length > 1)
+                      SafeText(
+                          '${item.customers.length} ${'customers'.tr(ref)}',
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.grey)),
                   ],
                 ),
               ),
@@ -369,114 +370,220 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent, // Fully transparent for custom look
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.8,
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
         expand: false,
-        builder: (context, controller) => SafePage(
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.all(16),
+        builder: (context, controller) => Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
             children: [
-              // Header
-              SafeText('${'order_no'.tr(ref)}: ${item.order.notes ?? "N/A"}',
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
-              SafeText(_dateFormat.format(item.order.loadingDate),
-                  style: const TextStyle(color: AppTheme.grey)),
-              const SizedBox(height: 20),
-
-              // For each customer
-              ...item.customers.map((customer) {
-                final customerItems = groupedItems[customer.id] ?? [];
-                final customerTotal = customerItems.fold<double>(
-                    0, (sum, oi) => sum + oi.netAmount);
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  padding: const EdgeInsets.all(20),
                   children: [
-                    // Customer Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: theme.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                    // Header
+                    SafeRow(
+                      leading: SafeColumn(
+                        children: [
+                          SafeText(
+                              '${'order_no'.tr(ref)}: ${item.order.notes ?? "N/A"}',
+                              style: const TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold)),
+                          SafeText(_dateFormat.format(item.order.loadingDate),
+                              style: const TextStyle(color: AppTheme.grey)),
+                        ],
                       ),
-                      child: SafeRow(
-                        leading: SafeText(customer.shopName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                        trailing: SafeText(
-                            '$currency${customerTotal.toStringAsFixed(0)}',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: theme.primaryColor)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            color: AppTheme.error),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _deleteOrder(item, db);
+                        },
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 24),
 
-                    // Customer Items
-                    ...customerItems.map((oi) {
-                      final prod = products.firstWhere(
-                          (p) => p.id == oi.productId,
-                          orElse: () => _fallbackProd());
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 12, bottom: 8),
-                        child: SafeRow(
-                          leading: SafeColumn(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SafeText(prod.name,
+                    // For each customer
+                    ...item.customers.map((customer) {
+                      final customerItems = groupedItems[customer.id] ?? [];
+                      final customerTotal = customerItems.fold<double>(
+                          0, (sum, oi) => sum + oi.netAmount);
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Customer Header
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: theme.primaryColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: SafeRow(
+                              leading: SafeText(customer.shopName,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.w500)),
-                              SafeText(
-                                  '26kg: ${oi.bags26} | 10kg: ${oi.bags10} | 5kg: ${oi.bags5}',
-                                  style: const TextStyle(
-                                      fontSize: 11, color: AppTheme.grey)),
-                            ],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
+                              trailing: SafeText(
+                                  '$currency${customerTotal.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.primaryColor)),
+                            ),
                           ),
-                          trailing: SafeColumn(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              SafeText('${oi.qtyQtl.toStringAsFixed(2)} QTL',
-                                  style: const TextStyle(fontSize: 12)),
-                              SafeText(
-                                  '$currency${oi.netAmount.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                        ),
+                          const SizedBox(height: 12),
+
+                          // Customer Items
+                          ...customerItems.map((oi) {
+                            final prod = products.firstWhere(
+                                (p) => p.id == oi.productId,
+                                orElse: () => _fallbackProd());
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(left: 12, bottom: 12),
+                              child: SafeRow(
+                                leading: SafeColumn(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SafeText(prod.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14)),
+                                    SafeText(
+                                        '26kg: ${oi.bags26} | 10kg: ${oi.bags10} | 5kg: ${oi.bags5}',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.grey)),
+                                  ],
+                                ),
+                                trailing: SafeColumn(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    SafeText(
+                                        '${oi.qtyQtl.toStringAsFixed(2)} QTL',
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500)),
+                                    SafeText(
+                                        '@$currency${oi.ratePerQtl.toStringAsFixed(0)}/QTL',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.grey)),
+                                    SafeText(
+                                        '$currency${oi.netAmount.toStringAsFixed(0)}',
+                                        style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: theme.primaryColor)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 16),
+                        ],
                       );
                     }),
-                    const SizedBox(height: 12),
-                  ],
-                );
-              }),
 
-              const Divider(height: 32),
-              SafeRow(
-                leading: SafeText('total_value'.tr(ref).toUpperCase(),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                trailing: SafeText(
-                    '$currency${item.order.totalAmount.toStringAsFixed(0)}',
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: theme.primaryColor)),
+                    const Divider(height: 48),
+                    SafeRow(
+                      leading: SafeText('total_value'.tr(ref).toUpperCase(),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              letterSpacing: 1.2)),
+                      trailing: SafeText(
+                          '$currency${item.order.totalAmount.toStringAsFixed(0)}',
+                          style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: theme.primaryColor)),
+                    ),
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      height: 56,
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: Text('done'.tr(ref),
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('close'.tr(ref)))),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _deleteOrder(OrderWithDetails item, AppDatabase db) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('delete_order'.tr(ref)),
+        content: Text('delete_order_confirm'.tr(ref)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr(ref)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            child: Text('delete'.tr(ref)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Phase 4: Auto-backup before manipulation
+    await BackupService.backupDatabase();
+
+    try {
+      await (db.delete(db.orders)..where((t) => t.id.equals(item.order.id)))
+          .go();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('order_deleted'.tr(ref)),
+          backgroundColor: AppTheme.success,
+        ));
+      }
+    } catch (e) {
+      _showError('Delete failed: $e');
+    }
   }
 
   Product _fallbackProd() => Product(
@@ -513,10 +620,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           items: orderItems,
           products: products,
           orderNumber: item.order.notes ?? 'N/A');
-      await ExcelService.copyToDownloads(path);
+      final finalPath = await ExcelService.copyToDownloads(path,
+          customPath: ref.read(settingsProvider).excelSavePath);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('excel_saved'.tr(ref)),
+            content: Text('${'excel_saved'.tr(ref)}: $finalPath'),
             backgroundColor: AppTheme.success));
       }
     } finally {
@@ -569,21 +677,25 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
     // Helper to send for a specific customer
     Future<void> sendForCustomer(Customer customer) async {
-      final customerItems = await (db.select(db.orderItems)
-            ..where((t) =>
-                t.orderId.equals(item.order.id) &
-                t.customerId.equals(customer.id)))
-          .get();
+      try {
+        final customerItems = await (db.select(db.orderItems)
+              ..where((t) =>
+                  t.orderId.equals(item.order.id) &
+                  t.customerId.equals(customer.id)))
+            .get();
 
-      final allProducts = await db.select(db.products).get();
+        final allProducts = await db.select(db.products).get();
 
-      WhatsAppService.sendOrderMessage(
-        customer: customer,
-        items: customerItems,
-        products: allProducts,
-        order: item.order,
-        currencySymbol: currency,
-      );
+        await WhatsAppService.sendOrderMessage(
+          customer: customer,
+          items: customerItems,
+          products: allProducts,
+          order: item.order,
+          currencySymbol: currency,
+        );
+      } catch (e) {
+        _showError('WhatsApp failed: $e');
+      }
     }
 
     if (item.customers.length == 1) {
@@ -598,25 +710,29 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(context);
-                final allItems = await (db.select(db.orderItems)
-                      ..where((t) => t.orderId.equals(item.order.id)))
-                    .get();
-                final allProducts = await db.select(db.products).get();
+                try {
+                  final allItems = await (db.select(db.orderItems)
+                        ..where((t) => t.orderId.equals(item.order.id)))
+                      .get();
+                  final allProducts = await db.select(db.products).get();
 
-                // Fetch customers explicitly to ensure we have them all
-                final customers = await (db.select(db.customers)
-                      ..where((t) =>
-                          t.id.isIn(item.customers.map((c) => c.id).toList())))
-                    .get();
+                  // Fetch customers explicitly to ensure we have them all
+                  final customers = await (db.select(db.customers)
+                        ..where((t) => t.id
+                            .isIn(item.customers.map((c) => c.id).toList())))
+                      .get();
 
-                WhatsAppService.sendLorrySummaryMessage(
-                  order: item.order,
-                  customers: customers,
-                  allItems: allItems,
-                  allProducts: allProducts,
-                  millContactPhone: '9848135359', // Sri Balaji Mill
-                  currencySymbol: currency,
-                );
+                  await WhatsAppService.sendLorrySummaryMessage(
+                    order: item.order,
+                    customers: customers,
+                    allItems: allItems,
+                    allProducts: allProducts,
+                    millContactPhone: localization.millContactPhone,
+                    currencySymbol: currency,
+                  );
+                } catch (e) {
+                  _showError('WhatsApp summary failed: $e');
+                }
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -706,8 +822,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       final path = await ExcelService.generateAllOrdersExcel(
           orders: orders, products: products);
 
-      await Share.shareXFiles([XFile(path)], text: 'orders_statement'.tr(ref));
-      _showSuccess('saved_successfully'.tr(ref));
+      final finalPath = await ExcelService.copyToDownloads(path,
+          customPath: ref.read(settingsProvider).excelSavePath);
+      await Share.shareXFiles([XFile(finalPath)],
+          text: 'orders_statement'.tr(ref));
+      _showSuccess('${'saved_successfully'.tr(ref)}: $finalPath');
     } catch (e) {
       _showError('${'export_failed'.tr(ref)}: $e');
     }

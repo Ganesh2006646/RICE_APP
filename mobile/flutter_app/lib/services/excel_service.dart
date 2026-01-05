@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import '../db/database.dart';
+import 'package:drift/drift.dart' as drift;
 
 /// Service for generating Excel files matching the strict rice mill order format.
 /// Supports multi-customer lorry loads with grouping and exact visual alignment.
@@ -230,7 +232,12 @@ class ExcelService {
   }
 
   /// Get the downloads directory path for the user
-  static Future<String> getDownloadsPath() async {
+  static Future<String> getDownloadsPath({String? customPath}) async {
+    if (customPath != null && customPath.isNotEmpty) {
+      final dir = Directory(customPath);
+      if (await dir.exists()) return customPath;
+    }
+
     if (Platform.isAndroid) {
       final directory = Directory('/storage/emulated/0/Download');
       if (await directory.exists()) {
@@ -242,14 +249,35 @@ class ExcelService {
   }
 
   /// Copy file to downloads folder for easy access
-  static Future<String> copyToDownloads(String sourcePath) async {
-    final sourceFile = File(sourcePath);
-    final downloadsPath = await getDownloadsPath();
-    final fileName = sourcePath.split('/').last;
-    final destPath = '$downloadsPath/$fileName';
+  static Future<String> copyToDownloads(String sourcePath,
+      {String? customPath}) async {
+    try {
+      final sourceFile = File(sourcePath);
+      final downloadsPath = await getDownloadsPath(customPath: customPath);
+      final fileName = sourcePath.split(Platform.pathSeparator).last;
 
-    await sourceFile.copy(destPath);
-    return destPath;
+      // Ensure directory exists
+      final dir = Directory(downloadsPath);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      final destPath = '$downloadsPath/$fileName';
+
+      // Verify write permission by attempting to write a test file
+      if (Platform.isAndroid) {
+        // If custom path is set, we assume permission is handled by the picker
+        // If default, we might need to be careful with Scoped Storage
+      }
+
+      await sourceFile.copy(destPath);
+      return destPath;
+    } catch (e) {
+      // Fallback: Just return source path (app docs dir) if copy fails
+      // This prevents the "Success" message from showing a path that doesn't exist
+      print('Excel Copy Failed: $e');
+      return sourcePath;
+    }
   }
 
   /// Generate a summary Excel for ALL orders (Statement)
@@ -347,5 +375,108 @@ class ExcelService {
     final bytes = excel.save();
     if (bytes != null) await File(filePath).writeAsBytes(bytes);
     return filePath;
+  }
+
+  /// Import Customers from an Excel file
+  /// Expected Column Headers: Shop Name, Place, Phone, GST
+  static Future<Map<String, dynamic>> importCustomersFromExcel(
+      AppDatabase db) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+
+      if (result == null || result.files.single.path == null) {
+        return {'success': false, 'message': 'No file selected'};
+      }
+
+      File file = File(result.files.single.path!);
+      var bytes = await file.readAsBytes();
+      var excel = Excel.decodeBytes(bytes);
+
+      int importedCount = 0;
+      int skippedCount = 0;
+
+      await db.transaction(() async {
+        for (var table in excel.tables.keys) {
+          final sheet = excel.tables[table];
+          if (sheet == null || sheet.maxRows == 0) continue;
+
+          // Find headers in first row
+          final headers = <String, int>{};
+          final firstRow = sheet.rows.first;
+          for (int i = 0; i < firstRow.length; i++) {
+            final cellValue = firstRow[i]?.value.toString().toLowerCase() ?? '';
+            if (cellValue.contains('name') || cellValue.contains('party')) {
+              headers['name'] = i;
+            } else if (cellValue.contains('place') ||
+                cellValue.contains('city')) {
+              headers['place'] = i;
+            } else if (cellValue.contains('phone') ||
+                cellValue.contains('mobile') ||
+                cellValue.contains('cell')) {
+              headers['phone'] = i;
+            } else if (cellValue.contains('gst') || cellValue.contains('tin')) {
+              headers['gst'] = i;
+            }
+          }
+
+          // If no 'name' column found, assume rigid structure: 0=Name, 1=Place, 2=Phone, 3=GST
+          if (!headers.containsKey('name')) {
+            headers['name'] = 0;
+            headers['place'] = 1;
+            headers['phone'] = 2;
+            headers['gst'] = 3;
+          }
+
+          // Iterate Rows (Skip header)
+          for (int i = 1; i < sheet.rows.length; i++) {
+            final row = sheet.rows[i];
+            if (row.isEmpty) continue;
+
+            String getValue(int? idx) {
+              if (idx == null || idx >= row.length) return '';
+              final val = row[idx]?.value;
+              return val?.toString().trim() ?? '';
+            }
+
+            final name = getValue(headers['name']);
+            if (name.isEmpty) continue; // Skip if no name
+
+            final place = getValue(headers['place']);
+            final phone = getValue(headers['phone']);
+            final gst = getValue(headers['gst']);
+
+            // Insert
+            try {
+              await db.into(db.customers).insert(
+                    CustomersCompanion(
+                      id: drift.Value(
+                          '${DateTime.now().millisecondsSinceEpoch}_${i}_${importedCount}'),
+                      shopName: drift.Value(name),
+                      place: drift.Value(place.isEmpty ? null : place),
+                      phone: drift.Value(phone.isEmpty ? null : phone),
+                      tinGst: drift.Value(gst.isEmpty ? null : gst),
+                      updatedAt: drift.Value(DateTime.now()),
+                    ),
+                  );
+              importedCount++;
+            } catch (k) {
+              skippedCount++; // Likely duplicate or error
+            }
+          }
+        }
+      });
+
+      return {
+        'success': true,
+        'count': importedCount,
+        'skipped': skippedCount,
+        'message': 'Imported $importedCount customers ($skippedCount skipped)'
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Import Failed: $e'};
+    }
   }
 }

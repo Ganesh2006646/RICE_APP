@@ -96,7 +96,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       TextEditingController(text: '110.0');
   final TextEditingController _orderNumberController = TextEditingController();
   final List<CustomerLoadFormData> _customers = [];
-  bool _sendEmail = true;
   bool _isSaving = false;
   String? _orderNumber;
 
@@ -118,6 +117,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     final orderCount = await db.select(db.orders).get();
     final nextNum =
         await SettingsService.generateOrderNumber(orderCount.length);
+    if (!mounted) return;
     setState(() {
       _orderNumber = nextNum;
       _orderNumberController.text = nextNum;
@@ -143,6 +143,8 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       ])
             ..where(db.lorryShipments.orderId.equals(orderId)))
           .get();
+
+      if (!mounted) return;
 
       final allItems = await (db.select(db.orderItems)
             ..where((tbl) => tbl.orderId.equals(orderId)))
@@ -173,10 +175,12 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       }
 
       if (loadedCustomers.isNotEmpty) {
-        setState(() {
-          _customers.clear();
-          _customers.addAll(loadedCustomers);
-        });
+        if (mounted) {
+          setState(() {
+            _customers.clear();
+            _customers.addAll(loadedCustomers);
+          });
+        }
       } else {
         _addCustomer();
       }
@@ -218,6 +222,26 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       return;
     }
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('confirm_save'.tr(ref)),
+        content: Text('confirm_save_desc'.tr(ref)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr(ref)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('save'.tr(ref)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     setState(() => _isSaving = true);
 
     try {
@@ -233,27 +257,39 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               notes: drift.Value(_orderNumber),
               createdAt: drift.Value(DateTime.now()),
               updatedAt: drift.Value(DateTime.now()),
+              paymentStatus: const drift.Value('UNPAID'),
             ));
 
+        var customerIndex = 0;
         for (var customerLoad in _customers) {
           if (!customerLoad.isValid) continue;
-          final cId = customerLoad.customer!.id;
+          final cId = customerLoad.customer?.id ?? 'unknown';
+          customerIndex++;
+
+          // UNIQUE ID: orderId + customerId + index to prevent ANY collisions
+          final shipmentId = '${lorryId}_${cId}_$customerIndex';
 
           await db.into(db.lorryShipments).insert(LorryShipmentsCompanion(
-                id: drift.Value('${lorryId}_$cId'),
+                id: drift.Value(shipmentId),
                 orderId: drift.Value(lorryId),
                 customerId: drift.Value(cId),
                 totalAmount: drift.Value(customerLoad.totalAmount),
               ));
 
+          var itemIndex = 0;
           for (var item in customerLoad.items) {
             if (!item.isValid) continue;
+            itemIndex++;
+            final pId = item.product?.id ?? 'unknown';
+
+            // UNIQUE ID: shipmentId + productId + index
+            final orderItemId = '${shipmentId}_${pId}_$itemIndex';
+
             await db.into(db.orderItems).insert(OrderItemsCompanion(
-                  id: drift.Value(
-                      '${lorryId}_${cId}_${item.product!.id}_${DateTime.now().microsecondsSinceEpoch}'),
+                  id: drift.Value(orderItemId),
                   orderId: drift.Value(lorryId),
                   customerId: drift.Value(cId),
-                  productId: drift.Value(item.product!.id),
+                  productId: drift.Value(pId),
                   bags26: drift.Value(item.bags26),
                   bags10: drift.Value(item.bags10),
                   bags5: drift.Value(item.bags5),
@@ -280,21 +316,37 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ..where((t) => t.id.equals(lorryId)))
           .getSingle();
 
-      await ExcelService.generateLorryExcel(
-        order: lorryOrder,
-        items: allItems,
-        customers: validCustomers,
-        products: products,
-        orderNumber: _orderNumber ?? lorryId,
-      );
+      // Excel generation & Custom Path storage
+      try {
+        final path = await ExcelService.generateLorryExcel(
+          order: lorryOrder,
+          items: allItems,
+          customers: validCustomers,
+          products: products,
+          orderNumber: (_orderNumber == null || _orderNumber!.isEmpty)
+              ? lorryId
+              : _orderNumber!,
+        );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('saved_successfully'.tr(ref)),
-            backgroundColor: AppTheme.success));
+        final finalPath = await ExcelService.copyToDownloads(path,
+            customPath: ref.read(settingsProvider).excelSavePath);
 
-        if (mounted) Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('${'saved_successfully'.tr(ref)}: $finalPath'),
+              backgroundColor: AppTheme.success,
+              duration: const Duration(seconds: 4)));
+        }
+      } catch (e) {
+        debugPrint('Excel Save Error: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('saved_successfully'.tr(ref)),
+              backgroundColor: AppTheme.success));
+        }
       }
+
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       _showError('${'failed_to_save_order'.tr(ref)}: $e');
     } finally {
@@ -348,41 +400,70 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: SafeText(
-            _currentStep == 1 ? 'build_lorry'.tr(ref) : 'review_send'.tr(ref),
-            style: const TextStyle(fontSize: 18)),
-        actions: [
-          if (_currentStep == 1)
-            TextButton.icon(
-              onPressed: _validateAndReview,
-              icon: const Icon(Icons.arrow_forward),
-              label: Text('review'.tr(ref)),
-            )
-          else
-            FilledButton.icon(
-              onPressed: _isSaving ? null : _saveLorryOrder,
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.send),
-              label: Text('save_send'.tr(ref)),
-            ),
-          const SizedBox(width: 8),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('discard_changes'.tr(ref)),
+            content: Text('discard_changes_desc'.tr(ref)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('cancel'.tr(ref)),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text('discard'.tr(ref)),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: SafeText(
+              _currentStep == 1 ? 'build_lorry'.tr(ref) : 'review_send'.tr(ref),
+              style: const TextStyle(fontSize: 18)),
+          actions: [
+            if (_currentStep == 1)
+              TextButton.icon(
+                onPressed: _validateAndReview,
+                icon: const Icon(Icons.arrow_forward),
+                label: Text('review'.tr(ref)),
+              )
+            else if (_isSaving)
+              const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                      child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))))
+            else
+              FilledButton.icon(
+                onPressed: _saveLorryOrder,
+                icon: const Icon(Icons.send),
+                label: Text('save_send'.tr(ref)),
+              ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: _currentStep == 1
+            ? _buildLorryBuilder()
+            : (_currentStep == 2 || _currentStep == 3
+                ? _buildReviewPage()
+                : null),
+        bottomNavigationBar:
+            _currentStep == 1 ? _buildLorryProgressFooter() : null,
       ),
-      body: _currentStep == 1
-          ? _buildLorryBuilder()
-          : (_currentStep == 2 || _currentStep == 3
-              ? _buildReviewPage()
-              : null),
-      bottomNavigationBar:
-          _currentStep == 1 ? _buildLorryProgressFooter() : null,
     );
   }
 
@@ -775,27 +856,171 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Widget _buildReviewPage() {
     final theme = Theme.of(context);
+    final validCustomers = _customers.where((c) => c.isValid).toList();
+
     return SafePage(
       backgroundColor: theme.scaffoldBackgroundColor,
       child: SafeColumn(
         children: [
+          // Detailed Party-wise Summary
           SafeCard(
             color: theme.cardColor,
             child: SafeColumn(
               children: [
-                _summaryRow('total_customers'.tr(ref),
-                    '${_customers.where((c) => c.isValid).length}'),
+                SafeText('party_wise_summary'.tr(ref),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 16),
+                ...validCustomers.map((c) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SafeColumn(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Customer Header
+                          SafeCard(
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.3),
+                            padding: const EdgeInsets.all(8),
+                            child: SafeRow(
+                              leading: SafeText(
+                                  c.customer?.shopName ?? 'Unknown',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14)),
+                              trailing: SafeText(
+                                  '${c.totalQtl.toStringAsFixed(2)} QTL',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13)),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Detailed Items Table
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: AppTheme.lightGrey.withOpacity(0.3)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Column(
+                              children: [
+                                // Table Header
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                          flex: 3,
+                                          child: Text('Item',
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.grey,
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      Expanded(
+                                          flex: 2,
+                                          child: Text('Bags',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.grey,
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      Expanded(
+                                          flex: 2,
+                                          child: Text('Rate',
+                                              textAlign: TextAlign.right,
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.grey,
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      Expanded(
+                                          flex: 2,
+                                          child: Text('Total',
+                                              textAlign: TextAlign.right,
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.grey,
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(height: 1),
+                                // Items
+                                ...c.items.where((i) => i.isValid).map((i) {
+                                  String bagsText = '';
+                                  if (i.bags26 > 0)
+                                    bagsText += '${i.bags26}x26k ';
+                                  if (i.bags10 > 0)
+                                    bagsText += '${i.bags10}x10k ';
+                                  if (i.bags5 > 0) bagsText += '${i.bags5}x5k';
+
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 6),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                            flex: 3,
+                                            child: Text(i.product?.name ?? '-',
+                                                style: const TextStyle(
+                                                    fontSize: 12))),
+                                        Expanded(
+                                            flex: 2,
+                                            child: Text(bagsText,
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                    fontSize: 11))),
+                                        Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                                i.rate.toStringAsFixed(0),
+                                                textAlign: TextAlign.right,
+                                                style: const TextStyle(
+                                                    fontSize: 12))),
+                                        Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                                i.baseAmount.toStringAsFixed(0),
+                                                textAlign: TextAlign.right,
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w500))),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                          if (validCustomers.indexOf(c) <
+                              validCustomers.length - 1)
+                            const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Divider(thickness: 1, height: 1)),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SafeCard(
+            color: theme.cardColor,
+            child: SafeColumn(
+              children: [
+                _summaryRow(
+                    'total_customers'.tr(ref), '${validCustomers.length}'),
                 _summaryRow('total_weight'.tr(ref),
                     '${_totalQtl.toStringAsFixed(2)} QTL'),
                 _summaryRow('total_value'.tr(ref),
                     '${ref.watch(settingsProvider).currencySymbol}${_totalAmount.toStringAsFixed(0)}',
                     isTotal: true),
                 const Divider(height: 32),
-                SwitchListTile(
-                  title: Text('send_to_mill'.tr(ref)),
-                  value: _sendEmail,
-                  onChanged: (v) => setState(() => _sendEmail = v),
-                ),
               ],
             ),
           ),

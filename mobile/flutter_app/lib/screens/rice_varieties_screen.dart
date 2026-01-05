@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../providers/settings_provider.dart';
+import '../services/backup_service.dart';
 
 /// Screen for managing rice varieties (products) with full CRUD operations
 /// Renamed from ProductsScreen to better match domain terminology
@@ -262,6 +263,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
     );
 
     if (confirmed == true) {
+      await BackupService.backupDatabase();
       await (db.delete(db.products)..where((tbl) => tbl.id.equals(product.id)))
           .go();
 
