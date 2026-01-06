@@ -1,27 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import 'screens/splash_screen.dart';
 import 'db/database.dart';
 import 'theme.dart';
 import 'providers/settings_provider.dart';
+import 'services/backup_service.dart';
+import 'services/crash_reporting_service.dart';
+import 'services/product_seeding_service.dart';
+import 'widgets/error_boundary.dart';
 
 /// Global database provider for Drift/SQLite access
 final databaseProvider = Provider<AppDatabase>((ref) => AppDatabase());
 
 void main() async {
+  // Initialize global error handler first
+  GlobalErrorHandler.init();
+
+  // Initialize crash reporting (uncomment DSN after setting up Sentry)
+  // To enable: Go to sentry.io, create project, paste DSN below
+  await CrashReportingService.init(
+      // dsn: 'https://your-dsn@sentry.io/your-project', // Uncomment with your DSN
+      );
+
+  // Run app in a zone to catch async errors
+  runZonedGuarded(
+    () async {
+      try {
+        WidgetsFlutterBinding.ensureInitialized();
+
+        final db = AppDatabase();
+
+        // Seed initial products if empty
+        await ProductSeedingService.seedInitialProducts(db);
+
+        // Trigger auto-backup before app starts (non-blocking)
+        _triggerAutoBackup();
+
+        runApp(ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+          ],
+          child: const ErrorBoundary(
+            child: RiceAgentApp(),
+          ),
+        ));
+      } catch (e, stack) {
+        debugPrint('Fatal Startup Error: $e');
+        GlobalErrorHandler.logError(e, stack);
+        CrashReportingService.reportError(e, stack, context: 'App Startup');
+      }
+    },
+    (error, stack) {
+      // Catch any async errors not caught by Flutter framework
+      debugPrint('[ZoneError] Uncaught async error: $error');
+      GlobalErrorHandler.logError(error, stack);
+      CrashReportingService.reportError(error, stack, context: 'Async Zone');
+    },
+  );
+}
+
+/// Trigger auto-backup silently during startup
+Future<void> _triggerAutoBackup() async {
   try {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    final db = AppDatabase();
-
-    runApp(ProviderScope(
-      overrides: [
-        databaseProvider.overrideWithValue(db),
-      ],
-      child: const RiceAgentApp(),
-    ));
+    final prefs = await SharedPreferences.getInstance();
+    final autoBackupEnabled = prefs.getBool('auto_backup_enabled') ?? true;
+    await BackupService.performAutoBackupIfNeeded(autoBackupEnabled);
   } catch (e) {
-    debugPrint('Fatal Startup Error: $e');
+    debugPrint('[Main] Auto-backup trigger failed: $e');
   }
 }
 

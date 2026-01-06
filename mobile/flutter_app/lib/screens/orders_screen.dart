@@ -17,7 +17,6 @@ import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
 
 /// Orders History Screen with filters and actions
-/// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
 class OrdersScreen extends ConsumerStatefulWidget {
   const OrdersScreen({super.key});
 
@@ -576,10 +575,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       await (db.delete(db.orders)..where((t) => t.id.equals(item.order.id)))
           .go();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('order_deleted'.tr(ref)),
-          backgroundColor: AppTheme.success,
-        ));
+        SafeSnackBar.show(context, 'order_deleted'.tr(ref));
       }
     } catch (e) {
       _showError('Delete failed: $e');
@@ -623,9 +619,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       final finalPath = await ExcelService.copyToDownloads(path,
           customPath: ref.read(settingsProvider).excelSavePath);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('${'excel_saved'.tr(ref)}: $finalPath'),
-            backgroundColor: AppTheme.success));
+        SafeSnackBar.show(context, '${'excel_saved'.tr(ref)}: $finalPath');
       }
     } finally {
       if (mounted) {
@@ -722,6 +716,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                             .isIn(item.customers.map((c) => c.id).toList())))
                       .get();
 
+                  // Check mounted before WhatsApp call - prevents use after dispose
+                  if (!mounted) return;
+
                   await WhatsAppService.sendLorrySummaryMessage(
                     order: item.order,
                     customers: customers,
@@ -731,7 +728,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     currencySymbol: currency,
                   );
                 } catch (e) {
-                  _showError('WhatsApp summary failed: $e');
+                  if (mounted) {
+                    _showError('WhatsApp summary failed: $e');
+                  }
                 }
               },
               child: Padding(
@@ -788,17 +787,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
   void _showError(String msg) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: AppTheme.error),
-      );
+      SafeSnackBar.show(context, msg, isError: true);
     }
   }
 
   void _showSuccess(String msg) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: AppTheme.success),
-      );
+      SafeSnackBar.show(context, msg);
     }
   }
 

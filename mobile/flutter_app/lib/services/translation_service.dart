@@ -196,6 +196,11 @@ class TranslationService {
       'restart_message':
           'Please restart the app for the restored data to take effect.',
       'restore_warning': 'This will overwrite all current data. Are you sure?',
+      'auto_backup_daily': 'Auto Backup (Daily)',
+      'auto_backup_helper': 'Automatically backs up data daily on app launch',
+      'last_backup': 'Last backup',
+      'backup_success': 'Backup created successfully',
+      'backup_failed': 'Backup failed',
     },
     'Telugu': {
       'dashboard': 'డ్యాష్‌బోర్డ్',
@@ -391,6 +396,12 @@ class TranslationService {
           'డేటా పునరుద్ధరణ అమలు కావడానికి దయచేసి యాప్‌ను రీస్టార్ట్ చేయండి.',
       'restore_warning':
           'ఇది ప్రస్తుత డేటా మొత్తాన్ని తొలగిస్తుంది. ఖచ్చితంగా కొనసాగించాలా?',
+      'auto_backup_daily': 'ఆటో బ్యాకప్ (రోజువారీ)',
+      'auto_backup_helper':
+          'యాప్ ప్రారంభంలో రోజువారీ డేటాను స్వయంచాలకంగా బ్యాకప్ చేస్తుంది',
+      'last_backup': 'చివరి బ్యాకప్',
+      'backup_success': 'బ్యాకప్ విజయవంతంగా సృష్టించబడింది',
+      'backup_failed': 'బ్యాకప్ విఫలమైంది',
     },
     'Hindi': {
       'dashboard': 'डैशबोर्ड',
@@ -586,6 +597,12 @@ class TranslationService {
           'पुनर्स्थापित डेटा को प्रभावी बनाने के लिए कृपया ऐप को रीस्टार्ट करें।',
       'restore_warning':
           'यह सभी वर्तमान डेटा को मिटा देगा। क्या आप सुनिश्चित हैं?',
+      'auto_backup_daily': 'ऑटो बैकअप (दैनिक)',
+      'auto_backup_helper':
+          'ऐप लॉन्च पर दैनिक डेटा स्वचालित रूप से बैकअप करता है',
+      'last_backup': 'अंतिम बैकअप',
+      'backup_success': 'बैकअप सफलतापूर्वक बनाया गया',
+      'backup_failed': 'बैकअप विफल',
     },
     'Tamil': {
       'dashboard': 'டாஷ்போர்டு',
@@ -783,6 +800,12 @@ class TranslationService {
           'மீட்கப்பட்ட தரவு நடைமுறைக்கு வர செயலியை மீண்டும் தொடங்கவும்.',
       'restore_warning':
           'இது தற்போதைய தரவு அனைத்தையும் அழிக்கும். நிச்சயமாகத் தொடர வேண்டுமா?',
+      'auto_backup_daily': 'ஆட்டோ பேக்கப் (தினசரி)',
+      'auto_backup_helper':
+          'செயலி தொடங்கும்போது தினசரி தரவை தானாகவே காப்புப்பிரதி எடுக்கும்',
+      'last_backup': 'கடைசி காப்புப்பிரதி',
+      'backup_success': 'காப்புப்பிரதி வெற்றிகரமாக உருவாக்கப்பட்டது',
+      'backup_failed': 'காப்புப்பிரதி தோல்வியடைந்தது',
     },
   };
 

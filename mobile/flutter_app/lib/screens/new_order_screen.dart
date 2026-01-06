@@ -112,6 +112,33 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     super.dispose();
   }
 
+  /// Reset all state for clean Cancel/Discard behavior
+  /// Prevents black screen when re-entering after cancel
+  void _resetState() {
+    _currentStep = 1;
+    _isSaving = false;
+    _customers.clear();
+    _loadingDate = DateTime.now();
+    _orderNumber = null;
+  }
+
+  /// Fallback widget when step state is invalid
+  /// Prevents black screen from null body rendering
+  Widget _buildLoadingFallback() {
+    final theme = Theme.of(context);
+    return Center(
+      child: SafeColumn(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: theme.primaryColor),
+          const SizedBox(height: 16),
+          SafeText('Loading...', style: TextStyle(color: theme.primaryColor)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _initLorry() async {
     final db = ref.read(databaseProvider);
     final orderCount = await db.select(db.orders).get();
@@ -332,17 +359,13 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             customPath: ref.read(settingsProvider).excelSavePath);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('${'saved_successfully'.tr(ref)}: $finalPath'),
-              backgroundColor: AppTheme.success,
-              duration: const Duration(seconds: 4)));
+          SafeSnackBar.show(
+              context, '${'saved_successfully'.tr(ref)}: $finalPath');
         }
       } catch (e) {
         debugPrint('Excel Save Error: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('saved_successfully'.tr(ref)),
-              backgroundColor: AppTheme.success));
+          SafeSnackBar.show(context, 'saved_successfully'.tr(ref));
         }
       }
 
@@ -355,8 +378,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppTheme.error));
+    SafeSnackBar.show(context, message, isError: true);
   }
 
   void _validateAndReview() {
@@ -422,6 +444,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
           ),
         );
         if (confirmed == true && context.mounted) {
+          _resetState(); // Clean state before navigation
           Navigator.pop(context);
         }
       },
@@ -460,7 +483,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ? _buildLorryBuilder()
             : (_currentStep == 2 || _currentStep == 3
                 ? _buildReviewPage()
-                : null),
+                : _buildLoadingFallback()), // Never null - prevents black screen
         bottomNavigationBar:
             _currentStep == 1 ? _buildLorryProgressFooter() : null,
       ),
@@ -479,16 +502,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             child: SafeColumn(
               children: [
                 SafeRow(
-                  leading: Expanded(
-                    child: TextFormField(
-                      controller: _orderNumberController,
-                      decoration: InputDecoration(
-                        labelText: 'order_no'.tr(ref),
-                        prefixIcon: const Icon(Icons.tag),
-                        border: InputBorder.none,
-                      ),
-                      onChanged: (v) => _orderNumber = v,
+                  leading: TextFormField(
+                    controller: _orderNumberController,
+                    decoration: InputDecoration(
+                      labelText: 'order_no'.tr(ref),
+                      prefixIcon: const Icon(Icons.tag),
+                      border: InputBorder.none,
                     ),
+                    onChanged: (v) => _orderNumber = v,
                   ),
                   trailing: InkWell(
                     onTap: () async {
@@ -899,14 +920,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                           Container(
                             decoration: BoxDecoration(
                               border: Border.all(
-                                  color: AppTheme.lightGrey.withOpacity(0.3)),
+                                  color: AppTheme.lightGrey
+                                      .withValues(alpha: 0.3)),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Column(
                               children: [
                                 // Table Header
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
+                                const Padding(
+                                  padding: EdgeInsets.all(8.0),
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -951,11 +973,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                                 // Items
                                 ...c.items.where((i) => i.isValid).map((i) {
                                   String bagsText = '';
-                                  if (i.bags26 > 0)
+                                  if (i.bags26 > 0) {
                                     bagsText += '${i.bags26}x26k ';
-                                  if (i.bags10 > 0)
+                                  }
+                                  if (i.bags10 > 0) {
                                     bagsText += '${i.bags10}x10k ';
-                                  if (i.bags5 > 0) bagsText += '${i.bags5}x5k';
+                                  }
+                                  if (i.bags5 > 0) {
+                                    bagsText += '${i.bags5}x5k';
+                                  }
 
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(

@@ -67,17 +67,6 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 _buildDropdown(
                   context: context,
-                  label: 'app_mode'.tr(ref),
-                  value: settings.appMode,
-                  items: ['Simple Mode', 'Advanced Mode'],
-                  onChanged: (value) => notifier.setAppMode(value!),
-                  helperText: settings.appMode == 'Simple Mode'
-                      ? 'Simple UI'
-                      : 'Advanced UI',
-                ),
-                const SizedBox(height: 16),
-                _buildDropdown(
-                  context: context,
                   label: 'theme'.tr(ref),
                   value: settings.theme,
                   items: ['Light', 'Dark'],
@@ -185,7 +174,8 @@ class SettingsScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Icon(Icons.edit, size: 16, color: AppTheme.grey),
+                            const Icon(Icons.edit,
+                                size: 16, color: AppTheme.grey),
                           ],
                         ),
                       ),
@@ -204,6 +194,61 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.backup_outlined,
               title: 'data_management'.tr(ref),
               children: [
+                // Auto-Backup Toggle
+                SafeCard(
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.3),
+                  padding: const EdgeInsets.all(12),
+                  child: SafeColumn(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.autorenew,
+                            color: theme.primaryColor, size: 24),
+                        title: Text(
+                          'auto_backup_daily'.tr(ref),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          'auto_backup_helper'.tr(ref),
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.grey),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                        trailing: Switch(
+                          value: settings.autoBackupEnabled,
+                          onChanged: (value) =>
+                              notifier.setAutoBackupEnabled(value),
+                          activeTrackColor: theme.primaryColor.withAlpha(128),
+                          activeThumbColor: theme.primaryColor,
+                        ),
+                      ),
+                      // Show last backup time
+                      FutureBuilder<DateTime?>(
+                        future: BackupService.getLastAutoBackupTime(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data != null) {
+                            final lastBackup = snapshot.data!;
+                            final formattedTime =
+                                '${lastBackup.day}/${lastBackup.month}/${lastBackup.year} ${lastBackup.hour}:${lastBackup.minute.toString().padLeft(2, '0')}';
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: SafeText(
+                                '${'last_backup'.tr(ref)}: $formattedTime',
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppTheme.grey),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: () async {
                     final result = await BackupService.backupDatabase();
@@ -556,7 +601,8 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
+          key: ValueKey(value),
           items: items
               .map((item) => DropdownMenuItem(value: item, child: Text(item)))
               .toList(),
@@ -631,9 +677,9 @@ class SettingsScreen extends ConsumerWidget {
               context: context,
               builder: (context) => AlertDialog(
                 title: Text('permission_required'.tr(ref)),
-                content: Text(
+                content: const Text(
                     'To save files in custom folders, this app needs "All Files Access".\n\nPlease grant this permission in the next screen (App Settings).',
-                    style: const TextStyle(fontSize: 14)),
+                    style: TextStyle(fontSize: 14)),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -722,8 +768,9 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppTheme.error));
+    if (context.mounted) {
+      SafeSnackBar.show(context, message, isError: true);
+    }
   }
 
   Future<void> _showResetConfirmation(
@@ -772,37 +819,12 @@ class SettingsScreen extends ConsumerWidget {
         ref.read(settingsProvider.notifier).resetAll();
 
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: SafeRow(
-                leading: Row(
-                  children: [
-                    const Icon(Icons.delete_forever, color: Colors.white),
-                    const SizedBox(width: 12),
-                    SafeText('deleted_success'.tr(ref)),
-                  ],
-                ),
-              ),
-              backgroundColor: AppTheme.error,
-            ),
-          );
+          SafeSnackBar.show(context, 'deleted_success'.tr(ref), isError: true);
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: SafeRow(
-                leading: Row(
-                  children: [
-                    const Icon(Icons.error, color: Colors.white),
-                    const SizedBox(width: 12),
-                    SafeText('${'failed_to_delete'.tr(ref)}: $e'),
-                  ],
-                ),
-              ),
-              backgroundColor: AppTheme.error,
-            ),
-          );
+          SafeSnackBar.show(context, '${'failed_to_delete'.tr(ref)}: $e',
+              isError: true);
         }
       }
     }

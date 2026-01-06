@@ -275,7 +275,7 @@ class ExcelService {
     } catch (e) {
       // Fallback: Just return source path (app docs dir) if copy fails
       // This prevents the "Success" message from showing a path that doesn't exist
-      print('Excel Copy Failed: $e');
+      // print('Excel Copy Failed: $e');
       return sourcePath;
     }
   }
@@ -453,7 +453,7 @@ class ExcelService {
               await db.into(db.customers).insert(
                     CustomersCompanion(
                       id: drift.Value(
-                          '${DateTime.now().millisecondsSinceEpoch}_${i}_${importedCount}'),
+                          '${DateTime.now().millisecondsSinceEpoch}_${i}_$importedCount'),
                       shopName: drift.Value(name),
                       place: drift.Value(place.isEmpty ? null : place),
                       phone: drift.Value(phone.isEmpty ? null : phone),
@@ -474,6 +474,122 @@ class ExcelService {
         'count': importedCount,
         'skipped': skippedCount,
         'message': 'Imported $importedCount customers ($skippedCount skipped)'
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Import Failed: $e'};
+    }
+  }
+
+  /// Import Products from Excel
+  /// Expected Column Headers: Name, SKU, Price, GST
+  static Future<Map<String, dynamic>> importProductsFromExcel(
+      AppDatabase db) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+
+      if (result == null || result.files.single.path == null) {
+        return {'success': false, 'message': 'No file selected'};
+      }
+
+      File file = File(result.files.single.path!);
+      var bytes = await file.readAsBytes();
+      var excel = Excel.decodeBytes(bytes);
+
+      int importedCount = 0;
+      int skippedCount = 0;
+
+      await db.transaction(() async {
+        for (var table in excel.tables.keys) {
+          final sheet = excel.tables[table];
+          if (sheet == null || sheet.maxRows == 0) continue;
+
+          // Find headers in first row
+          final headers = <String, int>{};
+          final firstRow = sheet.rows.first;
+          for (int i = 0; i < firstRow.length; i++) {
+            final cellValue = firstRow[i]?.value.toString().toLowerCase() ?? '';
+            if (cellValue.contains('name') || cellValue.contains('variety')) {
+              headers['name'] = i;
+            } else if (cellValue.contains('sku') ||
+                cellValue.contains('code')) {
+              headers['sku'] = i;
+            } else if (cellValue.contains('price') ||
+                cellValue.contains('rate') ||
+                cellValue.contains('cost')) {
+              headers['price'] = i;
+            } else if (cellValue.contains('gst') || cellValue.contains('tax')) {
+              headers['gst'] = i;
+            }
+          }
+
+          // If no 'name' column found, assume structure: 0=Name, 1=Price, 2=GST, 3=SKU
+          if (!headers.containsKey('name')) {
+            headers['name'] = 0;
+            headers['price'] = 1;
+            headers['gst'] = 2;
+            headers['sku'] = 3;
+          }
+
+          // Iterate Rows (Skip header if name matches)
+          bool skipFirst = false;
+          final firstRowName = sheet.rows.first[headers['name']!]?.value
+              .toString()
+              .toLowerCase();
+          if (firstRowName != null &&
+              (firstRowName.contains('name') ||
+                  firstRowName.contains('variety'))) {
+            skipFirst = true;
+          }
+
+          for (int i = skipFirst ? 1 : 0; i < sheet.rows.length; i++) {
+            final row = sheet.rows[i];
+            if (row.isEmpty) continue;
+
+            String getValue(int? idx) {
+              if (idx == null || idx >= row.length) return '';
+              final val = row[idx]?.value;
+              return val?.toString().trim() ?? '';
+            }
+
+            final name = getValue(headers['name']);
+            if (name.isEmpty) continue;
+
+            final priceStr = getValue(headers['price']);
+            final gstStr = getValue(headers['gst']);
+            final sku = getValue(headers['sku']);
+
+            final price = double.tryParse(priceStr) ?? 0.0;
+            final gst = double.tryParse(gstStr.replaceAll('%', '')) ?? 0.0;
+
+            try {
+              final id =
+                  '${DateTime.now().millisecondsSinceEpoch}_${importedCount}_product';
+              await db.into(db.products).insert(
+                    ProductsCompanion(
+                      id: drift.Value(id),
+                      sku: drift.Value(sku.isEmpty ? null : sku),
+                      name: drift.Value(name),
+                      defaultPrice: drift.Value(price),
+                      gstRateDefault: drift.Value(gst),
+                      updatedAt: drift.Value(DateTime.now()),
+                    ),
+                  );
+              importedCount++;
+            } catch (k) {
+              skippedCount++;
+            }
+          }
+        }
+      });
+
+      return {
+        'success': true,
+        'count': importedCount,
+        'skipped': skippedCount,
+        'message': 'Imported $importedCount products ($skippedCount skipped)'
       };
     } catch (e) {
       return {'success': false, 'message': 'Import Failed: $e'};

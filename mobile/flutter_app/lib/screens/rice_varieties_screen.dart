@@ -8,6 +8,8 @@ import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
+import '../services/excel_service.dart';
+import '../widgets/safe_widgets.dart';
 
 /// Screen for managing rice varieties (products) with full CRUD operations
 /// Renamed from ProductsScreen to better match domain terminology
@@ -23,6 +25,11 @@ class RiceVarietiesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text('rice_varieties'.tr(ref)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined),
+            tooltip: 'import_from_excel'.tr(ref),
+            onPressed: () => _handleImport(context, db, ref),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'add_rice_variety'.tr(ref),
@@ -88,14 +95,34 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 ),
           ),
           const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () => _showProductDialog(context, db, ref),
-            icon: const Icon(Icons.add),
-            label: Text('add_first_variety'.tr(ref)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _showProductDialog(context, db, ref),
+                icon: const Icon(Icons.add),
+                label: Text('add_first_variety'.tr(ref)),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => _handleImport(context, db, ref),
+                icon: const Icon(Icons.file_upload_outlined),
+                label: Text('import_excel'.tr(ref)),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleImport(
+      BuildContext context, AppDatabase db, WidgetRef ref) async {
+    final result = await ExcelService.importProductsFromExcel(db);
+    if (context.mounted) {
+      SafeSnackBar.show(context, result['message'],
+          isError: !result['success']);
+    }
   }
 
   Widget _buildProductCard(
@@ -268,9 +295,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
           .go();
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('rice_variety_deleted'.tr(ref))),
-        );
+        SafeSnackBar.show(context, 'rice_variety_deleted'.tr(ref));
       }
     }
   }
@@ -375,17 +400,15 @@ class RiceVarietiesScreen extends ConsumerWidget {
             FilledButton(
               onPressed: () async {
                 if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('name_required'.tr(ref))),
-                  );
+                  SafeSnackBar.show(context, 'name_required'.tr(ref),
+                      isError: true);
                   return;
                 }
 
                 final price = double.tryParse(priceController.text.trim());
                 if (price == null || price <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('valid_price_required'.tr(ref))),
-                  );
+                  SafeSnackBar.show(context, 'valid_price_required'.tr(ref),
+                      isError: true);
                   return;
                 }
 
@@ -416,14 +439,11 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 }
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isEditing
+                  SafeSnackBar.show(
+                      context,
+                      isEditing
                           ? 'variety_updated'.tr(ref)
-                          : 'variety_added'.tr(ref)),
-                      backgroundColor: AppTheme.success,
-                    ),
-                  );
+                          : 'variety_added'.tr(ref));
                   Navigator.pop(context);
                 }
               },

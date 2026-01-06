@@ -397,7 +397,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF333333), width: 1),
+          side: const BorderSide(color: Color(0xFF444444), width: 1),
         ),
         color: const Color(0xFF1E1E1E),
         surfaceTintColor: Colors.transparent,
@@ -441,7 +441,7 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2C2C2C), width: 1),
+          borderSide: const BorderSide(color: Color(0xFF444444), width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -459,6 +459,26 @@ class AppTheme {
         indicatorColor: lightGreen.withValues(alpha: 0.2),
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFF333333),
+        thickness: 1,
+        space: 1,
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: white,
+        ),
+        subtitleTextStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: grey,
         ),
       ),
       textTheme: baseTextTheme.apply(

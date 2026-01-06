@@ -13,6 +13,7 @@ class AppSettings {
   final String invoicePrefix;
   final String currencySymbol;
   final String excelSavePath;
+  final bool autoBackupEnabled;
 
   const AppSettings({
     this.language = 'English',
@@ -21,10 +22,11 @@ class AppSettings {
     this.theme = 'Light',
     this.defaultDueDays = 7,
     this.millEmail = 'sbbrrm@gmail.com',
-    this.millContactPhone = '9848012345',
+    this.millContactPhone = '9885185666',
     this.invoicePrefix = 'SBRM-2024-',
     this.currencySymbol = '₹',
     this.excelSavePath = '',
+    this.autoBackupEnabled = true,
   });
 
   AppSettings copyWith({
@@ -38,6 +40,7 @@ class AppSettings {
     String? invoicePrefix,
     String? currencySymbol,
     String? excelSavePath,
+    bool? autoBackupEnabled,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -50,6 +53,7 @@ class AppSettings {
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       excelSavePath: excelSavePath ?? this.excelSavePath,
+      autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
     );
   }
 
@@ -83,10 +87,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       theme: prefs.getString('theme') ?? 'Light',
       defaultDueDays: prefs.getInt('defaultDueDays') ?? 7,
       millEmail: prefs.getString('mill_email') ?? 'sbbrrm@gmail.com',
-      millContactPhone: prefs.getString('mill_contact') ?? '9848012345',
+      millContactPhone: prefs.getString('mill_contact') ?? '9885185666',
       invoicePrefix: prefs.getString('invoice_prefix') ?? 'SBRM-2024-',
       currencySymbol: prefs.getString('currency_symbol') ?? '₹',
       excelSavePath: prefs.getString('excel_save_path') ?? '',
+      autoBackupEnabled: prefs.getBool('auto_backup_enabled') ?? true,
     );
   }
 
@@ -148,6 +153,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('excel_save_path', path);
     state = state.copyWith(excelSavePath: path);
+  }
+
+  Future<void> setAutoBackupEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('auto_backup_enabled', enabled);
+    state = state.copyWith(autoBackupEnabled: enabled);
   }
 
   Future<void> resetAll() async {

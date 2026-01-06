@@ -322,3 +322,75 @@ class SafeListTile extends StatelessWidget {
     );
   }
 }
+
+/// SafeSnackBar - Prevents message stacking by clearing previous snackbars
+class SafeSnackBar {
+  static void show(BuildContext context, String message,
+      {bool isError = false}) {
+    // Clear any existing snackbars first to prevent stacking
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    // Show the new snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+/// SafeBuilder - Ensures conditional UI never renders null/blank
+///
+/// RULES APPLIED:
+/// 1. Always has a fallback (loading, error, or empty state)
+/// 2. Handles null builder results gracefully
+/// 3. Prevents black screen from null widget returns
+///
+/// USE THIS: For any conditional rendering that might return null
+class SafeBuilder extends StatelessWidget {
+  final Widget? Function() builder;
+  final Widget fallback;
+
+  const SafeBuilder({
+    super.key,
+    required this.builder,
+    this.fallback = const Center(child: CircularProgressIndicator()),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return builder() ?? fallback;
+  }
+}
+
+/// NavigationGuard - Utility for safe navigation with state cleanup
+///
+/// Provides centralized navigation guards to prevent:
+/// - Double pops
+/// - Navigation from disposed contexts
+/// - State leaks after cancel/discard
+class NavigationGuard {
+  /// Safely pop with mounted check
+  static void safePop(BuildContext context, {VoidCallback? onBeforePop}) {
+    if (context.mounted) {
+      onBeforePop?.call();
+      Navigator.pop(context);
+    }
+  }
+
+  /// Safely pop with result and mounted check
+  static void safePopWithResult<T>(BuildContext context, T result,
+      {VoidCallback? onBeforePop}) {
+    if (context.mounted) {
+      onBeforePop?.call();
+      Navigator.pop(context, result);
+    }
+  }
+
+  /// Check if safe to navigate (context is mounted)
+  static bool canNavigate(BuildContext context) {
+    return context.mounted;
+  }
+}
