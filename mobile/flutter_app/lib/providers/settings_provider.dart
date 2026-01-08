@@ -5,8 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppSettings {
   final String language;
   final String fontSize;
-  final String appMode;
-  final String theme;
   final int defaultDueDays;
   final String millEmail;
   final String millContactPhone;
@@ -18,8 +16,6 @@ class AppSettings {
   const AppSettings({
     this.language = 'English',
     this.fontSize = 'Medium',
-    this.appMode = 'Simple Mode',
-    this.theme = 'Light',
     this.defaultDueDays = 7,
     this.millEmail = 'sbbrrm@gmail.com',
     this.millContactPhone = '9885185666',
@@ -32,8 +28,6 @@ class AppSettings {
   AppSettings copyWith({
     String? language,
     String? fontSize,
-    String? appMode,
-    String? theme,
     int? defaultDueDays,
     String? millEmail,
     String? millContactPhone,
@@ -45,8 +39,6 @@ class AppSettings {
     return AppSettings(
       language: language ?? this.language,
       fontSize: fontSize ?? this.fontSize,
-      appMode: appMode ?? this.appMode,
-      theme: theme ?? this.theme,
       defaultDueDays: defaultDueDays ?? this.defaultDueDays,
       millEmail: millEmail ?? this.millEmail,
       millContactPhone: millContactPhone ?? this.millContactPhone,
@@ -68,8 +60,8 @@ class AppSettings {
     }
   }
 
-  bool get isDarkMode => theme == 'Dark';
-  bool get isAdvancedMode => appMode == 'Advanced Mode';
+  bool get isDarkMode => false; // Hardcoded to light mode
+  bool get isAdvancedMode => true; // Keep as true or remove if unused elsewhere
 }
 
 /// Settings Notifier to manage app settings state
@@ -83,8 +75,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = AppSettings(
       language: prefs.getString('language') ?? 'English',
       fontSize: prefs.getString('fontSize') ?? 'Medium',
-      appMode: prefs.getString('appMode') ?? 'Simple Mode',
-      theme: prefs.getString('theme') ?? 'Light',
       defaultDueDays: prefs.getInt('defaultDueDays') ?? 7,
       millEmail: prefs.getString('mill_email') ?? 'sbbrrm@gmail.com',
       millContactPhone: prefs.getString('mill_contact') ?? '9885185666',
@@ -105,18 +95,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('fontSize', fontSize);
     state = state.copyWith(fontSize: fontSize);
-  }
-
-  Future<void> setAppMode(String appMode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('appMode', appMode);
-    state = state.copyWith(appMode: appMode);
-  }
-
-  Future<void> setTheme(String theme) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('theme', theme);
-    state = state.copyWith(theme: theme);
   }
 
   Future<void> setDefaultDueDays(int days) async {

@@ -87,11 +87,14 @@ class SafeCard extends StatelessWidget {
 /// 1. Main content wrapped in Expanded/Flexible
 /// 2. Text has ellipsis
 /// 3. No fixed widths
+/// 4. Trailing wrapped in Flexible to prevent right overflow
 class SafeRow extends StatelessWidget {
   final Widget leading;
   final Widget? trailing;
   final CrossAxisAlignment crossAxisAlignment;
   final MainAxisAlignment mainAxisAlignment;
+  final int flexLeading;
+  final int flexTrailing;
 
   const SafeRow({
     super.key,
@@ -99,6 +102,9 @@ class SafeRow extends StatelessWidget {
     this.trailing,
     this.crossAxisAlignment = CrossAxisAlignment.center,
     this.mainAxisAlignment = MainAxisAlignment.spaceBetween,
+    this.flexLeading = 1,
+    this.flexTrailing =
+        0, // 0 means no flex (intrinsic size), >0 means flexible
   });
 
   @override
@@ -107,10 +113,12 @@ class SafeRow extends StatelessWidget {
       crossAxisAlignment: crossAxisAlignment,
       mainAxisAlignment: mainAxisAlignment,
       children: [
-        Expanded(child: leading),
+        Flexible(flex: flexLeading, child: leading),
         if (trailing != null) ...[
           const SizedBox(width: 8),
-          trailing!,
+          flexTrailing > 0
+              ? Flexible(flex: flexTrailing, child: trailing!)
+              : Flexible(flex: 0, fit: FlexFit.loose, child: trailing!),
         ],
       ],
     );

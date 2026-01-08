@@ -67,10 +67,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               title: Text(_getTitle(), overflow: TextOverflow.ellipsis),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => setState(() => _selectedIndex = 5),
-                ),
+                if (_selectedIndex != 5)
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: () => setState(() => _selectedIndex = 5),
+                  ),
               ],
             ),
       drawer: _buildNavigationDrawer(),
@@ -569,18 +570,20 @@ class DailyDashboard extends ConsumerWidget {
                     child: Icon(icon, size: 28, color: color),
                   ),
                   const SizedBox(height: 12),
-                  const SizedBox(height: 12),
-                  Flexible(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: theme.textTheme.bodyLarge?.color,
+                  SizedBox(
+                    height: 40, // Fixed height for labels to align
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],

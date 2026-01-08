@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import '../db/database.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/foundation.dart';
 
 /// Service for generating Excel files matching the strict rice mill order format.
 /// Supports multi-customer lorry loads with grouping and exact visual alignment.
@@ -168,12 +169,31 @@ class ExcelService {
     }
 
     for (var customerId in groupedItems.keys) {
-      final customer = customers.firstWhere((c) => c.id == customerId);
+      final customer = customers.firstWhere(
+        (c) => c.id == customerId,
+        orElse: () => Customer(
+          id: customerId,
+          shopName: 'Unknown',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
       final customerItems = groupedItems[customerId]!;
 
       for (int i = 0; i < customerItems.length; i++) {
         final item = customerItems[i];
-        final product = products.firstWhere((p) => p.id == item.productId);
+        final product = products.firstWhere(
+          (p) => p.id == item.productId,
+          orElse: () => Product(
+            id: item.productId,
+            name: 'Unknown Rice',
+            defaultPrice: 0,
+            gstRateDefault: 0,
+            unit: 'qtl',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
 
         final isFirstRow = i == 0;
 
@@ -593,6 +613,104 @@ class ExcelService {
       };
     } catch (e) {
       return {'success': false, 'message': 'Import Failed: $e'};
+    }
+  }
+
+  /// Append deleted customer to consolidated Excel file
+  static Future<void> appendDeletedCustomer(Customer customer,
+      {String? customPath}) async {
+    try {
+      final downloadsPath = await getDownloadsPath(customPath: customPath);
+      final filePath = '$downloadsPath/deleted_customers.xlsx';
+      final file = File(filePath);
+
+      Excel excel;
+      if (await file.exists()) {
+        var bytes = await file.readAsBytes();
+        excel = Excel.decodeBytes(bytes);
+      } else {
+        excel = Excel.createExcel();
+        excel.rename('Sheet1', 'Deleted Customers');
+        final headerStyle = CellStyle(bold: true);
+        final headers = ['ID', 'NAME', 'PLACE', 'PHONE', 'GST', 'DELETED_AT'];
+        for (int i = 0; i < headers.length; i++) {
+          final cell = excel['Deleted Customers']
+              .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+          cell.value = TextCellValue(headers[i]);
+          cell.cellStyle = headerStyle;
+        }
+      }
+
+      final sheet = excel['Deleted Customers'];
+      final nextRow = sheet.maxRows;
+      final data = [
+        customer.id,
+        customer.shopName,
+        customer.place ?? '',
+        customer.phone ?? '',
+        customer.tinGst ?? '',
+        DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now())
+      ];
+
+      for (int i = 0; i < data.length; i++) {
+        sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: nextRow))
+            .value = TextCellValue(data[i]);
+      }
+
+      final bytes = excel.save();
+      if (bytes != null) await file.writeAsBytes(bytes);
+    } catch (e) {
+      debugPrint('Error appending deleted customer: $e');
+    }
+  }
+
+  /// Append deleted variety to consolidated Excel file
+  static Future<void> appendDeletedVariety(Product product,
+      {String? customPath}) async {
+    try {
+      final downloadsPath = await getDownloadsPath(customPath: customPath);
+      final filePath = '$downloadsPath/deleted_varieties.xlsx';
+      final file = File(filePath);
+
+      Excel excel;
+      if (await file.exists()) {
+        var bytes = await file.readAsBytes();
+        excel = Excel.decodeBytes(bytes);
+      } else {
+        excel = Excel.createExcel();
+        excel.rename('Sheet1', 'Deleted Varieties');
+        final headerStyle = CellStyle(bold: true);
+        final headers = ['ID', 'NAME', 'SKU', 'PRICE', 'GST', 'DELETED_AT'];
+        for (int i = 0; i < headers.length; i++) {
+          final cell = excel['Deleted Varieties']
+              .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+          cell.value = TextCellValue(headers[i]);
+          cell.cellStyle = headerStyle;
+        }
+      }
+
+      final sheet = excel['Deleted Varieties'];
+      final nextRow = sheet.maxRows;
+      final data = [
+        product.id,
+        product.name,
+        product.sku ?? '',
+        product.defaultPrice.toString(),
+        product.gstRateDefault.toString(),
+        DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now())
+      ];
+
+      for (int i = 0; i < data.length; i++) {
+        sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: nextRow))
+            .value = TextCellValue(data[i]);
+      }
+
+      final bytes = excel.save();
+      if (bytes != null) await file.writeAsBytes(bytes);
+    } catch (e) {
+      debugPrint('Error appending deleted variety: $e');
     }
   }
 }

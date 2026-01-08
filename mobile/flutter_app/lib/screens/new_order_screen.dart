@@ -345,14 +345,16 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
       // Excel generation & Custom Path storage
       try {
+        final orderNum = _orderNumberController.text.trim().isEmpty
+            ? lorryId
+            : _orderNumberController.text.trim();
+
         final path = await ExcelService.generateLorryExcel(
           order: lorryOrder,
           items: allItems,
           customers: validCustomers,
           products: products,
-          orderNumber: (_orderNumber == null || _orderNumber!.isEmpty)
-              ? lorryId
-              : _orderNumber!,
+          orderNumber: orderNum,
         );
 
         final finalPath = await ExcelService.copyToDownloads(path,
@@ -1180,18 +1182,21 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   Widget _buildInfoItem(String label, String value, IconData icon) {
     final theme = Theme.of(context);
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: theme.primaryColor),
         const SizedBox(width: 8),
-        SafeColumn(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SafeText(label,
-                style: const TextStyle(fontSize: 10, color: AppTheme.grey)),
-            SafeText(value,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
+        Flexible(
+          child: SafeColumn(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SafeText(label,
+                  style: const TextStyle(fontSize: 10, color: AppTheme.grey)),
+              SafeText(value,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
         ),
       ],
     );

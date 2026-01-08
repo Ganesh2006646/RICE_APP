@@ -58,23 +58,6 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // SECTION 2: MODE & THEME
-            _buildSectionHeader(context, 'mode_theme'.tr(ref)),
-            _buildSettingsCard(
-              context: context,
-              icon: Icons.palette_outlined,
-              title: 'appearance'.tr(ref),
-              children: [
-                _buildDropdown(
-                  context: context,
-                  label: 'theme'.tr(ref),
-                  value: settings.theme,
-                  items: ['Light', 'Dark'],
-                  onChanged: (value) => notifier.setTheme(value!),
-                ),
-              ],
-            ),
-
             const SizedBox(height: 24),
 
             // SECTION 3: ORDER & PAYMENT SETTINGS

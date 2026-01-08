@@ -8,8 +8,8 @@ import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
-import '../services/backup_service.dart';
 import '../services/excel_service.dart';
+import '../providers/settings_provider.dart';
 
 /// Screen for managing customers with full CRUD operations
 /// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
@@ -293,7 +293,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     );
 
     if (confirmed == true) {
-      await BackupService.backupDatabase();
+      // Background consolidated backup
+      await ExcelService.appendDeletedCustomer(customer,
+          customPath: ref.read(settingsProvider).excelSavePath);
+
       await (db.delete(db.orderItems)
             ..where((tbl) => tbl.customerId.equals(customer.id)))
           .go();

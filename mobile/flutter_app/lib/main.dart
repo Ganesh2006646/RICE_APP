@@ -81,8 +81,8 @@ class RiceAgentApp extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
 
     // Build theme based on settings
-    final baseTheme =
-        settings.isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme;
+    // Build theme based on settings
+    final baseTheme = AppTheme.lightTheme;
 
     // Apply font scaling
     final scaledTheme = baseTheme.copyWith(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../db/database.dart';
 
@@ -13,7 +14,8 @@ class WhatsAppService {
   }) async {
     final phone = customer.phone;
     if (phone == null || phone.isEmpty) {
-      throw 'Customer phone number is missing';
+      debugPrint('[WhatsApp] Customer phone number is missing');
+      return; // Silent failure - no exception
     }
 
     // Format phone number (ensure no spaces and has country code)
@@ -87,7 +89,8 @@ class WhatsAppService {
             mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      throw 'Could not launch WhatsApp: $e';
+      debugPrint('[WhatsApp] Could not launch WhatsApp: $e');
+      // Silent failure - no exception propagated to UI
     }
   }
 
@@ -156,7 +159,8 @@ class WhatsAppService {
             mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      throw 'Could not launch WhatsApp Summary: $e';
+      debugPrint('[WhatsApp] Could not launch WhatsApp Summary: $e');
+      // Silent failure - no exception propagated to UI
     }
   }
 }

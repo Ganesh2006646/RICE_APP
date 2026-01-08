@@ -7,7 +7,6 @@ import '../theme.dart';
 import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../providers/settings_provider.dart';
-import '../services/backup_service.dart';
 import '../services/excel_service.dart';
 import '../widgets/safe_widgets.dart';
 
@@ -290,7 +289,10 @@ class RiceVarietiesScreen extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      await BackupService.backupDatabase();
+      // Background consolidated backup
+      await ExcelService.appendDeletedVariety(product,
+          customPath: ref.read(settingsProvider).excelSavePath);
+
       await (db.delete(db.products)..where((tbl) => tbl.id.equals(product.id)))
           .go();
 
