@@ -279,6 +279,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: SafeText('delete_customer'.tr(ref)),
         content: SafeText('delete_customer_confirm'.tr(ref)),
         actions: [
@@ -372,6 +373,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title:
             Text(isEditing ? 'edit_customer'.tr(ref) : 'add_customer'.tr(ref)),
         content: SingleChildScrollView(

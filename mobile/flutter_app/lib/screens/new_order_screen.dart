@@ -331,6 +331,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text('confirm_save'.tr(ref)),
         content: Text('confirm_save_desc'.tr(ref)),
         actions: [
@@ -505,6 +506,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
+            scrollable: true,
             title: Text('discard_changes'.tr(ref)),
             content: Text('discard_changes_desc'.tr(ref)),
             actions: [

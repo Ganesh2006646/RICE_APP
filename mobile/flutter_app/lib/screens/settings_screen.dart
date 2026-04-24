@@ -307,6 +307,7 @@ class SettingsScreen extends ConsumerWidget {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
+                        scrollable: true,
                         title: Text('restore_data'.tr(ref)),
                         content: Text('restore_warning'.tr(ref)),
                         actions: [
@@ -337,6 +338,7 @@ class SettingsScreen extends ConsumerWidget {
                             context: context,
                             barrierDismissible: false,
                             builder: (context) => AlertDialog(
+                              scrollable: true,
                               title: Text('restart_required'.tr(ref)),
                               content: Text('restart_message'.tr(ref)),
                               actions: [
@@ -785,6 +787,7 @@ class SettingsScreen extends ConsumerWidget {
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
+                scrollable: true,
                 title: Text('permission_required'.tr(ref)),
                 content: const Text(
                     'To save files in custom folders, this app needs "All Files Access".\n\nPlease grant this permission in the next screen (App Settings).',
@@ -842,21 +845,24 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text('enter_path'.tr(ref)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('manual_path_helper'.tr(ref),
-                style: const TextStyle(fontSize: 13, color: AppTheme.grey)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '/storage/emulated/0/Download',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('manual_path_helper'.tr(ref),
+                  style: const TextStyle(fontSize: 13, color: AppTheme.grey)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: '/storage/emulated/0/Download',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -887,6 +893,7 @@ class SettingsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: SafeRow(
           leading: Row(
             children: [

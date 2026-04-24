@@ -339,77 +339,84 @@ class ProductGalleryScreen extends ConsumerWidget {
       builder: (context) => Dialog(
         backgroundColor: theme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.asset(
-                    product['image']!,
-                    height: 350,
-                    width: double.infinity,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 350,
-                      color: theme.primaryColor.withValues(alpha: 0.05),
-                      child: const Icon(Icons.image,
-                          size: 64, color: AppTheme.grey),
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.asset(
+                        product['image']!,
+                        height: 350,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 350,
+                          color: theme.primaryColor.withValues(alpha: 0.05),
+                          child: const Icon(Icons.image,
+                              size: 64, color: AppTheme.grey),
+                        ),
+                      ),
                     ),
-                  ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black54,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black54,
-                    ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SafeColumn(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SafeText(
+                        product['name']!,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: theme.primaryColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      SafeText(
+                        product['description']!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      SafeText(
+                        'mill_full_name'.tr(ref),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: SafeColumn(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SafeText(
-                    product['name']!,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  SafeText(
-                    product['description']!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.grey,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  SafeText(
-                    'mill_full_name'.tr(ref),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

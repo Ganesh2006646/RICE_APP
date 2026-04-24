@@ -319,6 +319,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text('${'delete'.tr(ref)}?'),
         content: Text('delete_order_confirm'.tr(ref)),
         actions: [
@@ -560,6 +561,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text('delete_order'.tr(ref)),
         content: Text('delete_order_confirm'.tr(ref)),
         actions: [
