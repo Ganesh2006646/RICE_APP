@@ -36,27 +36,32 @@ class RiceVarietiesScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<Product>>(
-        stream: db.select(db.products).watch(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: SafePage(
+        padding: EdgeInsets.zero,
+        child: StreamBuilder<List<Product>>(
+          stream: db.select(db.products).watch(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final products = snapshot.data!;
-          if (products.isEmpty) {
-            return _buildEmptyState(context, db, ref);
-          }
+            final products = snapshot.data!;
+            if (products.isEmpty) {
+              return _buildEmptyState(context, db, ref);
+            }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              final product = products[index];
-              return _buildProductCard(context, product, db, ref);
-            },
-          );
-        },
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              itemCount: products.length,
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return _buildProductCard(context, product, db, ref);
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showProductDialog(context, db, ref),
@@ -67,60 +72,55 @@ class RiceVarietiesScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, AppDatabase db, WidgetRef ref) {
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: Lottie.asset(
-                    'assets/lottie/empty.json',
-                    fit: BoxFit.contain,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 200,
+              height: 200,
+              child: Lottie.asset(
+                'assets/lottie/empty.json',
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'no_rice_varieties'.tr(ref),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.grey,
                   ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'add_rice_helper'.tr(ref),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.grey,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _showProductDialog(context, db, ref),
+                  icon: const Icon(Icons.add),
+                  label: Text('add_first_variety'.tr(ref)),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'no_rice_varieties'.tr(ref),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.grey,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'add_rice_helper'.tr(ref),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.grey,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () => _showProductDialog(context, db, ref),
-                      icon: const Icon(Icons.add),
-                      label: Text('add_first_variety'.tr(ref)),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _handleImport(context, db, ref),
-                      icon: const Icon(Icons.file_upload_outlined),
-                      label: Text('import_excel'.tr(ref)),
-                    ),
-                  ],
+                OutlinedButton.icon(
+                  onPressed: () => _handleImport(context, db, ref),
+                  icon: const Icon(Icons.file_upload_outlined),
+                  label: Text('import_excel'.tr(ref)),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -251,7 +251,13 @@ class RiceVarietiesScreen extends ConsumerWidget {
                     children: [
                       const Icon(Icons.edit, size: 20),
                       const SizedBox(width: 12),
-                      Text('edit'.tr(ref)),
+                      Expanded(
+                        child: Text(
+                          'edit'.tr(ref),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -261,8 +267,12 @@ class RiceVarietiesScreen extends ConsumerWidget {
                     children: [
                       const Icon(Icons.delete, size: 20, color: AppTheme.error),
                       const SizedBox(width: 12),
-                      Text('delete'.tr(ref),
-                          style: const TextStyle(color: AppTheme.error)),
+                      Expanded(
+                        child: Text('delete'.tr(ref),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppTheme.error)),
+                      ),
                     ],
                   ),
                 ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:lottie/lottie.dart';
@@ -54,9 +54,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search Bar
+      body: SafePage(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            // Search Bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -79,10 +81,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             ),
           ),
 
-          // Customer List inside Expanded to take remaining space but still scrollable
-          Expanded(
-            child: StreamBuilder<List<Customer>>(
-              stream: db.select(db.customers).watch(),
+          // Customer List taking available height based on contents within scrollable page
+          StreamBuilder<List<Customer>>(
+            stream: db.select(db.customers).watch(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -106,19 +107,21 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   return _buildEmptyState();
                 }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                      16, 0, 16, 80), // bottom padding for FAB
-                  itemCount: customers.length,
-                  itemBuilder: (context, index) {
-                    final customer = customers[index];
-                    return _buildCustomerCard(customer, db);
-                  },
-                );
-              },
-            ),
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                    16, 0, 16, 80), // bottom padding for FAB
+                itemCount: customers.length,
+                itemBuilder: (context, index) {
+                  final customer = customers[index];
+                  return _buildCustomerCard(customer, db);
+                },
+              );
+            },
           ),
         ],
+      ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCustomerDialog(context, db),
@@ -207,9 +210,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             const Icon(Icons.location_on,
                                 size: 12, color: AppTheme.grey),
                             const SizedBox(width: 4),
-                            SafeText(customer.place!,
-                                style: const TextStyle(
-                                    fontSize: 12, color: AppTheme.grey)),
+                            Expanded(
+                              child: SafeText(customer.place!,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: AppTheme.grey)),
+                            ),
                           ],
                         ),
                       if (customer.phone != null && customer.phone!.isNotEmpty)
@@ -218,9 +223,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             const Icon(Icons.phone,
                                 size: 12, color: AppTheme.grey),
                             const SizedBox(width: 4),
-                            SafeText(customer.phone!,
-                                style: const TextStyle(
-                                    fontSize: 12, color: AppTheme.grey)),
+                            Expanded(
+                              child: SafeText(customer.phone!,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: AppTheme.grey)),
+                            ),
                           ],
                         ),
                     ],
@@ -245,21 +252,46 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               itemBuilder: (context) => [
                 PopupMenuItem(
                     value: 'order',
-                    child: SafeRow(
-                        leading: const Icon(Icons.add_shopping_cart, size: 20),
-                        trailing: Text('new_order'.tr(ref)))),
+                    child: Row(
+                        children: [
+                          const Icon(Icons.add_shopping_cart, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'new_order'.tr(ref),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )
+                        ])),
                 PopupMenuItem(
                     value: 'edit',
-                    child: SafeRow(
-                        leading: const Icon(Icons.edit, size: 20),
-                        trailing: Text('edit'.tr(ref)))),
+                    child: Row(
+                        children: [
+                          const Icon(Icons.edit, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'edit'.tr(ref),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )
+                        ])),
                 PopupMenuItem(
                     value: 'delete',
-                    child: SafeRow(
-                        leading: const Icon(Icons.delete,
-                            size: 20, color: AppTheme.error),
-                        trailing: Text('delete'.tr(ref),
-                            style: const TextStyle(color: AppTheme.error)))),
+                    child: Row(
+                        children: [
+                          const Icon(Icons.delete,
+                              size: 20, color: AppTheme.error),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text('delete'.tr(ref),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: AppTheme.error)),
+                          )
+                        ])),
               ],
             ),
           ),

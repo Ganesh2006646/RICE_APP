@@ -152,10 +152,16 @@ class SettingsScreen extends ConsumerWidget {
                           Icon(Icons.folder_outlined,
                               color: theme.primaryColor),
                           const SizedBox(width: 12),
-                          SafeText('excel_settings'.tr(ref),
+                          Expanded(
+                            child: SafeText(
+                              'excel_settings'.tr(ref),
+                              maxLines: 3,
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.primaryColor)),
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -591,12 +597,15 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 Icon(icon, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 12),
-                SafeText(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+                Expanded(
+                  child: SafeText(
+                    title,
+                    maxLines: 3,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).primaryColor,
+                    ),
                   ),
                 ),
               ],
@@ -899,7 +908,12 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               const Icon(Icons.warning_amber_rounded, color: AppTheme.error),
               const SizedBox(width: 12),
-              SafeText('reset_confirm_title'.tr(ref)),
+              Expanded(
+                child: SafeText(
+                  'reset_confirm_title'.tr(ref),
+                  maxLines: 3,
+                ),
+              ),
             ],
           ),
         ),

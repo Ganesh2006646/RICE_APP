@@ -169,7 +169,7 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 3) {
           await m.addColumn(orders, orders.lorryCapacity);
-          await m.alterTable(TableMigration(orders));
+          // await m.alterTable(TableMigration(orders));
           await m.addColumn(orderItems, orderItems.customerId);
           await m.createTable(lorryShipments);
         }

@@ -70,24 +70,25 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     })),
         ],
       ),
-      body: Column(
-        children: [
-          if (_filterDate != null)
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: theme.primaryColor.withValues(alpha: 0.1),
-              child: SafeWrap(
-                children: [
-                  Icon(Icons.filter_alt, size: 16, color: theme.primaryColor),
-                  if (_filterDate != null)
-                    Chip(
-                        label: Text(_dateFormat.format(_filterDate!)),
-                        onDeleted: () => setState(() => _filterDate = null)),
-                ],
+      body: SafePage(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            if (_filterDate != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: theme.primaryColor.withValues(alpha: 0.1),
+                child: SafeWrap(
+                  children: [
+                    Icon(Icons.filter_alt, size: 16, color: theme.primaryColor),
+                    if (_filterDate != null)
+                      Chip(
+                          label: Text(_dateFormat.format(_filterDate!)),
+                          onDeleted: () => setState(() => _filterDate = null)),
+                  ],
+                ),
               ),
-            ),
-          Expanded(
-            child: StreamBuilder<List<OrderWithDetails>>(
+            StreamBuilder<List<OrderWithDetails>>(
               stream: _buildOrdersQuery(db),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -127,20 +128,20 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                         onChanged: (val) => setState(() => _searchQuery = val),
                       ),
                     ),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: orders.length,
-                        itemBuilder: (context, index) =>
-                            _buildOrderCard(orders[index], db),
-                      ),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: orders.length,
+                      itemBuilder: (context, index) =>
+                          _buildOrderCard(orders[index], db),
                     ),
                   ],
                 );
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -808,7 +809,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       children: [
                         const Icon(Icons.person, size: 20),
                         const SizedBox(width: 12),
-                        Text(c.shopName),
+                        Expanded(
+                          child: Text(
+                            c.shopName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),

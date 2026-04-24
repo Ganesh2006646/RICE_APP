@@ -113,12 +113,16 @@ class SafeRow extends StatelessWidget {
       crossAxisAlignment: crossAxisAlignment,
       mainAxisAlignment: mainAxisAlignment,
       children: [
-        Flexible(flex: flexLeading, child: leading),
+        Flexible(
+          flex: flexLeading,
+          fit: FlexFit.tight,
+          child: leading,
+        ),
         if (trailing != null) ...[
           const SizedBox(width: 8),
           flexTrailing > 0
               ? Flexible(flex: flexTrailing, child: trailing!)
-              : Flexible(flex: 0, fit: FlexFit.loose, child: trailing!),
+              : Flexible(fit: FlexFit.loose, child: trailing!),
         ],
       ],
     );

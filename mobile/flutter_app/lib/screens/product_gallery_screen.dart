@@ -111,13 +111,18 @@ class ProductGalleryScreen extends ConsumerWidget {
                     children: [
                       const Icon(Icons.verified, size: 32, color: Colors.teal),
                       const SizedBox(width: 12),
-                      Text(
-                        'quality_assurance'.tr(ref),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade800,
-                          letterSpacing: 0.5,
+                      Flexible(
+                        child: Text(
+                          'quality_assurance'.tr(ref),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.teal.shade800,
+                            letterSpacing: 0.5,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     ],

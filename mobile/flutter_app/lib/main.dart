@@ -17,6 +17,7 @@ final databaseProvider = Provider<AppDatabase>((ref) => AppDatabase());
 void main() async {
   // Initialize global error handler first
   GlobalErrorHandler.init();
+  WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize crash reporting (uncomment DSN after setting up Sentry)
   // To enable: Go to sentry.io, create project, paste DSN below
@@ -28,8 +29,6 @@ void main() async {
   runZonedGuarded(
     () async {
       try {
-        WidgetsFlutterBinding.ensureInitialized();
-
         // Apply any staged DB restore before opening Drift connection.
         await BackupService.applyPendingRestoreIfAny();
 
@@ -53,6 +52,7 @@ void main() async {
         debugPrint('Fatal Startup Error: $e');
         GlobalErrorHandler.logError(e, stack);
         CrashReportingService.reportError(e, stack, context: 'App Startup');
+        runApp(const _StartupErrorApp());
       }
     },
     (error, stack) {
@@ -100,6 +100,40 @@ class RiceAgentApp extends ConsumerWidget {
       // Pass language to locale for system components
       locale: Locale(settings.language.localeCode),
       home: const SplashScreen(),
+    );
+  }
+}
+
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                SizedBox(height: 12),
+                Text(
+                  'Unable to start the app.',
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Please restart and check logs in settings.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

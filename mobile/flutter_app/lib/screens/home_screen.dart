@@ -33,7 +33,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _getCurrentScreen() {
     switch (_selectedIndex) {
       case 0:
-        return const DailyDashboard();
+        return DailyDashboard(
+          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+        );
       case 1:
         return const NewOrderScreen();
       case 2:
@@ -45,7 +47,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 5:
         return const SettingsScreen();
       default:
-        return const DailyDashboard();
+        return DailyDashboard(
+          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+        );
     }
   }
 
@@ -182,7 +186,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class DailyDashboard extends ConsumerWidget {
-  const DailyDashboard({super.key});
+  const DailyDashboard({
+    super.key,
+    required this.onOpenDrawer,
+  });
+
+  final VoidCallback onOpenDrawer;
 
   (String, IconData) _getGreetingData() {
     final hour = DateTime.now().hour;
@@ -197,6 +206,7 @@ class DailyDashboard extends ConsumerWidget {
     final theme = Theme.of(context);
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
+    final (greetingText, greetingIcon) = _getGreetingData();
 
     return SafePage(
       child: Column(
@@ -231,38 +241,44 @@ class DailyDashboard extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _getGreetingData().$2,
-                              size: 16,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${_getGreetingData().$1},',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(greetingIcon,
+                                  size: 16, color: Colors.white70),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '$greetingText,',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Narendra',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Narendra',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 12),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
@@ -270,7 +286,7 @@ class DailyDashboard extends ConsumerWidget {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.menu, color: Colors.white),
-                        onPressed: () => Scaffold.of(context).openDrawer(),
+                        onPressed: onOpenDrawer,
                       ),
                     ),
                   ],
@@ -324,7 +340,7 @@ class DailyDashboard extends ConsumerWidget {
           _buildQuickActions(context, ref),
 
           const SizedBox(height: 24),
-          
+
           // PRODUCT LINEUP BANNER
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -586,18 +602,16 @@ class DailyDashboard extends ConsumerWidget {
                     child: Icon(icon, size: 24, color: color),
                   ),
                   const SizedBox(height: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: theme.textTheme.bodyLarge?.color,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
