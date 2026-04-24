@@ -30,6 +30,9 @@ void main() async {
       try {
         WidgetsFlutterBinding.ensureInitialized();
 
+        // Apply any staged DB restore before opening Drift connection.
+        await BackupService.applyPendingRestoreIfAny();
+
         final db = AppDatabase();
 
         // Seed initial products if empty

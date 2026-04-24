@@ -117,7 +117,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
   Future<void> _handleImport(
       BuildContext context, AppDatabase db, WidgetRef ref) async {
-    final result = await ExcelService.importProductsFromExcel(db);
+    final result = await ExcelService.importDailyPriceListFromExcel(db);
     if (context.mounted) {
       SafeSnackBar.show(context, result['message'],
           isError: !result['success']);
@@ -289,15 +289,37 @@ class RiceVarietiesScreen extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      // Background consolidated backup
-      await ExcelService.appendDeletedVariety(product,
-          customPath: ref.read(settingsProvider).excelSavePath);
+      try {
+        final usageRows = await (db.select(db.orderItems)
+              ..where((tbl) => tbl.productId.equals(product.id)))
+            .get();
+        if (usageRows.isNotEmpty) {
+          if (context.mounted) {
+            SafeSnackBar.show(
+              context,
+              'Cannot delete this variety because it is used in existing orders.',
+              isError: true,
+            );
+          }
+          return;
+        }
 
-      await (db.delete(db.products)..where((tbl) => tbl.id.equals(product.id)))
-          .go();
+        // Background consolidated backup
+        await ExcelService.appendDeletedVariety(product,
+            customPath: ref.read(settingsProvider).excelSavePath);
 
-      if (context.mounted) {
-        SafeSnackBar.show(context, 'rice_variety_deleted'.tr(ref));
+        await (db.delete(db.products)
+              ..where((tbl) => tbl.id.equals(product.id)))
+            .go();
+
+        if (context.mounted) {
+          SafeSnackBar.show(context, 'rice_variety_deleted'.tr(ref));
+        }
+      } catch (e) {
+        if (context.mounted) {
+          SafeSnackBar.show(context, '${'failed_to_delete'.tr(ref)}: $e',
+              isError: true);
+        }
       }
     }
   }

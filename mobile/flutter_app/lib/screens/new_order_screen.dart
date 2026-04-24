@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
@@ -20,11 +21,11 @@ class OrderItemFormData {
   int bags5;
   double rate; // Defined ONLY for 100 KG (1 Quintal)
 
-  // Configurable business logic parameters (from Settings)
+  // Packing costs remain configurable from settings.
   double packingPrice10;
   double packingPrice5;
-  double amcRate;  // as fraction (e.g. 0.01 for 1%)
-  double gstRate;  // as fraction (e.g. 0.05 for 5%)
+  double amcRate; // Kept for backward compatibility; effective AMC is fixed.
+  double gstRate; // Kept for backward compatibility; effective GST comes from product.
 
   OrderItemFormData({
     this.product,
@@ -38,32 +39,42 @@ class OrderItemFormData {
     this.gstRate = 0.05,
   });
 
+  static const double _fixedAmcRate = 0.01;
+
+  bool get supports10Kg => _supportsPackFromUnit(product?.unit, 10);
+  bool get supports5Kg => _supportsPackFromUnit(product?.unit, 5);
+
+  int get applicableBags10 => supports10Kg ? bags10 : 0;
+  int get applicableBags5 => supports5Kg ? bags5 : 0;
+
+  double get effectiveGstRate => (product?.gstRateDefault ?? 0) / 100.0;
+
   // WEIGHTS
   double get kg26 => bags26 * 26.0;
-  double get kg10 => bags10 * 10.0;
-  double get kg5 => bags5 * 5.0;
+  double get kg10 => applicableBags10 * 10.0;
+  double get kg5 => applicableBags5 * 5.0;
   double get kgTotal => kg26 + kg10 + kg5;
   double get qtlTotal => kgTotal / 100.0;
 
   // 26 KG LOGIC: No Packing, No GST, configurable AMC
   double get value26 => (rate / 100.0) * 26.0 * bags26;
-  double get amc26 => value26 * amcRate;
+  double get amc26 => value26 * _fixedAmcRate;
   double get total26 => value26 + amc26;
 
   // 10 KG LOGIC: Configurable Packing, AMC, GST
-  double get baseValue10 => (rate / 100.0) * 10.0 * bags10;
-  double get packing10 => packingPrice10 * bags10;
+  double get baseValue10 => (rate / 100.0) * 10.0 * applicableBags10;
+  double get packing10 => packingPrice10 * applicableBags10;
   double get subtotal10 => baseValue10 + packing10;
-  double get amc10 => subtotal10 * amcRate;
-  double get gst10 => (subtotal10 + amc10) * gstRate;
+  double get amc10 => subtotal10 * _fixedAmcRate;
+  double get gst10 => (subtotal10 + amc10) * effectiveGstRate;
   double get total10 => subtotal10 + amc10 + gst10;
 
   // 5 KG LOGIC: Configurable Packing, AMC, GST
-  double get baseValue5 => (rate / 100.0) * 5.0 * bags5;
-  double get packing5 => packingPrice5 * bags5;
+  double get baseValue5 => (rate / 100.0) * 5.0 * applicableBags5;
+  double get packing5 => packingPrice5 * applicableBags5;
   double get subtotal5 => baseValue5 + packing5;
-  double get amc5 => subtotal5 * amcRate;
-  double get gst5 => (subtotal5 + amc5) * gstRate;
+  double get amc5 => subtotal5 * _fixedAmcRate;
+  double get gst5 => (subtotal5 + amc5) * effectiveGstRate;
   double get total5 => subtotal5 + amc5 + gst5;
 
   // TOTALS for Line Item
@@ -72,7 +83,7 @@ class OrderItemFormData {
   double get gstAmount => gst10 + gst5;
 
   // Percentage Helpers for DB/Legacy UI
-  double get amcPercent => amcRate * 100.0;
+  double get amcPercent => _fixedAmcRate * 100.0;
   double get gstPercent {
     double taxableSubtotal = (subtotal10 + amc10) + (subtotal5 + amc5);
     if (taxableSubtotal == 0) return 0.0;
@@ -83,7 +94,22 @@ class OrderItemFormData {
   double get baseAmount => value26 + baseValue10 + baseValue5;
 
   bool get isValid =>
-      product != null && (bags26 > 0 || bags10 > 0 || bags5 > 0) && rate > 0;
+      product != null &&
+      bags26 >= 0 &&
+      bags10 >= 0 &&
+      bags5 >= 0 &&
+      (bags26 > 0 || applicableBags10 > 0 || applicableBags5 > 0) &&
+      rate > 0;
+
+  static bool _supportsPackFromUnit(String? unit, int packKg) {
+    if (unit == null || unit.isEmpty) return true;
+
+    final match = RegExp('p$packKg:(0|1)', caseSensitive: false)
+        .firstMatch(unit);
+    if (match == null) return true;
+
+    return match.group(1) == '1';
+  }
 }
 
 /// Lorry Based Order Screen - Refactored for Stability
@@ -105,6 +131,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   final TextEditingController _capacityController =
       TextEditingController(text: '110.0');
   final TextEditingController _orderNumberController = TextEditingController();
+  final Map<String, int> _inputFieldRevisions = {};
   final List<CustomerLoadFormData> _customers = [];
   bool _isSaving = false;
   String? _orderNumber;
@@ -128,6 +155,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     _currentStep = 1;
     _isSaving = false;
     _customers.clear();
+    _inputFieldRevisions.clear();
     _loadingDate = DateTime.now();
     _orderNumber = null;
   }
@@ -205,7 +233,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             rate: i.ratePerQtl,
             packingPrice10: ref.read(settingsProvider).packing10Price,
             packingPrice5: ref.read(settingsProvider).packing5Price,
-            amcRate: ref.read(settingsProvider).amcPercent / 100.0,
+            amcRate: 0.01,
             gstRate: ref.read(settingsProvider).gstPercent / 100.0,
           );
         }).toList();
@@ -240,7 +268,12 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       updatedAt: DateTime.now());
 
   /// Creates an OrderItemFormData with current settings values
-  OrderItemFormData _createFormItem({Product? product, int bags26 = 0, int bags10 = 0, int bags5 = 0, double rate = 0}) {
+  OrderItemFormData _createFormItem(
+      {Product? product,
+      int bags26 = 0,
+      int bags10 = 0,
+      int bags5 = 0,
+      double rate = 0}) {
     final settings = ref.read(settingsProvider);
     return OrderItemFormData(
       product: product,
@@ -250,21 +283,26 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       rate: rate,
       packingPrice10: settings.packing10Price,
       packingPrice5: settings.packing5Price,
-      amcRate: settings.amcPercent / 100.0,
+      amcRate: 0.01,
       gstRate: settings.gstPercent / 100.0,
     );
   }
 
   void _addCustomer({Customer? initial}) {
     setState(() {
-      _customers.add(CustomerLoadFormData(
-          customer: initial, items: [_createFormItem()]));
+      _customers.add(
+          CustomerLoadFormData(customer: initial, items: [_createFormItem()]));
     });
   }
 
   void _removeCustomer(int index) {
     if (_customers.length > 1) {
-      setState(() => _customers.removeAt(index));
+      setState(() {
+        final removed = _customers.removeAt(index);
+        for (final item in removed.items) {
+          _clearItemInputRevisions(item);
+        }
+      });
     }
   }
 
@@ -272,6 +310,17 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   double get _totalAmount =>
       _customers.fold(0.0, (sum, c) => sum + (c.isValid ? c.totalAmount : 0.0));
   double get _capacity => double.tryParse(_capacityController.text) ?? 110.0;
+
+  void _bumpInputRevision(String fieldKey) {
+    _inputFieldRevisions[fieldKey] = (_inputFieldRevisions[fieldKey] ?? 0) + 1;
+  }
+
+  void _clearItemInputRevisions(OrderItemFormData item) {
+    _inputFieldRevisions.remove('${item.hashCode}_bags26');
+    _inputFieldRevisions.remove('${item.hashCode}_bags10');
+    _inputFieldRevisions.remove('${item.hashCode}_bags5');
+    _inputFieldRevisions.remove('${item.hashCode}_rate');
+  }
 
   Future<void> _saveLorryOrder() async {
     if (_customers.every((c) => !c.isValid)) {
@@ -347,6 +396,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                   qtyKg: drift.Value(item.kgTotal),
                   qtyQtl: drift.Value(item.qtlTotal),
                   ratePerQtl: drift.Value(item.rate),
+                  amcPercent: drift.Value(item.amcPercent),
                   amcAmount: drift.Value(item.amcAmount),
                   gstPercent: drift.Value(item.gstPercent),
                   gstAmount: drift.Value(item.gstAmount),
@@ -804,19 +854,49 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                       onChanged: (val) => setState(() {
                         item.product = val;
                         item.rate = val?.defaultPrice ?? 0;
+
+                        if (!item.supports10Kg && item.bags10 > 0) {
+                          item.bags10 = 0;
+                          _bumpInputRevision('${item.hashCode}_bags10');
+                        }
+
+                        if (!item.supports5Kg && item.bags5 > 0) {
+                          item.bags5 = 0;
+                          _bumpInputRevision('${item.hashCode}_bags5');
+                        }
+
+                        _bumpInputRevision('${item.hashCode}_rate');
                       }),
                     ),
                   ),
                 ),
-                _itemInput(60, item.bags26,
-                    (v) => setState(() => item.bags26 = int.tryParse(v) ?? 0)),
-                _itemInput(60, item.bags10,
-                    (v) => setState(() => item.bags10 = int.tryParse(v) ?? 0)),
-                _itemInput(60, item.bags5,
-                    (v) => setState(() => item.bags5 = int.tryParse(v) ?? 0)),
-                _itemInput(80, item.rate,
-                    (v) => setState(() => item.rate = double.tryParse(v) ?? 0),
-                    isDouble: true),
+                _itemInput(
+                  60,
+                  item.bags26,
+                  (v) => setState(() => item.bags26 = _parseNonNegativeInt(v)),
+                  fieldKey: '${item.hashCode}_bags26',
+                ),
+                _itemInput(
+                  60,
+                  item.supports10Kg ? item.bags10 : 0,
+                  (v) => setState(() => item.bags10 = _parseNonNegativeInt(v)),
+                  fieldKey: '${item.hashCode}_bags10',
+                  enabled: item.supports10Kg,
+                ),
+                _itemInput(
+                  60,
+                  item.supports5Kg ? item.bags5 : 0,
+                  (v) => setState(() => item.bags5 = _parseNonNegativeInt(v)),
+                  fieldKey: '${item.hashCode}_bags5',
+                  enabled: item.supports5Kg,
+                ),
+                _itemInput(
+                  80,
+                  item.rate,
+                  (v) => setState(() => item.rate = _parseNonNegativeDouble(v)),
+                  fieldKey: '${item.hashCode}_rate',
+                  isDouble: true,
+                ),
                 SizedBox(
                     width: 60,
                     child: Text(item.qtlTotal.toStringAsFixed(2),
@@ -834,39 +914,55 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                     child: IconButton(
                         icon: const Icon(Icons.close,
                             size: 18, color: Colors.red),
-                        onPressed: () =>
-                            setState(() => data.items.removeAt(index)))),
+                        onPressed: () => setState(() {
+                              _clearItemInputRevisions(item);
+                              data.items.removeAt(index);
+                            }))),
               ],
             ),
           );
         });
   }
 
+  int _parseNonNegativeInt(String input) {
+    return math.max(0, int.tryParse(input) ?? 0);
+  }
+
+  double _parseNonNegativeDouble(String input) {
+    return math.max(0.0, double.tryParse(input) ?? 0.0);
+  }
+
   Widget _itemInput(double width, num value, Function(String) onChanged,
-      {bool isDouble = false}) {
+      {bool isDouble = false,
+      required String fieldKey,
+      bool enabled = true}) {
     final theme = Theme.of(context);
     final initial = value == 0
         ? ''
         : (isDouble ? value.toStringAsFixed(0) : value.toString());
+    final revision = _inputFieldRevisions[fieldKey] ?? 0;
     return Container(
       width: width,
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      child: TextField(
+      child: TextFormField(
+        key: ValueKey('$fieldKey:$revision'),
+        initialValue: initial,
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         style: const TextStyle(fontSize: 13),
+        enabled: enabled,
         decoration: InputDecoration(
           contentPadding: const EdgeInsets.symmetric(vertical: 8),
           isDense: true,
           filled: true,
-          fillColor: theme.inputDecorationTheme.fillColor ?? Colors.white,
+          fillColor: enabled
+              ? (theme.inputDecorationTheme.fillColor ?? Colors.white)
+              : AppTheme.lightGrey.withValues(alpha: 0.35),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
               borderSide: const BorderSide(color: AppTheme.lightGrey)),
         ),
         onChanged: onChanged,
-        controller: TextEditingController(text: initial)
-          ..selection = TextSelection.collapsed(offset: initial.length),
       ),
     );
   }

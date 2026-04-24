@@ -10,6 +10,8 @@ class BackupService {
   static const String _dbFileName = 'db.sqlite';
   static const String _autoBackupDirName = 'backups';
   static const String _lastBackupKey = 'last_auto_backup_time';
+  static const String _pendingRestoreKey = 'pending_db_restore';
+  static const String _pendingRestoreFileName = 'db_restore_pending.sqlite';
   static const int _maxBackups = 5;
 
   /// Get the path to the database file
@@ -42,7 +44,11 @@ class BackupService {
       debugPrint('[BackupService] Error getting backup directory: $e');
       // Ultimate fallback
       final docs = await getApplicationDocumentsDirectory();
-      return '${docs.path}/$_autoBackupDirName';
+      final fallbackDir = Directory('${docs.path}/$_autoBackupDirName');
+      if (!await fallbackDir.exists()) {
+        await fallbackDir.create(recursive: true);
+      }
+      return fallbackDir.path;
     }
   }
 
@@ -182,7 +188,7 @@ class BackupService {
     }
   }
 
-  /// Create a backup of the database and share it
+  /// Create a backup of the database and return the local backup path.
   static Future<String?> backupDatabase() async {
     try {
       final dbPath = await getDatabasePath();
@@ -195,11 +201,12 @@ class BackupService {
 
       // Create backup file with timestamp
       final timestamp = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
-      final backupFileName = 'RiceAgent_Backup_$timestamp.db';
+      final backupFileName = 'RiceAgent_Manual_$timestamp.db';
 
-      // Copy to temporary location for sharing
-      final tempDir = await getTemporaryDirectory();
-      final backupPath = '${tempDir.path}/$backupFileName';
+      // Persist manual backups in the backup directory so they survive cleanup
+      // of temporary folders and can be restored later.
+      final backupDir = await getAutoBackupDirectory();
+      final backupPath = '$backupDir/$backupFileName';
       await dbFile.copy(backupPath);
 
       debugPrint('[BackupService] Manual backup created: $backupPath');
@@ -211,8 +218,9 @@ class BackupService {
     }
   }
 
-  /// Restore database from a backup file
-  /// Returns true if successful, false otherwise
+  /// Stage database restore from a user-selected backup file.
+  /// The actual replacement is applied on next app start (before DB opens).
+  /// Returns true if staging was successful.
   static Future<bool> restoreDatabase() async {
     try {
       // Pick backup file
@@ -238,22 +246,69 @@ class BackupService {
         return false;
       }
 
-      // Validate it's a valid SQLite file (check magic bytes)
-      final bytes = await backupFile.openRead(0, 16).first;
-      final header = String.fromCharCodes(bytes.take(6));
-      if (header != 'SQLite') {
+      if (!await _isLikelySqliteFile(backupFile)) {
         debugPrint('[BackupService] Invalid SQLite file.');
         return false;
       }
 
-      // Get current database path and replace
-      final dbPath = await getDatabasePath();
-      await backupFile.copy(dbPath);
+      // Stage restore file for next launch. Avoid replacing an open DB file.
+      final dbFolder = await getApplicationDocumentsDirectory();
+      final stagedFile = File('${dbFolder.path}/$_pendingRestoreFileName');
+      if (await stagedFile.exists()) {
+        await stagedFile.delete();
+      }
+      await backupFile.copy(stagedFile.path);
 
-      debugPrint('[BackupService] Database restored successfully.');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_pendingRestoreKey, true);
+
+      debugPrint('[BackupService] Database restore staged: ${stagedFile.path}');
       return true;
     } catch (e) {
       debugPrint('[BackupService] Restore failed: $e');
+      return false;
+    }
+  }
+
+  /// Apply a staged restore before opening the app database.
+  static Future<bool> applyPendingRestoreIfAny() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pending = prefs.getBool(_pendingRestoreKey) ?? false;
+      final dbFolder = await getApplicationDocumentsDirectory();
+      final stagedFile = File('${dbFolder.path}/$_pendingRestoreFileName');
+
+      if (!pending && !await stagedFile.exists()) {
+        return false;
+      }
+
+      if (!await stagedFile.exists()) {
+        await prefs.setBool(_pendingRestoreKey, false);
+        return false;
+      }
+
+      final dbPath = await getDatabasePath();
+      final dbFile = File(dbPath);
+      if (await dbFile.exists()) {
+        await dbFile.delete();
+      }
+      await stagedFile.copy(dbPath);
+      await stagedFile.delete();
+      await prefs.setBool(_pendingRestoreKey, false);
+      debugPrint('[BackupService] Pending database restore applied.');
+      return true;
+    } catch (e) {
+      debugPrint('[BackupService] Failed to apply pending restore: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> _isLikelySqliteFile(File file) async {
+    try {
+      final bytes = await file.openRead(0, 16).first;
+      final header = String.fromCharCodes(bytes.take(6));
+      return header == 'SQLite';
+    } catch (_) {
       return false;
     }
   }

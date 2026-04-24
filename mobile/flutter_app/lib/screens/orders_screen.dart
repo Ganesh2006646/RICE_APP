@@ -33,6 +33,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   String? _processingOrderId;
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
     final theme = Theme.of(context);
@@ -587,8 +593,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         await (db.delete(db.payments)
               ..where((t) => t.orderId.equals(item.order.id)))
             .go();
-        await (db.delete(db.orders)
-              ..where((t) => t.id.equals(item.order.id)))
+        await (db.delete(db.orders)..where((t) => t.id.equals(item.order.id)))
             .go();
       });
       if (mounted) {
@@ -638,6 +643,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       if (mounted) {
         SafeSnackBar.show(context, '${'excel_saved'.tr(ref)}: $finalPath');
       }
+    } catch (e) {
+      _showError('${'export_failed'.tr(ref)}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -666,12 +673,14 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           orderNumber: item.order.notes ?? 'N/A');
       final settings = ref.read(settingsProvider);
       await EmailService.shareOrderExcel(
-          filePath: path,
-          orderNumber: item.order.notes ?? 'N/A',
-          loadingDate: item.order.loadingDate,
-          agentName: settings.agentName,
-          millName: settings.millName,
+        filePath: path,
+        orderNumber: item.order.notes ?? 'N/A',
+        loadingDate: item.order.loadingDate,
+        agentName: settings.agentName,
+        millName: settings.millName,
       );
+    } catch (e) {
+      _showError('Email failed: $e');
     } finally {
       if (mounted) {
         setState(() {

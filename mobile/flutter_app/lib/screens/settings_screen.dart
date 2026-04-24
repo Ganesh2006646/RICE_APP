@@ -280,9 +280,11 @@ class SettingsScreen extends ConsumerWidget {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(result != null
-                              ? 'backup_success'.tr(ref)
-                              : 'backup_failed'.tr(ref)),
+                          content: Text(
+                            result != null
+                                ? '${'backup_success'.tr(ref)}: $result'
+                                : 'backup_failed'.tr(ref),
+                          ),
                           backgroundColor: result != null
                               ? AppTheme.success
                               : AppTheme.error,
@@ -767,8 +769,6 @@ class SettingsScreen extends ConsumerWidget {
       ],
     );
   }
-
-
 
   Future<void> _pickExcelPath(BuildContext context, WidgetRef ref) async {
     try {
