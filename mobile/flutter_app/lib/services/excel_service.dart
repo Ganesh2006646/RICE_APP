@@ -483,6 +483,19 @@ class ExcelService {
                 possibleHeader.contains('party')) {
               startRow = 1;
             }
+
+            // Common dataset shape:
+            // [SL NO, SHOP NAME, PLACE/ADDRESS, PHONE, GST]
+            // If first column is serial-like and second column has text,
+            // shift the rigid mapping by one.
+            final firstCol = _valueAt(firstRow, 0).trim();
+            final secondCol = _valueAt(firstRow, 1).trim();
+            if (_isLikelySerial(firstCol) && secondCol.isNotEmpty) {
+              headers['name'] = 1;
+              headers['place'] = 2;
+              headers['phone'] = 3;
+              headers['gst'] = 4;
+            }
           }
 
           for (int i = startRow; i < sheet.rows.length; i++) {
@@ -608,6 +621,13 @@ class ExcelService {
             continue;
           }
 
+          if (_isDailyFooterOrNoteRow(rowText)) {
+            // Footer and notes are not product rows; stop parsing section data.
+            section = _DailyPriceSection.none;
+            ignoredRows++;
+            continue;
+          }
+
           if (section == _DailyPriceSection.none) continue;
 
           final packingKg = _parsePackingKg(
@@ -622,6 +642,30 @@ class ExcelService {
           }
 
           if (productName.toUpperCase().contains('PRODUCT NAME')) {
+            ignoredRows++;
+            continue;
+          }
+
+          if (_isDailyNonDataProductName(productName)) {
+            ignoredRows++;
+            continue;
+          }
+
+          // Strict row constraints based on the provided mill sheet:
+          // - EXEMPTED section should be 26kg rows.
+          // - GST 5% section should be 10kg / 5kg rows.
+          // - Skip rows with unknown packing to avoid parsing notes/footers.
+          if (packingKg == null) {
+            ignoredRows++;
+            continue;
+          }
+          if (section == _DailyPriceSection.exempted && packingKg != 26) {
+            ignoredRows++;
+            continue;
+          }
+          if (section == _DailyPriceSection.gst5 &&
+              packingKg != 10 &&
+              packingKg != 5) {
             ignoredRows++;
             continue;
           }
@@ -1139,6 +1183,13 @@ class ExcelService {
     return double.tryParse(cleaned);
   }
 
+  static bool _isLikelySerial(String input) {
+    if (input.isEmpty) return false;
+    final trimmed = input.trim();
+    // Handles "1", "001", "1.", "1)"
+    return RegExp(r'^\d+([.)])?$').hasMatch(trimmed);
+  }
+
   static double? _extractRatePerQtl(
       List<Data?> row, _DailyColumnIndexes? columns) {
     final configuredRate =
@@ -1210,6 +1261,29 @@ class ExcelService {
     required bool supports5Kg,
   }) {
     return 'qtl|p10:${supports10Kg ? 1 : 0}|p5:${supports5Kg ? 1 : 0}';
+  }
+
+  static bool _isDailyFooterOrNoteRow(String rowTextUpper) {
+    final t = rowTextUpper;
+    if (t.trim().isEmpty) return false;
+
+    return t.contains('CASH DISCOUNT') ||
+        t.contains('PAYMENT WITH') ||
+        t.contains('ABOVE 20 DAYS') ||
+        t.contains('AFTER 30 DAYS') ||
+        t.contains('NOTE') ||
+        t.contains('LOADING AFTER') ||
+        t.contains('TODAY OUR PRICE LIST') ||
+        t.contains('SRI BALAJI') ||
+        t.contains('GALAXY RICE');
+  }
+
+  static bool _isDailyNonDataProductName(String name) {
+    final upper = name.toUpperCase().trim();
+    if (upper.isEmpty) return true;
+    if (upper == '-' || upper == '--' || upper == '---') return true;
+    if (upper.contains('EXEMPTED') || upper.contains('GST 5')) return true;
+    return false;
   }
 
   static String _stableHexHash(String input) {
