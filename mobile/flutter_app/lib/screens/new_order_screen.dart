@@ -1179,6 +1179,8 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         allProducts: products,
         millContactPhone: settings.millContactPhone,
         currencySymbol: settings.currencySymbol,
+        agentName: settings.agentName,
+        millName: settings.millName,
       );
     } catch (e) {
       _showError('Error: $e');

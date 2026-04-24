@@ -10,7 +10,7 @@ class SettingsService {
   // Default values - Official Sri Balaji Rice Mill
   static const String defaultMillEmail = 'sbbrrm@gmail.com';
   static const String defaultInvoicePrefix = 'SBRM-2024-';
-  static const String defaultAgentName = 'Kankatala Narayana Murthy';
+  static const String defaultAgentName = 'Narendra';
 
   /// Get the default mill email for sending orders
   static Future<String> getMillEmail() async {

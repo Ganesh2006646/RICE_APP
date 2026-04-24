@@ -324,6 +324,19 @@ class DailyDashboard extends ConsumerWidget {
           _buildQuickActions(context, ref),
 
           const SizedBox(height: 24),
+          
+          // PRODUCT LINEUP BANNER
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset(
+              'assets/images/product_lineup_full.png',
+              height: 120,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+
+          const SizedBox(height: 24),
 
           // RECENT ORDERS
           Text(

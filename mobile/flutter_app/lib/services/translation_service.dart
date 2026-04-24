@@ -116,6 +116,10 @@ class TranslationService {
       'premium_quality': 'Premium Quality',
       'galaxy_brown': 'Galaxy Brown Rice',
       'healthy_nutritious': 'Healthy & Nutritious',
+      'common_rice_desc': 'Medium grain raw rice sourced from local villages of the Andhra Pradesh state. Aged up to 6 months before packaging and has a rich and unique aroma to its name.',
+      'raw_non_basmati': 'Raw Non Basmati Rice',
+      'parboiled_rice': 'Non Basmati Parboiled Rice',
+      'broken_rice': 'Raw Broken Rice',
       'fssai_certified': 'FSSAI Certified',
       'japan_technology': 'Japan Technology',
       'premium_rice': 'Premium Quality Rice',
@@ -216,6 +220,8 @@ class TranslationService {
       'restore_failed': 'Restore failed',
       'ok': 'OK',
       'order_deleted': 'Order deleted',
+      'agent_name_setting': 'Agent Name',
+      'mill_name_setting': 'Mill Name',
     },
     'Telugu': {
       'dashboard': 'డ్యాష్‌బోర్డ్',
@@ -328,6 +334,10 @@ class TranslationService {
       'premium_quality': 'ప్రీమియం క్వాలిటీ',
       'galaxy_brown': 'గెలాక్సీ బ్రౌన్ రైస్',
       'healthy_nutritious': 'ఆరోగ్యకరమైన మరియు పోషకమైన',
+      'common_rice_desc': 'ఆంధ్రప్రదేశ్ రాష్ట్రంలోని స్థానిక గ్రామాల నుండి సేకరించిన మధ్యస్థ గింజల ముడి బియ్యం. ప్యాకేజింగ్‌కు ముందు 6 నెలల వరకు నిల్వ ఉంచబడింది మరియు ఇది గొప్ప మరియు ప్రత్యేకమైన సువాసనను కలిగి ఉంటుంది.',
+      'raw_non_basmati': 'రా నాన్ బాస్మతి రైస్',
+      'parboiled_rice': 'నాన్ బాస్మతి పార్బోయిల్డ్ రైస్',
+      'broken_rice': 'రా బ్రోకెన్ రైస్',
       'fssai_certified': 'FSSAI ధృవీకరించబడింది',
       'japan_technology': 'జపాన్ టెక్నాలజీ',
       'premium_rice': 'ప్రీమియం క్వాలిటీ బియ్యం',
@@ -432,6 +442,8 @@ class TranslationService {
       'restore_failed': 'పునరుద్ధరణ విఫలమైంది',
       'ok': 'సరే',
       'order_deleted': 'ఆర్డర్ తొలగించబడింది',
+      'agent_name_setting': 'ఏజెంట్ పేరు',
+      'mill_name_setting': 'మిల్లు పేరు',
     },
     'Hindi': {
       'dashboard': 'डैशबोर्ड',
@@ -648,6 +660,8 @@ class TranslationService {
       'restore_failed': 'पुनर्प्राप्ति विफल',
       'ok': 'ठीक है',
       'order_deleted': 'ऑर्डर हटाया गया',
+      'agent_name_setting': 'एजेंट का नाम',
+      'mill_name_setting': 'मिल का नाम',
     },
     'Tamil': {
       'dashboard': 'டாஷ்போர்டு',
@@ -866,6 +880,8 @@ class TranslationService {
       'restore_failed': 'மீட்டெடுப்பு தோல்வியடைந்தது',
       'ok': 'சரி',
       'order_deleted': 'ஆர்டர் நீக்கப்பட்டது',
+      'agent_name_setting': 'முகவர் பெயர்',
+      'mill_name_setting': 'ஆலை பெயர்',
     },
   };
 

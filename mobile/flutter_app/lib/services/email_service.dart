@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -9,8 +10,10 @@ class EmailService {
   /// This allows user to send via Gmail, WhatsApp, etc.
   static Future<bool> shareOrderExcel({
     required String filePath,
-    required String customerName,
     required String orderNumber,
+    required DateTime loadingDate,
+    String agentName = 'Narendra',
+    String millName = 'SBBRM',
     String? recipientEmail,
   }) async {
     try {
@@ -26,21 +29,26 @@ class EmailService {
         return false;
       }
 
-      final subject = 'Order $orderNumber - $customerName';
+      // Format date as (MMM dd) to match real email format
+      final dateStr = DateFormat('MMM dd').format(loadingDate).toUpperCase();
+
+      // Subject matches the real email format:
+      // NARENDRA PLACING ORDER NO : 38 . (NOV 25)
+      final subject =
+          '${agentName.toUpperCase()} PLACING ORDER NO : $orderNumber . ($dateStr)';
+
+      // Body matches the real email format
       final body = '''
-🌾 *Sri Balaji Rice Mill - New Load Order* 🌾
---------------------------------------------
-Order No: $orderNumber
-Party: $customerName
+TO
 
-Dear Team,
+${millName.toUpperCase()}
 
-Please find the attached Lorry Load Sheet for the above order. 
-Kindly process the shipment and confirm the loading status.
+${agentName.toUpperCase()} PLACING ORDER NO :  $orderNumber .  ($dateStr)
+
+Please find the attached Lorry Load Sheet.
 
 Regards,
-Kankatala Narayana Murthy
-Sri Balaji Rice Mill
+$agentName
 ''';
 
       final result = await Share.shareXFiles(
@@ -103,6 +111,7 @@ Sri Balaji Rice Mill
     required double totalAmount,
     required int itemCount,
     String currencySymbol = '₹',
+    String agentName = 'Narendra',
   }) {
     return '''
 Dear Sir/Madam,
@@ -122,13 +131,8 @@ Total Amount: $currencySymbol${totalAmount.toStringAsFixed(2)}
 
 Kindly arrange for loading as per the attached order sheet.
 
-Thank you for your continued partnership.
-
-Best regards,
-Rice Agent
-
----
-This order was generated using RiceAgent App.
+Regards,
+$agentName
 ''';
   }
 

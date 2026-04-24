@@ -238,22 +238,22 @@ class ProductGalleryScreen extends ConsumerWidget {
       {
         'name': 'galaxy_sona'.tr(ref),
         'image': 'assets/images/galaxy_sona_rice.png',
-        'description': 'sona_desc'.tr(ref),
+        'description': 'common_rice_desc'.tr(ref),
       },
       {
-        'name': 'galaxy_hmt'.tr(ref),
+        'name': 'raw_non_basmati'.tr(ref),
         'image': 'assets/images/galaxy_hmt_jeera_yellow.png',
-        'description': 'japan_tech'.tr(ref),
+        'description': 'common_rice_desc'.tr(ref),
       },
       {
-        'name': 'amaravathi_hmt'.tr(ref),
+        'name': 'parboiled_rice'.tr(ref),
         'image': 'assets/images/hmt_jeera_rice.png',
-        'description': 'premium_quality'.tr(ref),
+        'description': 'common_rice_desc'.tr(ref),
       },
       {
-        'name': 'galaxy_brown'.tr(ref),
+        'name': 'broken_rice'.tr(ref),
         'image': 'assets/images/brown_rice.png',
-        'description': 'healthy_nutritious'.tr(ref),
+        'description': 'common_rice_desc'.tr(ref),
       },
     ];
 

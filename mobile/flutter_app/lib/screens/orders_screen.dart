@@ -664,12 +664,14 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           items: orderItems,
           products: products,
           orderNumber: item.order.notes ?? 'N/A');
+      final settings = ref.read(settingsProvider);
       await EmailService.shareOrderExcel(
           filePath: path,
-          customerName: item.customers.isNotEmpty
-              ? item.customers.first.shopName
-              : 'Lorry',
-          orderNumber: item.order.notes ?? 'N/A');
+          orderNumber: item.order.notes ?? 'N/A',
+          loadingDate: item.order.loadingDate,
+          agentName: settings.agentName,
+          millName: settings.millName,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -703,6 +705,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           products: allProducts,
           order: item.order,
           currencySymbol: currency,
+          agentName: localization.agentName,
+          millName: localization.millName,
         );
       } catch (e) {
         _showError('WhatsApp failed: $e');
@@ -743,6 +747,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     allProducts: allProducts,
                     millContactPhone: localization.millContactPhone,
                     currencySymbol: currency,
+                    agentName: localization.agentName,
+                    millName: localization.millName,
                   );
                 } catch (e) {
                   if (mounted) {

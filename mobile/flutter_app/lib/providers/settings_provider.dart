@@ -37,6 +37,8 @@ class AppSettings {
   final String currencySymbol;
   final String excelSavePath;
   final bool autoBackupEnabled;
+  final String agentName;   // Agent name for email/WhatsApp signatures
+  final String millName;    // Mill name for headers
 
   // Configurable Business Logic (previously hardcoded)
   final double packing10Price; // Packing cost per 10kg bag
@@ -54,6 +56,8 @@ class AppSettings {
     this.currencySymbol = '₹',
     this.excelSavePath = '',
     this.autoBackupEnabled = true,
+    this.agentName = 'Narendra',
+    this.millName = 'Sri Balaji Boiled and Raw Rice Mill',
     this.packing10Price = 200.0,
     this.packing5Price = 250.0,
     this.amcPercent = 1.0,
@@ -74,6 +78,8 @@ class AppSettings {
     double? packing5Price,
     double? amcPercent,
     double? gstPercent,
+    String? agentName,
+    String? millName,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -85,6 +91,8 @@ class AppSettings {
       currencySymbol: currencySymbol ?? this.currencySymbol,
       excelSavePath: excelSavePath ?? this.excelSavePath,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      agentName: agentName ?? this.agentName,
+      millName: millName ?? this.millName,
       packing10Price: packing10Price ?? this.packing10Price,
       packing5Price: packing5Price ?? this.packing5Price,
       amcPercent: amcPercent ?? this.amcPercent,
@@ -125,6 +133,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       currencySymbol: prefs.getString('currency_symbol') ?? '₹',
       excelSavePath: prefs.getString('excel_save_path') ?? '',
       autoBackupEnabled: prefs.getBool('auto_backup_enabled') ?? true,
+      agentName: prefs.getString('agent_name') ?? 'Narendra',
+      millName: prefs.getString('mill_name') ?? 'Sri Balaji Boiled and Raw Rice Mill',
       packing10Price: prefs.getDouble('packing_10_price') ?? 200.0,
       packing5Price: prefs.getDouble('packing_5_price') ?? 250.0,
       amcPercent: prefs.getDouble('amc_percent') ?? 1.0,
@@ -184,6 +194,18 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('auto_backup_enabled', enabled);
     state = state.copyWith(autoBackupEnabled: enabled);
+  }
+
+  Future<void> setAgentName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('agent_name', name);
+    state = state.copyWith(agentName: name);
+  }
+
+  Future<void> setMillName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('mill_name', name);
+    state = state.copyWith(millName: name);
   }
 
   Future<void> setPacking10Price(double price) async {

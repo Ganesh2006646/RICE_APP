@@ -64,103 +64,80 @@ class ExcelService {
     // --- TOP HEADER ---
     // Row 1: OM SRI GURUBHYONAMAHA KANKATALA NARAYANA MURTHY ORDER FORM
     final cellA1 = sheet.cell(CellIndex.indexByString('A1'));
-    cellA1.value = TextCellValue(
-        'OM SRI GURUBHYONAMAHA  KANKATALA NARAYANA MURTHY ORDER FORM');
+    cellA1.value = TextCellValue('OM SRI GURUBHYONAMAHA  KANKATALA NARAYANA MURTHY ORDER FORM');
     cellA1.cellStyle = titleStyle;
-    sheet.merge(CellIndex.indexByString('A1'), CellIndex.indexByString('M1'));
+    sheet.merge(CellIndex.indexByString('A1'), CellIndex.indexByString('N1'));
 
-    // Row 2: ORDER NO - <ORDER_NO>
+    // Row 2: ORDER NO - <ORDER_NO> and LOADING DATE
     final cellA2 = sheet.cell(CellIndex.indexByString('A2'));
     cellA2.value = TextCellValue('ORDER NO - $orderNumber');
-    cellA2.cellStyle = titleStyle;
-    sheet.merge(CellIndex.indexByString('A2'), CellIndex.indexByString('M2'));
+    cellA2.cellStyle = headerStyle;
+    sheet.merge(CellIndex.indexByString('A2'), CellIndex.indexByString('F2'));
 
-    // Row 3: Loading Date (Aligned Right)
-    final cellM3 = sheet.cell(CellIndex.indexByString('M3'));
-    cellM3.value = TextCellValue(
-        'LOADING DATE : ${DateFormat('dd-MM-yyyy').format(order.loadingDate)}');
-    cellM3.cellStyle =
-        CellStyle(fontSize: 10, horizontalAlign: HorizontalAlign.Right);
+    final cellG2 = sheet.cell(CellIndex.indexByString('G2'));
+    cellG2.value = TextCellValue('LOADING DATE : ${DateFormat('dd - MM -yyyy.').format(order.loadingDate)}');
+    cellG2.cellStyle = headerStyle;
+    sheet.merge(CellIndex.indexByString('G2'), CellIndex.indexByString('N2'));
 
     // --- TABLE HEADERS (14 Columns mapped to indices 0-13) ---
-    // Column Index Mapping:
-    // 0: SL | 1: PARTY NAME | 2: PLACE | 3: TIN / GST | 4: CELL | 5: TYPE OF RICE
-    // 6: 26 KG | 7: 10 KG | 8: 5 KG | 9: QTL | 10: RATE | 11: AMC | 12: GST | 13: EX INFO
-
-    // Row 4: Main Header
+    // Row 3: Main Header
     final mainHeaders = [
-      'SL',
-      'PARTY NAME',
-      'PLACE',
-      'TIN / GST',
-      'CELL',
-      'TYPE OF RICE',
-      '26 KG',
-      '10 KG',
-      '5 KG',
-      'TOTAL',
-      'BASE RATE',
-      'AMC',
-      'GST',
-      'EX INFO'
+      'SL', 'PARTY NAME', 'PLACE', 'TIN/GST', 'CELL', 'TYPE OF RICE',
+      '26 KG', '', '10 KG', '5 KG', 'QTL', 'AMC', 'GST', 'EX INFO'
     ];
 
     for (int i = 0; i < mainHeaders.length; i++) {
-      final cell =
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 3));
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 2));
       cell.value = TextCellValue(mainHeaders[i]);
       cell.cellStyle = headerStyle;
     }
 
-    // Row 5: Sub Header
+    // Row 4: Sub Header
     final subHeaders = [
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      'BAGS',
-      'QTL',
-      'QTL',
-      'QTL',
-      'PER 100 KG',
-      '1%',
-      'TAX',
-      'TOTAL'
+      '', '', '', '', '', '',
+      'BAGS', 'QTL', 'QTL', 'QTL', 'RATE', '1%', '5%', ''
     ];
     for (int i = 0; i < subHeaders.length; i++) {
-      final cell =
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 4));
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 3));
       if (subHeaders[i].isNotEmpty) {
         cell.value = TextCellValue(subHeaders[i]);
       }
       cell.cellStyle = headerStyle;
     }
 
+    // Merging Headers
+    sheet.merge(CellIndex.indexByString('A3'), CellIndex.indexByString('A4'));
+    sheet.merge(CellIndex.indexByString('B3'), CellIndex.indexByString('B4'));
+    sheet.merge(CellIndex.indexByString('C3'), CellIndex.indexByString('C4'));
+    sheet.merge(CellIndex.indexByString('D3'), CellIndex.indexByString('D4'));
+    sheet.merge(CellIndex.indexByString('E3'), CellIndex.indexByString('E4'));
+    sheet.merge(CellIndex.indexByString('F3'), CellIndex.indexByString('F4'));
+    sheet.merge(CellIndex.indexByString('G3'), CellIndex.indexByString('H3')); // 26 KG spans BAGS & QTL
+    sheet.merge(CellIndex.indexByString('N3'), CellIndex.indexByString('N4')); // EX INFO
+
     // Set Column Widths
     final widths = [
-      5.0,
-      25.0,
-      15.0,
-      18.0,
-      15.0,
-      20.0,
-      8.0,
-      10.0,
-      10.0,
-      10.0,
-      12.0,
-      8.0,
-      8.0,
-      15.0
+      5.0,  // 0: SL
+      30.0, // 1: PARTY NAME
+      15.0, // 2: PLACE
+      20.0, // 3: TIN/GST
+      15.0, // 4: CELL
+      25.0, // 5: TYPE OF RICE
+      8.0,  // 6: 26 KG BAGS
+      8.0,  // 7: 26 KG QTL
+      8.0,  // 8: 10 KG QTL
+      8.0,  // 9: 5 KG QTL
+      10.0, // 10: RATE
+      6.0,  // 11: AMC
+      6.0,  // 12: GST
+      15.0  // 13: EX INFO
     ];
     for (int i = 0; i < widths.length; i++) {
       sheet.setColumnWidth(i, widths[i]);
     }
 
     // --- DATA ROWS ---
-    int rowIndex = 5;
+    int rowIndex = 4;
     int slNo = 1;
 
     // Group items by customer
@@ -168,6 +145,9 @@ class ExcelService {
     for (var item in items) {
       groupedItems.putIfAbsent(item.customerId, () => []).add(item);
     }
+
+    final nf = NumberFormat('#,##0.00', 'en_US');
+    final rateNf = NumberFormat('#,##0', 'en_US');
 
     for (var customerId in groupedItems.keys) {
       final customer = customers.firstWhere(
@@ -199,39 +179,31 @@ class ExcelService {
         final isFirstRow = i == 0;
 
         // Calculations (Strict Mill Logic)
-        final qtl10 = (item.bags10 * 10) / 100.0;
-        final qtl5 = (item.bags5 * 5) / 100.0;
-        final totalQtl = item.qtyQtl;
+        final qtl26 = item.bags26 > 0 ? (item.bags26 * 26.0) / 100.0 : 0.0;
+        final qtl10 = item.bags10 > 0 ? (item.bags10 * 10.0) / 100.0 : 0.0;
+        final qtl5 = item.bags5 > 0 ? (item.bags5 * 5.0) / 100.0 : 0.0;
 
         final rowData = [
-          isFirstRow ? slNo.toString() : '-', // 0: SL
-          isFirstRow ? (customer.shopName) : '-', // 1: PARTY NAME
-          isFirstRow ? (customer.place ?? '-') : '-', // 2: PLACE
-          isFirstRow ? (customer.tinGst ?? '-') : '-', // 3: TIN / GST
-          isFirstRow ? (customer.phone ?? '-') : '-', // 4: CELL
+          isFirstRow ? slNo.toString() : '', // 0: SL
+          isFirstRow ? (customer.shopName) : '', // 1: PARTY NAME
+          isFirstRow ? (customer.place ?? '') : '', // 2: PLACE
+          isFirstRow ? (customer.tinGst ?? '') : '', // 3: TIN / GST
+          isFirstRow ? (customer.phone ?? '') : '', // 4: CELL
           product.name, // 5: TYPE OF RICE
           item.bags26 > 0 ? item.bags26.toString() : '-', // 6: 26 KG BAGS
-          qtl10 > 0 ? qtl10.toStringAsFixed(2) : '-', // 7: 10 KG QTL
-          qtl5 > 0 ? qtl5.toStringAsFixed(2) : '-', // 8: 5 KG QTL
-          totalQtl > 0 ? totalQtl.toStringAsFixed(2) : '-', // 9: TOTAL QTL
-          item.ratePerQtl > 0
-              ? item.ratePerQtl.toStringAsFixed(2)
-              : '-', // 10: BASE RATE
-          item.amcAmount > 0
-              ? item.amcAmount.toStringAsFixed(2)
-              : '-', // 11: AMC (1%)
-          item.gstAmount > 0
-              ? item.gstAmount.toStringAsFixed(2)
-              : '-', // 12: GST
-          item.netAmount
-              .toStringAsFixed(2), // 13: EX INFO (Grand Total for line)
+          qtl26 > 0 ? qtl26.toStringAsFixed(2) : '-', // 7: 26 KG QTL
+          qtl10 > 0 ? (qtl10 == qtl10.toInt() ? qtl10.toInt().toString() : qtl10.toStringAsFixed(2)) : '-', // 8: 10 KG QTL
+          qtl5 > 0 ? (qtl5 == qtl5.toInt() ? qtl5.toInt().toString() : qtl5.toStringAsFixed(2)) : '-', // 9: 5 KG QTL
+          item.ratePerQtl > 0 ? rateNf.format(item.ratePerQtl) : '-', // 10: RATE
+          item.amcPercent > 0 ? '${item.amcPercent.toInt()}%' : '0%', // 11: AMC
+          item.gstPercent > 0 ? '${item.gstPercent.toInt()}%' : '0%', // 12: GST
+          nf.format(item.netAmount), // 13: EX INFO (Grand Total for line)
         ];
+        
         for (int j = 0; j < rowData.length; j++) {
-          final cell = sheet.cell(
-              CellIndex.indexByColumnRow(columnIndex: j, rowIndex: rowIndex));
+          final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: j, rowIndex: rowIndex));
           cell.value = TextCellValue(rowData[j]);
-          cell.cellStyle =
-              (j == 1 || j == 2 || j == 5) ? leftStyle : centerStyle;
+          cell.cellStyle = (j == 1 || j == 2 || j == 5) ? leftStyle : centerStyle;
         }
         rowIndex++;
       }
