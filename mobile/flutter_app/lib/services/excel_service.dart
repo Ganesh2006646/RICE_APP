@@ -426,9 +426,21 @@ class ExcelService {
         return {'success': false, 'message': 'No file selected'};
       }
 
-      File file = File(result.files.single.path!);
-      var bytes = await file.readAsBytes();
-      var excel = Excel.decodeBytes(bytes);
+      final filePath = result.files.single.path;
+      if (filePath == null || filePath.isEmpty) {
+        return {'success': false, 'message': 'Selected file path is invalid'};
+      }
+
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      final excel = _decodeExcelSafe(bytes);
+      if (excel == null) {
+        return {
+          'success': false,
+          'message':
+              'Import failed: Unsupported or damaged Excel format. Please re-save the file as .xlsx and try again.'
+        };
+      }
 
       int importedCount = 0;
       int skippedCount = 0;
@@ -571,13 +583,25 @@ class ExcelService {
         return {'success': false, 'message': 'No file selected'};
       }
 
-      final file = File(result.files.single.path!);
+      final filePath = result.files.single.path;
+      if (filePath == null || filePath.isEmpty) {
+        return {'success': false, 'message': 'Selected file path is invalid'};
+      }
+
+      final file = File(filePath);
       if (!await file.exists()) {
         return {'success': false, 'message': 'Selected file does not exist'};
       }
 
       final bytes = await file.readAsBytes();
-      final excel = Excel.decodeBytes(bytes);
+      final excel = _decodeExcelSafe(bytes);
+      if (excel == null) {
+        return {
+          'success': false,
+          'message':
+              'Cannot read this Excel file (style/format issue like numFmtId mismatch). Open it in Excel/WPS and Save As .xlsx, then import again.'
+        };
+      }
 
       final baseRowsByName = <String, _DailyBaseRow>{};
       final gstEligibleNames = <String>{};
@@ -593,6 +617,8 @@ class ExcelService {
 
         var section = _DailyPriceSection.none;
         _DailyColumnIndexes? columns;
+        String? lastProductName;
+        int? lastPackingKg;
 
         for (int i = 0; i < sheet.rows.length; i++) {
           final row = sheet.rows[i];
@@ -630,15 +656,24 @@ class ExcelService {
 
           if (section == _DailyPriceSection.none) continue;
 
-          final packingKg = _parsePackingKg(
+          int? packingKg = _parsePackingKg(
               _valueAt(row, _firstValidIndex([columns?.packingIndex, 1])));
-          final productName = _cleanProductName(
+          String productName = _cleanProductName(
               _valueAt(row, _firstValidIndex([columns?.nameIndex, 2])));
           final ratePerQtl = _extractRatePerQtl(row, columns);
+          final gstPercent = _extractGstPercent(row, columns);
+          final serialText =
+              _valueAt(row, _firstValidIndex([columns?.serialIndex, 0])).trim();
 
           if (productName.isEmpty) {
-            ignoredRows++;
-            continue;
+            // Handle merged-style sheets where name appears once then blanks.
+            // Reuse last non-empty product name if the row still looks like data.
+            if (ratePerQtl != null && lastProductName != null) {
+              productName = lastProductName;
+            } else {
+              ignoredRows++;
+              continue;
+            }
           }
 
           if (productName.toUpperCase().contains('PRODUCT NAME')) {
@@ -656,9 +691,31 @@ class ExcelService {
           // - GST 5% section should be 10kg / 5kg rows.
           // - Skip rows with unknown packing to avoid parsing notes/footers.
           if (packingKg == null) {
+            // Handle merged-style sheets where packing appears once then blanks.
+            if (ratePerQtl != null && lastPackingKg != null) {
+              packingKg = lastPackingKg;
+            } else {
+              ignoredRows++;
+              continue;
+            }
+          }
+
+          // Guard against non-data rows that still contain text/numbers.
+          final hasSerial = RegExp(r'^\d+$').hasMatch(serialText);
+          if (!hasSerial && serialText.isNotEmpty && ratePerQtl == null) {
             ignoredRows++;
             continue;
           }
+
+          // Some files may miss section labels. Infer section from GST/packing.
+          if (section == _DailyPriceSection.none) {
+            if ((gstPercent ?? 0) > 0) {
+              section = _DailyPriceSection.gst5;
+            } else if (packingKg == 26) {
+              section = _DailyPriceSection.exempted;
+            }
+          }
+
           if (section == _DailyPriceSection.exempted && packingKg != 26) {
             ignoredRows++;
             continue;
@@ -671,6 +728,8 @@ class ExcelService {
           }
 
           final normalizedName = _normalizeProductName(productName);
+          lastProductName = productName;
+          lastPackingKg = packingKg;
 
           if (packingKg == 10) {
             has10KgNames.add(normalizedName);
@@ -861,9 +920,21 @@ class ExcelService {
         return {'success': false, 'message': 'No file selected'};
       }
 
-      File file = File(result.files.single.path!);
-      var bytes = await file.readAsBytes();
-      var excel = Excel.decodeBytes(bytes);
+      final filePath = result.files.single.path;
+      if (filePath == null || filePath.isEmpty) {
+        return {'success': false, 'message': 'Selected file path is invalid'};
+      }
+
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      final excel = _decodeExcelSafe(bytes);
+      if (excel == null) {
+        return {
+          'success': false,
+          'message':
+              'Import failed: Unsupported or damaged Excel format. Please re-save the file as .xlsx and try again.'
+        };
+      }
 
       int importedCount = 0;
       int skippedCount = 0;
@@ -1107,6 +1178,8 @@ class ExcelService {
     int? packingIndex;
     int? nameIndex;
     int? rateIndex;
+    int? gstIndex;
+    int? totalIndex;
 
     for (int i = 0; i < row.length; i++) {
       final text = _cellToText(row[i]).toUpperCase();
@@ -1137,12 +1210,26 @@ class ExcelService {
         rateIndex = i;
         continue;
       }
+
+      if (gstIndex == null && text.contains('GST')) {
+        gstIndex = i;
+        continue;
+      }
+
+      if (totalIndex == null &&
+          (text == 'TOTAL' ||
+              text.contains('LINE TOTAL') ||
+              text.contains('GRAND TOTAL'))) {
+        totalIndex = i;
+      }
     }
 
     if (serialIndex == null &&
         packingIndex == null &&
         nameIndex == null &&
-        rateIndex == null) {
+        rateIndex == null &&
+        gstIndex == null &&
+        totalIndex == null) {
       return null;
     }
 
@@ -1151,6 +1238,8 @@ class ExcelService {
       packingIndex: packingIndex,
       nameIndex: nameIndex,
       rateIndex: rateIndex,
+      gstIndex: gstIndex,
+      totalIndex: totalIndex,
     );
   }
 
@@ -1205,6 +1294,10 @@ class ExcelService {
     }
 
     return null;
+  }
+
+  static double? _extractGstPercent(List<Data?> row, _DailyColumnIndexes? cols) {
+    return _toNumber(_valueAt(row, _firstValidIndex([cols?.gstIndex, 5])));
   }
 
   static int? _parsePackingKg(String input) {
@@ -1295,6 +1388,18 @@ class ExcelService {
     }
     return hash.toRadixString(16).toUpperCase().padLeft(8, '0');
   }
+
+  static Excel? _decodeExcelSafe(List<int> bytes) {
+    try {
+      return Excel.decodeBytes(bytes);
+    } catch (e) {
+      // Known failure class from some edited sheets:
+      // "custom numFmtId is at ... but found in ..."
+      // Also guards null-check crashes inside the parser.
+      debugPrint('Excel decode failed: $e');
+      return null;
+    }
+  }
 }
 
 enum _DailyPriceSection { none, exempted, gst5 }
@@ -1320,11 +1425,15 @@ class _DailyColumnIndexes {
   final int? packingIndex;
   final int? nameIndex;
   final int? rateIndex;
+  final int? gstIndex;
+  final int? totalIndex;
 
   const _DailyColumnIndexes({
     this.serialIndex,
     this.packingIndex,
     this.nameIndex,
     this.rateIndex,
+    this.gstIndex,
+    this.totalIndex,
   });
 }

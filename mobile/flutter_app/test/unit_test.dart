@@ -15,6 +15,17 @@ void main() {
     sku: 'TEST-001',
   );
 
+  final testProductWithGst5 = Product(
+    id: '2',
+    name: 'Test Rice GST',
+    defaultPrice: 5000,
+    gstRateDefault: 5.0,
+    unit: 'qtl',
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+    sku: 'TEST-002',
+  );
+
   group('OrderItemFormData - Weight Calculations', () {
     test('calculates weight correctly for 26kg bags only', () {
       final item = OrderItemFormData(
@@ -106,7 +117,7 @@ void main() {
   group('OrderItemFormData - 10kg Bags (₹200 Packing, 1% AMC, 5% GST)', () {
     test('calculates correctly for 10kg bags with packing and GST', () {
       final item = OrderItemFormData(
-        product: testProduct,
+        product: testProductWithGst5,
         bags26: 0,
         bags10: 10,
         bags5: 0,
@@ -136,7 +147,7 @@ void main() {
   group('OrderItemFormData - 5kg Bags (₹250 Packing, 1% AMC, 5% GST)', () {
     test('calculates correctly for 5kg bags with packing and GST', () {
       final item = OrderItemFormData(
-        product: testProduct,
+        product: testProductWithGst5,
         bags26: 0,
         bags10: 0,
         bags5: 20,
