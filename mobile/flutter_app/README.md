@@ -4,7 +4,12 @@ RiceAgent is a mobile application designed for rice mill agents to manage orders
 
 ## Excel Import Formats
 
-To import your data from Excel, use the following column structures. The app detects columns based on the header names provided below.
+To import your data from Excel, use the following column structures. The app detects columns based on the header names provided below. 
+
+**Tips for a successful import:**
+*   **File Format:** Save your files as `.xlsx` or `.xls`.
+*   **Headers:** Keep the first row as headers. Detection is **case-insensitive** (e.g., "Shop Name" and "shop name" both work).
+*   **Sheets:** The app reads the first sheet in the workbook.
 
 ### 1. Customers Import Format
 The app searches for these headers in your Excel sheet.

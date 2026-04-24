@@ -45,3 +45,23 @@ The app stores data locally in SQLite. Add data using the built-in screens:
 |-----------|------------|
 | **Customers** | Home → Customers → (+) Add Customer |
 | **Rice Varieties** | Home → Rice Varieties → (+) Add Variety |
+
+## Excel Import Formats
+
+You can bulk-upload data via Excel (.xlsx or .xls).
+
+### 1. Customers
+| Recommended Header | Also Accepts | Default Col |
+| :--- | :--- | :--- |
+| **Shop Name** | Name, Party | A |
+| **Place** | City | B |
+| **Phone** | Mobile, Cell | C |
+| **GST** | TIN | D |
+
+### 2. Products (Rice Varieties)
+| Recommended Header | Also Accepts | Default Col |
+| :--- | :--- | :--- |
+| **Name** | Variety | A |
+| **Price** | Rate, Cost | B |
+| **GST** | Tax | C |
+| **SKU** | Code | D |
