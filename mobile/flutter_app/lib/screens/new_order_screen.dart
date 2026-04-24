@@ -20,12 +20,22 @@ class OrderItemFormData {
   int bags5;
   double rate; // Defined ONLY for 100 KG (1 Quintal)
 
+  // Configurable business logic parameters (from Settings)
+  double packingPrice10;
+  double packingPrice5;
+  double amcRate;  // as fraction (e.g. 0.01 for 1%)
+  double gstRate;  // as fraction (e.g. 0.05 for 5%)
+
   OrderItemFormData({
     this.product,
     this.bags26 = 0,
     this.bags10 = 0,
     this.bags5 = 0,
     this.rate = 0,
+    this.packingPrice10 = 200.0,
+    this.packingPrice5 = 250.0,
+    this.amcRate = 0.01,
+    this.gstRate = 0.05,
   });
 
   // WEIGHTS
@@ -35,25 +45,25 @@ class OrderItemFormData {
   double get kgTotal => kg26 + kg10 + kg5;
   double get qtlTotal => kgTotal / 100.0;
 
-  // 26 KG LOGIC: No Packing, No GST, 1% AMC
+  // 26 KG LOGIC: No Packing, No GST, configurable AMC
   double get value26 => (rate / 100.0) * 26.0 * bags26;
-  double get amc26 => value26 * 0.01;
+  double get amc26 => value26 * amcRate;
   double get total26 => value26 + amc26;
 
-  // 10 KG LOGIC: ₹200 Packing, 1% AMC, 5% GST
+  // 10 KG LOGIC: Configurable Packing, AMC, GST
   double get baseValue10 => (rate / 100.0) * 10.0 * bags10;
-  double get packing10 => 200.0 * bags10;
+  double get packing10 => packingPrice10 * bags10;
   double get subtotal10 => baseValue10 + packing10;
-  double get amc10 => subtotal10 * 0.01;
-  double get gst10 => (subtotal10 + amc10) * 0.05;
+  double get amc10 => subtotal10 * amcRate;
+  double get gst10 => (subtotal10 + amc10) * gstRate;
   double get total10 => subtotal10 + amc10 + gst10;
 
-  // 5 KG LOGIC: ₹250 Packing, 1% AMC, 5% GST
+  // 5 KG LOGIC: Configurable Packing, AMC, GST
   double get baseValue5 => (rate / 100.0) * 5.0 * bags5;
-  double get packing5 => 250.0 * bags5;
+  double get packing5 => packingPrice5 * bags5;
   double get subtotal5 => baseValue5 + packing5;
-  double get amc5 => subtotal5 * 0.01;
-  double get gst5 => (subtotal5 + amc5) * 0.05;
+  double get amc5 => subtotal5 * amcRate;
+  double get gst5 => (subtotal5 + amc5) * gstRate;
   double get total5 => subtotal5 + amc5 + gst5;
 
   // TOTALS for Line Item
@@ -62,7 +72,7 @@ class OrderItemFormData {
   double get gstAmount => gst10 + gst5;
 
   // Percentage Helpers for DB/Legacy UI
-  double get amcPercent => 1.0;
+  double get amcPercent => amcRate * 100.0;
   double get gstPercent {
     double taxableSubtotal = (subtotal10 + amc10) + (subtotal5 + amc5);
     if (taxableSubtotal == 0) return 0.0;
@@ -193,10 +203,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             bags10: i.bags10,
             bags5: i.bags5,
             rate: i.ratePerQtl,
+            packingPrice10: ref.read(settingsProvider).packing10Price,
+            packingPrice5: ref.read(settingsProvider).packing5Price,
+            amcRate: ref.read(settingsProvider).amcPercent / 100.0,
+            gstRate: ref.read(settingsProvider).gstPercent / 100.0,
           );
         }).toList();
 
-        if (formItems.isEmpty) formItems.add(OrderItemFormData());
+        if (formItems.isEmpty) formItems.add(_createFormItem());
         loadedCustomers
             .add(CustomerLoadFormData(customer: customer, items: formItems));
       }
@@ -225,10 +239,26 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now());
 
+  /// Creates an OrderItemFormData with current settings values
+  OrderItemFormData _createFormItem({Product? product, int bags26 = 0, int bags10 = 0, int bags5 = 0, double rate = 0}) {
+    final settings = ref.read(settingsProvider);
+    return OrderItemFormData(
+      product: product,
+      bags26: bags26,
+      bags10: bags10,
+      bags5: bags5,
+      rate: rate,
+      packingPrice10: settings.packing10Price,
+      packingPrice5: settings.packing5Price,
+      amcRate: settings.amcPercent / 100.0,
+      gstRate: settings.gstPercent / 100.0,
+    );
+  }
+
   void _addCustomer({Customer? initial}) {
     setState(() {
       _customers.add(CustomerLoadFormData(
-          customer: initial, items: [OrderItemFormData()]));
+          customer: initial, items: [_createFormItem()]));
     });
   }
 
@@ -273,7 +303,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
     try {
       final db = ref.read(databaseProvider);
-      final lorryId = DateTime.now().millisecondsSinceEpoch.toString();
+      final lorryId = generateId();
 
       await db.transaction(() async {
         await db.into(db.orders).insert(OrdersCompanion(
@@ -287,14 +317,11 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               paymentStatus: const drift.Value('UNPAID'),
             ));
 
-        var customerIndex = 0;
         for (var customerLoad in _customers) {
           if (!customerLoad.isValid) continue;
           final cId = customerLoad.customer?.id ?? 'unknown';
-          customerIndex++;
 
-          // UNIQUE ID: orderId + customerId + index to prevent ANY collisions
-          final shipmentId = '${lorryId}_${cId}_$customerIndex';
+          final shipmentId = generateId();
 
           await db.into(db.lorryShipments).insert(LorryShipmentsCompanion(
                 id: drift.Value(shipmentId),
@@ -303,14 +330,11 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                 totalAmount: drift.Value(customerLoad.totalAmount),
               ));
 
-          var itemIndex = 0;
           for (var item in customerLoad.items) {
             if (!item.isValid) continue;
-            itemIndex++;
             final pId = item.product?.id ?? 'unknown';
 
-            // UNIQUE ID: shipmentId + productId + index
-            final orderItemId = '${shipmentId}_${pId}_$itemIndex';
+            final orderItemId = generateId();
 
             await db.into(db.orderItems).insert(OrderItemsCompanion(
                   id: drift.Value(orderItemId),
@@ -644,7 +668,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                               fontWeight: FontWeight.bold, fontSize: 14)),
                       trailing: TextButton.icon(
                         onPressed: () =>
-                            setState(() => data.items.add(OrderItemFormData())),
+                            setState(() => data.items.add(_createFormItem())),
                         icon: const Icon(Icons.add_circle_outline, size: 20),
                         label: Text('add_rice'.tr(ref)),
                       ),

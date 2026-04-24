@@ -345,50 +345,48 @@ class DailyDashboard extends ConsumerWidget {
   // ... _buildTodayStats ...
   Widget _buildTodayStats(BuildContext context, WidgetRef ref, AppDatabase db,
       DateTime startOfDay) {
-    return StreamBuilder<List<Order>>(
-      stream: (db.select(db.orders)
-            ..where((tbl) => tbl.loadingDate.isBiggerOrEqualValue(startOfDay)))
-          .watch(),
+    // Single stream that computes both order count and total QTL
+    // Eliminates the N+1 nested StreamBuilder pattern
+    final statsStream = (db.select(db.orders)
+          ..where((tbl) => tbl.loadingDate.isBiggerOrEqualValue(startOfDay)))
+        .watch()
+        .asyncMap((todayOrders) async {
+      if (todayOrders.isEmpty) return (0, 0.0);
+      final orderIds = todayOrders.map((o) => o.id).toList();
+      final items = await (db.select(db.orderItems)
+            ..where((tbl) => tbl.orderId.isIn(orderIds)))
+          .get();
+      final totalQtl = items.fold(0.0, (sum, item) => sum + item.qtyQtl);
+      return (todayOrders.length, totalQtl);
+    });
+
+    return StreamBuilder<(int, double)>(
+      stream: statsStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
+        final (ordersCount, totalQtl) = snapshot.data ?? (0, 0.0);
 
-        final todayOrders = snapshot.data!;
-        final ordersCount = todayOrders.length;
-
-        // Compute total QTL reactively from items associated with today's orders
-        return StreamBuilder<List<OrderItem>>(
-          stream: (db.select(db.orderItems)
-                ..where((tbl) =>
-                    tbl.orderId.isIn(todayOrders.map((o) => o.id).toList())))
-              .watch(),
-          builder: (context, itemsSnapshot) {
-            final items = itemsSnapshot.data ?? [];
-            final totalQtl = items.fold(0.0, (sum, item) => sum + item.qtyQtl);
-
-            return Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context: context,
-                    icon: Icons.local_shipping_outlined,
-                    label: 'orders_today'.tr(ref),
-                    value: ordersCount.toString(),
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    context: context,
-                    icon: Icons.scale_outlined,
-                    label: 'total_qtl'.tr(ref),
-                    value: totalQtl.toStringAsFixed(1),
-                    color: Colors.orange,
-                  ),
-                ),
-              ],
-            );
-          },
+        return Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                context: context,
+                icon: Icons.local_shipping_outlined,
+                label: 'orders_today'.tr(ref),
+                value: ordersCount.toString(),
+                color: Colors.blueAccent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                context: context,
+                icon: Icons.scale_outlined,
+                label: 'total_qtl'.tr(ref),
+                value: totalQtl.toStringAsFixed(1),
+                color: Colors.orange,
+              ),
+            ),
+          ],
         );
       },
     );
@@ -493,7 +491,7 @@ class DailyDashboard extends ConsumerWidget {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.3, // Taller tiles to prevent overflow
+          childAspectRatio: 1.1, // Taller tiles to prevent overflow
           children: gridActions.map((a) {
             return _buildActionButton(
               context: context,
@@ -532,7 +530,7 @@ class DailyDashboard extends ConsumerWidget {
       onTap: onTap,
       child: Container(
         width: isFullWidth ? double.infinity : null,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
@@ -549,41 +547,43 @@ class DailyDashboard extends ConsumerWidget {
             ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Icon(icon, size: 24, color: color),
                 const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: theme.textTheme.bodyLarge?.color,
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: theme.textTheme.bodyLarge?.color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ])
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 28, color: color),
+                    child: Icon(icon, size: 24, color: color),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 40, // Fixed height for labels to align
-                    child: Center(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: theme.textTheme.bodyLarge?.color,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: theme.textTheme.bodyLarge?.color,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],

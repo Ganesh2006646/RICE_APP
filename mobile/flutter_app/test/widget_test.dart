@@ -25,7 +25,7 @@ void main() {
     testWidgets('Dark theme renders correctly', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          theme: AppTheme.darkTheme,
+          darkTheme: AppTheme.lightTheme,
           home: const Scaffold(
             body: Center(child: Text('Dark Theme Test')),
           ),

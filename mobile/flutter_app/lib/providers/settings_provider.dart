@@ -1,9 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+
+/// Generates collision-free unique IDs using UUID v4
+String generateId() => const Uuid().v4();
+
+/// Type-safe language enum to prevent string-matching bugs
+enum AppLanguage {
+  english('English', 'en'),
+  telugu('Telugu', 'te'),
+  hindi('Hindi', 'hi'),
+  tamil('Tamil', 'ta');
+
+  final String displayName;
+  final String localeCode;
+  const AppLanguage(this.displayName, this.localeCode);
+
+  /// Parse from stored string, defaulting to English
+  static AppLanguage fromString(String? value) {
+    if (value == null) return AppLanguage.english;
+    return AppLanguage.values.firstWhere(
+      (e) => e.displayName.toLowerCase() == value.toLowerCase(),
+      orElse: () => AppLanguage.english,
+    );
+  }
+}
 
 /// App Settings State
 class AppSettings {
-  final String language;
+  final AppLanguage language;
   final String fontSize;
   final int defaultDueDays;
   final String millEmail;
@@ -13,8 +38,14 @@ class AppSettings {
   final String excelSavePath;
   final bool autoBackupEnabled;
 
+  // Configurable Business Logic (previously hardcoded)
+  final double packing10Price; // Packing cost per 10kg bag
+  final double packing5Price;  // Packing cost per 5kg bag
+  final double amcPercent;     // AMC percentage (e.g. 1.0 = 1%)
+  final double gstPercent;     // GST percentage (e.g. 5.0 = 5%)
+
   const AppSettings({
-    this.language = 'English',
+    this.language = AppLanguage.english,
     this.fontSize = 'Medium',
     this.defaultDueDays = 7,
     this.millEmail = 'sbbrrm@gmail.com',
@@ -23,10 +54,14 @@ class AppSettings {
     this.currencySymbol = '₹',
     this.excelSavePath = '',
     this.autoBackupEnabled = true,
+    this.packing10Price = 200.0,
+    this.packing5Price = 250.0,
+    this.amcPercent = 1.0,
+    this.gstPercent = 5.0,
   });
 
   AppSettings copyWith({
-    String? language,
+    AppLanguage? language,
     String? fontSize,
     int? defaultDueDays,
     String? millEmail,
@@ -35,6 +70,10 @@ class AppSettings {
     String? currencySymbol,
     String? excelSavePath,
     bool? autoBackupEnabled,
+    double? packing10Price,
+    double? packing5Price,
+    double? amcPercent,
+    double? gstPercent,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -46,6 +85,10 @@ class AppSettings {
       currencySymbol: currencySymbol ?? this.currencySymbol,
       excelSavePath: excelSavePath ?? this.excelSavePath,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      packing10Price: packing10Price ?? this.packing10Price,
+      packing5Price: packing5Price ?? this.packing5Price,
+      amcPercent: amcPercent ?? this.amcPercent,
+      gstPercent: gstPercent ?? this.gstPercent,
     );
   }
 
@@ -73,7 +116,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     state = AppSettings(
-      language: prefs.getString('language') ?? 'English',
+      language: AppLanguage.fromString(prefs.getString('language')),
       fontSize: prefs.getString('fontSize') ?? 'Medium',
       defaultDueDays: prefs.getInt('defaultDueDays') ?? 7,
       millEmail: prefs.getString('mill_email') ?? 'sbbrrm@gmail.com',
@@ -82,12 +125,16 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       currencySymbol: prefs.getString('currency_symbol') ?? '₹',
       excelSavePath: prefs.getString('excel_save_path') ?? '',
       autoBackupEnabled: prefs.getBool('auto_backup_enabled') ?? true,
+      packing10Price: prefs.getDouble('packing_10_price') ?? 200.0,
+      packing5Price: prefs.getDouble('packing_5_price') ?? 250.0,
+      amcPercent: prefs.getDouble('amc_percent') ?? 1.0,
+      gstPercent: prefs.getDouble('gst_percent') ?? 5.0,
     );
   }
 
-  Future<void> setLanguage(String language) async {
+  Future<void> setLanguage(AppLanguage language) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('language', language);
+    await prefs.setString('language', language.displayName);
     state = state.copyWith(language: language);
   }
 
@@ -137,6 +184,30 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('auto_backup_enabled', enabled);
     state = state.copyWith(autoBackupEnabled: enabled);
+  }
+
+  Future<void> setPacking10Price(double price) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('packing_10_price', price);
+    state = state.copyWith(packing10Price: price);
+  }
+
+  Future<void> setPacking5Price(double price) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('packing_5_price', price);
+    state = state.copyWith(packing5Price: price);
+  }
+
+  Future<void> setAmcPercent(double percent) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('amc_percent', percent);
+    state = state.copyWith(amcPercent: percent);
+  }
+
+  Future<void> setGstPercent(double percent) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('gst_percent', percent);
+    state = state.copyWith(gstPercent: percent);
   }
 
   Future<void> resetAll() async {

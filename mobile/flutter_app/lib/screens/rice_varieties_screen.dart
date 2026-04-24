@@ -428,8 +428,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                   ));
                 } else {
                   await db.into(db.products).insert(ProductsCompanion(
-                        id: drift.Value(
-                            DateTime.now().millisecondsSinceEpoch.toString()),
+                        id: drift.Value(generateId()),
                         name: drift.Value(nameController.text.trim()),
                         sku: drift.Value(skuController.text.trim().isEmpty
                             ? null

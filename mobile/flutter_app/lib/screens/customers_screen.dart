@@ -10,6 +10,7 @@ import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
 import '../services/excel_service.dart';
 import '../providers/settings_provider.dart';
+import '../services/backup_service.dart';
 
 /// Screen for managing customers with full CRUD operations
 /// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
@@ -293,19 +294,65 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     );
 
     if (confirmed == true) {
+      // Auto-backup before destructive operation
+      await BackupService.backupDatabase();
+
       // Background consolidated backup
       await ExcelService.appendDeletedCustomer(customer,
           customPath: ref.read(settingsProvider).excelSavePath);
 
-      await (db.delete(db.orderItems)
-            ..where((tbl) => tbl.customerId.equals(customer.id)))
-          .go();
-      await (db.delete(db.lorryShipments)
-            ..where((tbl) => tbl.customerId.equals(customer.id)))
-          .go();
-      await (db.delete(db.customers)
-            ..where((tbl) => tbl.id.equals(customer.id)))
-          .go();
+      await db.transaction(() async {
+        // 1. Find all orders this customer is part of
+        final affectedShipments = await (db.select(db.lorryShipments)
+              ..where((tbl) => tbl.customerId.equals(customer.id)))
+            .get();
+        final affectedOrderIds =
+            affectedShipments.map((s) => s.orderId).toSet();
+
+        // 2. Delete customer's order items and shipments
+        await (db.delete(db.orderItems)
+              ..where((tbl) => tbl.customerId.equals(customer.id)))
+            .go();
+        await (db.delete(db.lorryShipments)
+              ..where((tbl) => tbl.customerId.equals(customer.id)))
+            .go();
+
+        // 3. Recalculate totals for each affected order
+        for (final orderId in affectedOrderIds) {
+          final remainingItems = await (db.select(db.orderItems)
+                ..where((tbl) => tbl.orderId.equals(orderId)))
+              .get();
+
+          if (remainingItems.isEmpty) {
+            // Order is now empty — delete it and its payments
+            await (db.delete(db.payments)
+                  ..where((tbl) => tbl.orderId.equals(orderId)))
+                .go();
+            await (db.delete(db.orders)
+                  ..where((tbl) => tbl.id.equals(orderId)))
+                .go();
+          } else {
+            // Recalculate total from remaining items
+            final newTotal =
+                remainingItems.fold(0.0, (sum, item) => sum + item.netAmount);
+            await (db.update(db.orders)
+                  ..where((tbl) => tbl.id.equals(orderId)))
+                .write(OrdersCompanion(
+              totalAmount: drift.Value(newTotal),
+              updatedAt: drift.Value(DateTime.now()),
+            ));
+          }
+        }
+
+        // 4. Delete customer prices and the customer itself
+        await (db.delete(db.customerPrices)
+              ..where((tbl) => tbl.customerId.equals(customer.id)))
+            .go();
+        await (db.delete(db.customers)
+              ..where((tbl) => tbl.id.equals(customer.id)))
+            .go();
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('deleted'.tr(ref))));
@@ -379,8 +426,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     .write(companion);
               } else {
                 await db.into(db.customers).insert(companion.copyWith(
-                    id: drift.Value(
-                        DateTime.now().millisecondsSinceEpoch.toString())));
+                    id: drift.Value(generateId())));
               }
               if (context.mounted) Navigator.pop(context);
             },

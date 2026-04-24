@@ -38,12 +38,13 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.language,
               title: 'app_language'.tr(ref),
               children: [
-                _buildDropdown(
+                _buildLanguageDropdown(
                   context: context,
                   label: 'app_language'.tr(ref),
                   value: settings.language,
-                  items: ['English', 'Telugu', 'Hindi', 'Tamil'],
-                  onChanged: (value) => notifier.setLanguage(value!),
+                  onChanged: (value) {
+                    if (value != null) notifier.setLanguage(value);
+                  },
                 ),
                 const SizedBox(height: 16),
                 _buildDropdown(
@@ -57,6 +58,47 @@ class SettingsScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 24),
+
+            // SECTION 2: PRICING & TAX (previously hardcoded)
+            _buildSectionHeader(context, 'pricing_tax'.tr(ref)),
+            _buildSettingsCard(
+              context: context,
+              icon: Icons.calculate_outlined,
+              title: 'pricing_config'.tr(ref),
+              children: [
+                _buildNumberField(
+                  context: context,
+                  label: 'packing_10kg'.tr(ref),
+                  value: settings.packing10Price,
+                  onChanged: (v) => notifier.setPacking10Price(v),
+                  suffix: '₹/bag',
+                ),
+                const SizedBox(height: 16),
+                _buildNumberField(
+                  context: context,
+                  label: 'packing_5kg'.tr(ref),
+                  value: settings.packing5Price,
+                  onChanged: (v) => notifier.setPacking5Price(v),
+                  suffix: '₹/bag',
+                ),
+                const SizedBox(height: 16),
+                _buildNumberField(
+                  context: context,
+                  label: 'amc_percent'.tr(ref),
+                  value: settings.amcPercent,
+                  onChanged: (v) => notifier.setAmcPercent(v),
+                  suffix: '%',
+                ),
+                const SizedBox(height: 16),
+                _buildNumberField(
+                  context: context,
+                  label: 'gst_percent'.tr(ref),
+                  value: settings.gstPercent,
+                  onChanged: (v) => notifier.setGstPercent(v),
+                  suffix: '%',
+                ),
+              ],
+            ),
 
             const SizedBox(height: 24),
 
@@ -610,6 +652,88 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildLanguageDropdown({
+    required BuildContext context,
+    required String label,
+    required AppLanguage value,
+    required ValueChanged<AppLanguage?> onChanged,
+  }) {
+    return SafeColumn(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SafeText(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<AppLanguage>(
+          initialValue: value,
+          items: AppLanguage.values
+              .map((lang) => DropdownMenuItem(
+                    value: lang,
+                    child: Text(lang.displayName),
+                  ))
+              .toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNumberField({
+    required BuildContext context,
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+    String? suffix,
+  }) {
+    return SafeColumn(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SafeText(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          initialValue: value.toString(),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            suffixText: suffix,
+          ),
+          onChanged: (val) {
+            final parsed = double.tryParse(val);
+            if (parsed != null) {
+              onChanged(parsed);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildEditableField({
     required BuildContext context,
     required String label,
@@ -643,6 +767,8 @@ class SettingsScreen extends ConsumerWidget {
       ],
     );
   }
+
+
 
   Future<void> _pickExcelPath(BuildContext context, WidgetRef ref) async {
     try {

@@ -339,7 +339,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           await (db.delete(db.lorryShipments)
                 ..where((tbl) => tbl.orderId.equals(item.order.id)))
               .go();
-          // 3. Delete the order itself
+          // 3. Delete payment records (fixes orphaned payments bug)
+          await (db.delete(db.payments)
+                ..where((tbl) => tbl.orderId.equals(item.order.id)))
+              .go();
+          // 4. Delete the order itself
           await (db.delete(db.orders)
                 ..where((tbl) => tbl.id.equals(item.order.id)))
               .go();
@@ -572,8 +576,21 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     await BackupService.backupDatabase();
 
     try {
-      await (db.delete(db.orders)..where((t) => t.id.equals(item.order.id)))
-          .go();
+      await db.transaction(() async {
+        // Delete in correct order: items -> shipments -> payments -> order
+        await (db.delete(db.orderItems)
+              ..where((t) => t.orderId.equals(item.order.id)))
+            .go();
+        await (db.delete(db.lorryShipments)
+              ..where((t) => t.orderId.equals(item.order.id)))
+            .go();
+        await (db.delete(db.payments)
+              ..where((t) => t.orderId.equals(item.order.id)))
+            .go();
+        await (db.delete(db.orders)
+              ..where((t) => t.id.equals(item.order.id)))
+            .go();
+      });
       if (mounted) {
         SafeSnackBar.show(context, 'order_deleted'.tr(ref));
       }

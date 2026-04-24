@@ -1,5 +1,3 @@
-# Start of .gitignore
-
 # Misc
 .DS_Store
 Thumbs.db
@@ -7,22 +5,12 @@ Thumbs.db
 .vscode/
 *.log
 
-# Node.js / Backend
-node_modules/
-dist/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.env
-
-# Flutter / Mobile
+# Flutter / Dart
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 build/
-ios/.generated/
-packages
 .pub/
 .pub-cache/
 
@@ -31,13 +19,11 @@ packages
 **/android/.gradle
 **/android/*.iml
 
-# Python / ML
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-env/
-.venv/
+# Unused platforms (Windows + Android only)
+ios/
+linux/
+macos/
+web/
 
 # Agent specific
 .agent/

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../db/database.dart';
+import '../providers/settings_provider.dart';
 
 class ProductSeedingService {
   static Future<void> seedInitialProducts(AppDatabase db) async {
@@ -51,7 +52,7 @@ class ProductSeedingService {
   static ProductsCompanion _p(
       String name, double price, double gst, int index) {
     return ProductsCompanion.insert(
-      id: '${DateTime.now().millisecondsSinceEpoch}_${index}_p',
+      id: generateId(),
       name: name,
       defaultPrice: price,
       gstRateDefault: Value(gst),

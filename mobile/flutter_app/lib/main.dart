@@ -81,7 +81,6 @@ class RiceAgentApp extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
 
     // Build theme based on settings
-    // Build theme based on settings
     final baseTheme = AppTheme.lightTheme;
 
     // Apply font scaling
@@ -95,12 +94,8 @@ class RiceAgentApp extends ConsumerWidget {
       title: 'Galaxy E-Orders',
       debugShowCheckedModeBanner: false,
       theme: scaledTheme,
-      // Pass language to locale for system components (though manual translation is used primary)
-      locale: Locale(settings.language == 'Telugu'
-          ? 'te'
-          : (settings.language == 'Hindi'
-              ? 'hi'
-              : (settings.language == 'Tamil' ? 'ta' : 'en'))),
+      // Pass language to locale for system components
+      locale: Locale(settings.language.localeCode),
       home: const SplashScreen(),
     );
   }

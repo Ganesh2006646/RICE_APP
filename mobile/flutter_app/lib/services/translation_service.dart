@@ -4,7 +4,7 @@ import '../providers/settings_provider.dart';
 /// Simple Translation Service for RiceAgent
 /// Supports English, Telugu, Hindi, and Tamil
 class TranslationService {
-  static final Map<String, Map<String, String>> _localizedValues = {
+  static const Map<String, Map<String, String>> _localizedValues = {
     'English': {
       'dashboard': 'Dashboard',
       'new_order': 'New Order',
@@ -201,6 +201,21 @@ class TranslationService {
       'last_backup': 'Last backup',
       'backup_success': 'Backup created successfully',
       'backup_failed': 'Backup failed',
+      'pricing_tax': 'Pricing & Tax',
+      'pricing_config': 'Pricing Configuration',
+      'packing_10kg': '10 KG Packing Cost',
+      'packing_5kg': '5 KG Packing Cost',
+      'amc_percent': 'AMC Percentage',
+      'gst_percent': 'GST Percentage',
+      'invoice_prefix': 'Invoice Prefix',
+      'currency_symbol_desc': 'Currency shown in orders and reports',
+      'permission_required': 'Permission Required',
+      'open_settings': 'Open Settings',
+      'restore': 'Restore',
+      'restore_success': 'Data restored successfully',
+      'restore_failed': 'Restore failed',
+      'ok': 'OK',
+      'order_deleted': 'Order deleted',
     },
     'Telugu': {
       'dashboard': 'డ్యాష్‌బోర్డ్',
@@ -402,6 +417,21 @@ class TranslationService {
       'last_backup': 'చివరి బ్యాకప్',
       'backup_success': 'బ్యాకప్ విజయవంతంగా సృష్టించబడింది',
       'backup_failed': 'బ్యాకప్ విఫలమైంది',
+      'pricing_tax': 'ధరలు & పన్నులు',
+      'pricing_config': 'ధర కాన్ఫిగరేషన్',
+      'packing_10kg': '10 KG ప్యాకింగ్ ఖరీదు',
+      'packing_5kg': '5 KG ప్యాకింగ్ ఖరీదు',
+      'amc_percent': 'AMC శాతం',
+      'gst_percent': 'GST శాతం',
+      'invoice_prefix': 'ఇన్వాయిస్ ప్రిఫిక్స్',
+      'currency_symbol_desc': 'ఆర్డర్లు మరియు రిపోర్ట్లలో చూపించే కరెన్సీ',
+      'permission_required': 'అనుమతి అవసరం',
+      'open_settings': 'సెట్టింగ్స్ తెరవండి',
+      'restore': 'పునరుద్ధరించు',
+      'restore_success': 'డేటా విజయవంతంగా పునరుద్ధరించబడింది',
+      'restore_failed': 'పునరుద్ధరణ విఫలమైంది',
+      'ok': 'సరే',
+      'order_deleted': 'ఆర్డర్ తొలగించబడింది',
     },
     'Hindi': {
       'dashboard': 'डैशबोर्ड',
@@ -603,6 +633,21 @@ class TranslationService {
       'last_backup': 'अंतिम बैकअप',
       'backup_success': 'बैकअप सफलतापूर्वक बनाया गया',
       'backup_failed': 'बैकअप विफल',
+      'pricing_tax': 'मूल्य निर्धारण और कर',
+      'pricing_config': 'मूल्य कॉन्फ़िगरेशन',
+      'packing_10kg': '10 KG पैकिंग लागत',
+      'packing_5kg': '5 KG पैकिंग लागत',
+      'amc_percent': 'AMC प्रतिशत',
+      'gst_percent': 'GST प्रतिशत',
+      'invoice_prefix': 'इनवॉइस प्रिफ़िक्स',
+      'currency_symbol_desc': 'ऑर्डर और रिपोर्ट में दिखाई जाने वाली मुद्रा',
+      'permission_required': 'अनुमति आवश्यक',
+      'open_settings': 'सेटिंग्स खोलें',
+      'restore': 'पुनर्प्राप्त करें',
+      'restore_success': 'डेटा सफलतापूर्वक पुनर्प्राप्त किया गया',
+      'restore_failed': 'पुनर्प्राप्ति विफल',
+      'ok': 'ठीक है',
+      'order_deleted': 'ऑर्डर हटाया गया',
     },
     'Tamil': {
       'dashboard': 'டாஷ்போர்டு',
@@ -806,6 +851,21 @@ class TranslationService {
       'last_backup': 'கடைசி காப்புப்பிரதி',
       'backup_success': 'காப்புப்பிரதி வெற்றிகரமாக உருவாக்கப்பட்டது',
       'backup_failed': 'காப்புப்பிரதி தோல்வியடைந்தது',
+      'pricing_tax': 'விலை நிர்ணயம் & வரி',
+      'pricing_config': 'விலை கட்டமைப்பு',
+      'packing_10kg': '10 KG பேக்கிங் செலவு',
+      'packing_5kg': '5 KG பேக்கிங் செலவு',
+      'amc_percent': 'AMC சதவீதம்',
+      'gst_percent': 'GST சதவீதம்',
+      'invoice_prefix': 'விலைப்பட்டி முன்னொட்டு',
+      'currency_symbol_desc': 'ஆர்டர்கள் மற்றும் அறிக்கைகளில் காட்டப்படும் நாணயம்',
+      'permission_required': 'அனுமதி தேவை',
+      'open_settings': 'அமைப்புகளைத் திற',
+      'restore': 'மீட்டெடு',
+      'restore_success': 'தரவு வெற்றிகரமாக மீட்டெடுக்கப்பட்டது',
+      'restore_failed': 'மீட்டெடுப்பு தோல்வியடைந்தது',
+      'ok': 'சரி',
+      'order_deleted': 'ஆர்டர் நீக்கப்பட்டது',
     },
   };
 
@@ -821,6 +881,6 @@ class TranslationService {
 extension TranslateExtension on String {
   String tr(WidgetRef ref) {
     final language = ref.watch(settingsProvider).language;
-    return TranslationService.translate(this, language);
+    return TranslationService.translate(this, language.displayName);
   }
 }

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../db/database.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
+import '../providers/settings_provider.dart';
 
 /// Service for generating Excel files matching the strict rice mill order format.
 /// Supports multi-customer lorry loads with grouping and exact visual alignment.
@@ -417,6 +418,7 @@ class ExcelService {
 
       int importedCount = 0;
       int skippedCount = 0;
+      final List<String> errors = [];
 
       await db.transaction(() async {
         for (var table in excel.tables.keys) {
@@ -472,8 +474,7 @@ class ExcelService {
             try {
               await db.into(db.customers).insert(
                     CustomersCompanion(
-                      id: drift.Value(
-                          '${DateTime.now().millisecondsSinceEpoch}_${i}_$importedCount'),
+                      id: drift.Value(generateId()),
                       shopName: drift.Value(name),
                       place: drift.Value(place.isEmpty ? null : place),
                       phone: drift.Value(phone.isEmpty ? null : phone),
@@ -482,18 +483,28 @@ class ExcelService {
                     ),
                   );
               importedCount++;
-            } catch (k) {
-              skippedCount++; // Likely duplicate or error
+            } on Exception catch (e) {
+              if (e.toString().contains('UNIQUE') || e.toString().contains('constraint')) {
+                skippedCount++; // Duplicate entry
+              } else {
+                errors.add('Row ${i + 1} ($name): $e');
+                skippedCount++;
+              }
             }
           }
         }
       });
 
+      final errorSuffix = errors.isNotEmpty
+          ? '\nErrors: ${errors.take(5).join('; ')}'
+          : '';
       return {
         'success': true,
         'count': importedCount,
         'skipped': skippedCount,
-        'message': 'Imported $importedCount customers ($skippedCount skipped)'
+        'errors': errors,
+        'message':
+            'Imported $importedCount customers ($skippedCount skipped)$errorSuffix'
       };
     } catch (e) {
       return {'success': false, 'message': 'Import Failed: $e'};
@@ -520,6 +531,7 @@ class ExcelService {
 
       int importedCount = 0;
       int skippedCount = 0;
+      final List<String> errors = [];
 
       await db.transaction(() async {
         for (var table in excel.tables.keys) {
@@ -585,8 +597,7 @@ class ExcelService {
             final gst = double.tryParse(gstStr.replaceAll('%', '')) ?? 0.0;
 
             try {
-              final id =
-                  '${DateTime.now().millisecondsSinceEpoch}_${importedCount}_product';
+              final id = generateId();
               await db.into(db.products).insert(
                     ProductsCompanion(
                       id: drift.Value(id),
@@ -598,18 +609,28 @@ class ExcelService {
                     ),
                   );
               importedCount++;
-            } catch (k) {
-              skippedCount++;
+            } on Exception catch (e) {
+              if (e.toString().contains('UNIQUE') || e.toString().contains('constraint')) {
+                skippedCount++;
+              } else {
+                errors.add('Row ${i + 1} ($name): $e');
+                skippedCount++;
+              }
             }
           }
         }
       });
 
+      final errorSuffix = errors.isNotEmpty
+          ? '\nErrors: ${errors.take(5).join('; ')}'
+          : '';
       return {
         'success': true,
         'count': importedCount,
         'skipped': skippedCount,
-        'message': 'Imported $importedCount products ($skippedCount skipped)'
+        'errors': errors,
+        'message':
+            'Imported $importedCount products ($skippedCount skipped)$errorSuffix'
       };
     } catch (e) {
       return {'success': false, 'message': 'Import Failed: $e'};
