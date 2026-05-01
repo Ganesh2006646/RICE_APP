@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -173,6 +174,7 @@ class ExcelService {
     // Group items by customer
     final groupedItems = <String, List<OrderItem>>{};
     for (var item in items) {
+      if (item.bags26 == 0 && item.bags10 == 0 && item.bags5 == 0) continue;
       groupedItems.putIfAbsent(item.customerId, () => []).add(item);
     }
 
@@ -609,7 +611,6 @@ class ExcelService {
       final has5KgNames = <String>{};
       final rowErrors = <String>[];
       int parsedRows = 0;
-      int ignoredRows = 0;
 
       for (final tableName in excel.tables.keys) {
         final sheet = excel.tables[tableName];
@@ -650,7 +651,6 @@ class ExcelService {
           if (_isDailyFooterOrNoteRow(rowText)) {
             // Footer and notes are not product rows; stop parsing section data.
             section = _DailyPriceSection.none;
-            ignoredRows++;
             continue;
           }
 
@@ -671,18 +671,15 @@ class ExcelService {
             if (ratePerQtl != null && lastProductName != null) {
               productName = lastProductName;
             } else {
-              ignoredRows++;
               continue;
             }
           }
 
           if (productName.toUpperCase().contains('PRODUCT NAME')) {
-            ignoredRows++;
             continue;
           }
 
           if (_isDailyNonDataProductName(productName)) {
-            ignoredRows++;
             continue;
           }
 
@@ -695,7 +692,6 @@ class ExcelService {
             if (ratePerQtl != null && lastPackingKg != null) {
               packingKg = lastPackingKg;
             } else {
-              ignoredRows++;
               continue;
             }
           }
@@ -703,7 +699,6 @@ class ExcelService {
           // Guard against non-data rows that still contain text/numbers.
           final hasSerial = RegExp(r'^\d+$').hasMatch(serialText);
           if (!hasSerial && serialText.isNotEmpty && ratePerQtl == null) {
-            ignoredRows++;
             continue;
           }
 
@@ -717,13 +712,11 @@ class ExcelService {
           }
 
           if (section == _DailyPriceSection.exempted && packingKg != 26) {
-            ignoredRows++;
             continue;
           }
           if (section == _DailyPriceSection.gst5 &&
               packingKg != 10 &&
               packingKg != 5) {
-            ignoredRows++;
             continue;
           }
 
@@ -742,9 +735,9 @@ class ExcelService {
           }
 
           if (ratePerQtl == null) {
-            ignoredRows++;
             continue;
           }
+
 
           parsedRows++;
 
@@ -783,33 +776,61 @@ class ExcelService {
         };
       }
 
-      int insertedCount = 0;
+      // PRICE-UPDATE-ONLY MODE:
+      // We only update prices for varieties that already exist in the database.
+      // We never insert new varieties from the price sheet — the user must add
+      // those manually. This prevents ghost entries from header/footer rows.
       int updatedCount = 0;
-      int skippedCount = 0;
+      int skippedCount = 0; // rate is 0 or no db match found
+      final List<_PriceUpdateResult> updateResults = [];
 
       await db.transaction(() async {
         final now = DateTime.now();
         final existingProducts = await db.select(db.products).get();
 
-        final productsBySku = <String, Product>{};
+        // Build lookup maps: normalized name → product
         final productsByNormalizedName = <String, Product>{};
+        final productsBySku = <String, Product>{};
 
         for (final product in existingProducts) {
+          productsByNormalizedName[_normalizeProductName(product.name)] =
+              product;
           final sku = product.sku;
           if (sku != null && sku.isNotEmpty) {
             productsBySku[sku] = product;
           }
-          productsByNormalizedName[_normalizeProductName(product.name)] =
-              product;
         }
 
         for (final row in baseRowsByName.values) {
+          // Skip zero-price rows (e.g., out-of-stock items with 0.00)
           if (row.ratePerQtl <= 0) {
+            updateResults.add(_PriceUpdateResult(
+              excelName: row.name,
+              status: _UpdateStatus.zeroPriceSkipped,
+            ));
             skippedCount++;
             continue;
           }
 
+          // Try to find a matching product in DB
+          // 1. Exact normalized name match
+          // 2. SKU match (for previously imported varieties)
+          // 3. Fuzzy: DB name contains all words from Excel name (or vice versa)
           final sku = _buildDailyPriceSku(row.normalizedName);
+          Product? matchedProduct = productsByNormalizedName[row.normalizedName]
+              ?? productsBySku[sku]
+              ?? _fuzzyMatchProduct(row.normalizedName, productsByNormalizedName);
+
+          if (matchedProduct == null) {
+            // Not found in DB — report for the user to add manually
+            updateResults.add(_PriceUpdateResult(
+              excelName: row.name,
+              status: _UpdateStatus.notFound,
+            ));
+            skippedCount++;
+            continue;
+          }
+
           final gstRate =
               gstEligibleNames.contains(row.normalizedName) ? 5.0 : 0.0;
           final supports10Kg = has10KgNames.contains(row.normalizedName);
@@ -819,91 +840,99 @@ class ExcelService {
             supports5Kg: supports5Kg,
           );
 
-          final existingProduct = productsBySku[sku] ??
-              productsByNormalizedName[row.normalizedName];
-
           try {
-            if (existingProduct != null) {
-              await (db.update(db.products)
-                    ..where((tbl) => tbl.id.equals(existingProduct.id)))
-                  .write(ProductsCompanion(
-                sku: drift.Value(sku),
-                name: drift.Value(row.name),
-                defaultPrice: drift.Value(row.ratePerQtl),
-                gstRateDefault: drift.Value(gstRate),
-                unit: drift.Value(unitMeta),
-                updatedAt: drift.Value(now),
-              ));
-              updatedCount++;
+            // Only update price, GST rate, unit meta, and SKU — never rename
+            await (db.update(db.products)
+                  ..where((tbl) => tbl.id.equals(matchedProduct.id)))
+                .write(ProductsCompanion(
+              sku: drift.Value(sku),
+              defaultPrice: drift.Value(row.ratePerQtl),
+              gstRateDefault: drift.Value(gstRate),
+              unit: drift.Value(unitMeta),
+              updatedAt: drift.Value(now),
+            ));
 
-              // Keep local lookup maps fresh so later rows resolve consistently.
-              final refreshed = existingProduct.copyWith(
-                sku: drift.Value(sku),
-                name: row.name,
-                defaultPrice: row.ratePerQtl,
-                gstRateDefault: gstRate,
-                unit: unitMeta,
-                updatedAt: now,
-              );
-              productsBySku[sku] = refreshed;
-              productsByNormalizedName[row.normalizedName] = refreshed;
-            } else {
-              final id = generateId();
-              final insertedProduct = Product(
-                id: id,
-                sku: sku,
-                name: row.name,
-                defaultPrice: row.ratePerQtl,
-                gstRateDefault: gstRate,
-                unit: unitMeta,
-                createdAt: now,
-                updatedAt: now,
-              );
+            updateResults.add(_PriceUpdateResult(
+              excelName: row.name,
+              dbName: matchedProduct.name,
+              newPrice: row.ratePerQtl,
+              status: _UpdateStatus.updated,
+            ));
+            updatedCount++;
 
-              await db.into(db.products).insert(ProductsCompanion(
-                    id: drift.Value(id),
-                    sku: drift.Value(sku),
-                    name: drift.Value(row.name),
-                    defaultPrice: drift.Value(row.ratePerQtl),
-                    gstRateDefault: drift.Value(gstRate),
-                    unit: drift.Value(unitMeta),
-                    updatedAt: drift.Value(now),
-                  ));
-              insertedCount++;
-
-              productsBySku[sku] = insertedProduct;
-              productsByNormalizedName[row.normalizedName] = insertedProduct;
-            }
+            // Keep maps fresh
+            final refreshed = matchedProduct.copyWith(
+              defaultPrice: row.ratePerQtl,
+              gstRateDefault: gstRate,
+              unit: unitMeta,
+              updatedAt: now,
+            );
+            productsByNormalizedName[_normalizeProductName(matchedProduct.name)] =
+                refreshed;
           } on Exception catch (e) {
+            updateResults.add(_PriceUpdateResult(
+              excelName: row.name,
+              status: _UpdateStatus.error,
+              errorMsg: e.toString(),
+            ));
+            if (rowErrors.length < 5) rowErrors.add('${row.name}: $e');
             skippedCount++;
-            if (rowErrors.length < 5) {
-              rowErrors.add('${row.name}: $e');
-            }
           }
         }
       });
 
-      final gstOnlyCount =
-          gstEligibleNames.difference(baseRowsByName.keys.toSet()).length;
-      final gstOnlyNote =
-          gstOnlyCount > 0 ? ' | GST-only rows skipped: $gstOnlyCount' : '';
-      final errorNote =
-          rowErrors.isNotEmpty ? ' | Row issues: ${rowErrors.join(' ; ')}' : '';
+      final notFoundList = updateResults
+          .where((r) => r.status == _UpdateStatus.notFound)
+          .map((r) => r.excelName)
+          .toList();
+
+      final zeroList = updateResults
+          .where((r) => r.status == _UpdateStatus.zeroPriceSkipped)
+          .map((r) => r.excelName)
+          .toList();
 
       return {
         'success': true,
-        'inserted': insertedCount,
         'updated': updatedCount,
         'skipped': skippedCount,
         'parsedRows': parsedRows,
-        'ignoredRows': ignoredRows,
+        'notFound': notFoundList,       // List<String> — varieties in Excel not in DB
+        'zeroPriced': zeroList,         // List<String> — varieties with 0 price
         'errors': rowErrors,
-        'message':
-            'Daily price list imported: $insertedCount new, $updatedCount updated, $skippedCount skipped.$gstOnlyNote$errorNote'
+        'updateResults': updateResults, // full detail list
+        'message': updatedCount > 0
+            ? '✅ $updatedCount ${updatedCount == 1 ? 'variety' : 'varieties'} updated'
+                '${notFoundList.isNotEmpty ? '\n⚠️ ${notFoundList.length} not found in your database' : ''}'
+            : 'No varieties were updated. Check that variety names in the Excel match your database.',
       };
     } catch (e) {
       return {'success': false, 'message': 'Import Failed: $e'};
     }
+  }
+
+  /// Fuzzy match: find a DB product whose normalized name shares enough
+  /// words with the Excel normalized name (minimum 2 meaningful words).
+  static Product? _fuzzyMatchProduct(
+      String normalizedExcelName, Map<String, Product> dbMap) {
+    final excelWords = normalizedExcelName.split(' ')
+        .where((w) => w.length > 2)
+        .toSet();
+    if (excelWords.length < 2) return null;
+
+    Product? bestMatch;
+    int bestScore = 0;
+
+    for (final entry in dbMap.entries) {
+      final dbWords = entry.key.split(' ')
+          .where((w) => w.length > 2)
+          .toSet();
+      final shared = excelWords.intersection(dbWords).length;
+      if (shared >= 2 && shared > bestScore) {
+        bestScore = shared;
+        bestMatch = entry.value;
+      }
+    }
+    return bestMatch;
   }
 
   /// Import Products from Excel
@@ -1390,15 +1419,282 @@ class ExcelService {
   }
 
   static Excel? _decodeExcelSafe(List<int> bytes) {
+    // First attempt: direct decode
     try {
       return Excel.decodeBytes(bytes);
     } catch (e) {
-      // Known failure class from some edited sheets:
-      // "custom numFmtId is at ... but found in ..."
-      // Also guards null-check crashes inside the parser.
-      debugPrint('Excel decode failed: $e');
+      debugPrint('Excel decode attempt 1 failed: $e');
+    }
+
+    // Second attempt: sanitize styles.xml inside the xlsx zip to fix numFmtId
+    // mismatches (common in WPS/LibreOffice saved files).
+    try {
+      final patched = _patchXlsxStyles(bytes);
+      if (patched != null) {
+        return Excel.decodeBytes(patched);
+      }
+    } catch (e) {
+      debugPrint('Excel decode attempt 2 (patched) failed: $e');
+    }
+
+    return null;
+  }
+
+  /// Patches the xl/styles.xml inside an xlsx (zip) archive to remove
+  /// custom numFmt entries whose IDs conflict with built-in Excel IDs (< 164).
+  /// Returns the patched bytes, or null if zip manipulation failed.
+  static List<int>? _patchXlsxStyles(List<int> bytes) {
+    try {
+      // An xlsx is a ZIP file. We look for the PK local-file-header signatures
+      // to find and patch xl/styles.xml in-place using a simple string substitution.
+      // This avoids needing the `archive` package.
+
+      // Convert bytes to string for zip directory scanning
+      // We'll work at the raw byte level using a simple ZIP parser.
+      final data = Uint8List.fromList(bytes);
+
+      // Find central directory by scanning from end for EOCD signature
+      const eocdSig = [0x50, 0x4B, 0x05, 0x06];
+      int eocdOffset = -1;
+      for (int i = data.length - 22; i >= 0; i--) {
+        if (data[i] == eocdSig[0] &&
+            data[i + 1] == eocdSig[1] &&
+            data[i + 2] == eocdSig[2] &&
+            data[i + 3] == eocdSig[3]) {
+          eocdOffset = i;
+          break;
+        }
+      }
+      if (eocdOffset < 0) return null;
+
+      // Read central directory offset and size from EOCD
+      final cdOffset = _readUint32LE(data, eocdOffset + 16);
+      final cdSize = _readUint32LE(data, eocdOffset + 12);
+      final entryCount = _readUint16LE(data, eocdOffset + 10);
+
+      // Scan central directory entries for xl/styles.xml
+      int pos = cdOffset;
+      int? stylesLocalOffset;
+      int stylesCompressedSize = 0;
+      int stylesUncompressedSize = 0;
+      int stylesCompressionMethod = 0;
+
+      for (int e = 0; e < entryCount && pos < cdOffset + cdSize; e++) {
+        // Central directory signature: PK\x01\x02
+        if (data[pos] != 0x50 || data[pos + 1] != 0x4B ||
+            data[pos + 2] != 0x01 || data[pos + 3] != 0x02) { break; }
+
+        final compressionMethod = _readUint16LE(data, pos + 10);
+        final compressedSize = _readUint32LE(data, pos + 20);
+        final uncompressedSize = _readUint32LE(data, pos + 24);
+        final fileNameLen = _readUint16LE(data, pos + 28);
+        final extraLen = _readUint16LE(data, pos + 30);
+        final commentLen = _readUint16LE(data, pos + 32);
+        final localHeaderOffset = _readUint32LE(data, pos + 42);
+
+        final fileName = utf8.decode(
+            data.sublist(pos + 46, pos + 46 + fileNameLen),
+            allowMalformed: true);
+
+        if (fileName == 'xl/styles.xml') {
+          stylesLocalOffset = localHeaderOffset;
+          stylesCompressedSize = compressedSize;
+          stylesUncompressedSize = uncompressedSize;
+          stylesCompressionMethod = compressionMethod;
+        }
+
+        pos += 46 + fileNameLen + extraLen + commentLen;
+      }
+
+      if (stylesLocalOffset == null) return null;
+
+      // Read local file header to find actual data offset
+      final localPos = stylesLocalOffset;
+      if (data[localPos] != 0x50 || data[localPos + 1] != 0x4B ||
+          data[localPos + 2] != 0x03 || data[localPos + 3] != 0x04) { return null; }
+
+      final localFileNameLen = _readUint16LE(data, localPos + 26);
+      final localExtraLen = _readUint16LE(data, localPos + 28);
+      final dataStart = localPos + 30 + localFileNameLen + localExtraLen;
+      final dataEnd = dataStart + stylesCompressedSize;
+
+      // Decompress styles.xml content
+      final compressedData = data.sublist(dataStart, dataEnd);
+      List<int> xmlBytes;
+      if (stylesCompressionMethod == 0) {
+        // Stored (no compression)
+        xmlBytes = compressedData;
+      } else if (stylesCompressionMethod == 8) {
+        // Deflate
+        xmlBytes = ZLibDecoder().convert(compressedData);
+      } else {
+        return null; // Unknown compression
+      }
+
+      // Patch the XML: remove numFmt elements with id < 164 (built-in range)
+      // that should not be redefined, as they cause the mismatch crash.
+      var xmlStr = utf8.decode(xmlBytes, allowMalformed: true);
+      xmlStr = _sanitizeNumFmts(xmlStr);
+
+      // Re-compress the patched XML
+      final newXmlBytes = utf8.encode(xmlStr);
+      List<int> newCompressedData;
+      int newCompressionMethod;
+      if (stylesCompressionMethod == 8) {
+        newCompressedData = ZLibEncoder().convert(newXmlBytes);
+        newCompressionMethod = 8;
+      } else {
+        newCompressedData = newXmlBytes;
+        newCompressionMethod = 0;
+      }
+
+      // Rebuild the ZIP: replace the styles.xml data in-place if sizes match,
+      // otherwise rebuild the full archive byte array.
+      final newData = _rebuildZipWithPatchedEntry(
+        original: data,
+        entryCount: entryCount,
+        cdOffset: cdOffset,
+        cdSize: cdSize,
+        eocdOffset: eocdOffset,
+        localHeaderOffset: stylesLocalOffset,
+        localFileNameLen: localFileNameLen,
+        localExtraLen: localExtraLen,
+        oldCompressedSize: stylesCompressedSize,
+        oldUncompressedSize: stylesUncompressedSize,
+        newCompressedData: newCompressedData,
+        newUncompressedSize: newXmlBytes.length,
+        newCompressionMethod: newCompressionMethod,
+      );
+
+      return newData;
+    } catch (e) {
+      debugPrint('_patchXlsxStyles failed: $e');
       return null;
     }
+  }
+
+  /// Removes numFmt XML elements whose numFmtId is in the built-in range (< 164).
+  static String _sanitizeNumFmts(String xml) {
+    // Match <numFmt ... numFmtId="NNN" .../> or <numFmt ...numFmtId="NNN"...></numFmt>
+    // and remove those where NNN < 164.
+    return xml.replaceAllMapped(
+      RegExp(r'<numFmt\s[^>]*numFmtId="(\d+)"[^/]*/>', multiLine: true),
+      (m) {
+        final id = int.tryParse(m.group(1) ?? '') ?? 999;
+        return id < 164 ? '' : m.group(0)!;
+      },
+    );
+  }
+
+  static int _readUint16LE(Uint8List data, int offset) {
+    return data[offset] | (data[offset + 1] << 8);
+  }
+
+  static int _readUint32LE(Uint8List data, int offset) {
+    return data[offset] |
+        (data[offset + 1] << 8) |
+        (data[offset + 2] << 16) |
+        (data[offset + 3] << 24);
+  }
+
+  static void _writeUint16LE(Uint8List data, int offset, int value) {
+    data[offset] = value & 0xFF;
+    data[offset + 1] = (value >> 8) & 0xFF;
+  }
+
+  static void _writeUint32LE(Uint8List data, int offset, int value) {
+    data[offset] = value & 0xFF;
+    data[offset + 1] = (value >> 8) & 0xFF;
+    data[offset + 2] = (value >> 16) & 0xFF;
+    data[offset + 3] = (value >> 24) & 0xFF;
+  }
+
+  /// Rebuilds a ZIP archive with one entry's compressed data replaced.
+  static List<int> _rebuildZipWithPatchedEntry({
+    required Uint8List original,
+    required int entryCount,
+    required int cdOffset,
+    required int cdSize,
+    required int eocdOffset,
+    required int localHeaderOffset,
+    required int localFileNameLen,
+    required int localExtraLen,
+    required int oldCompressedSize,
+    required int oldUncompressedSize,
+    required List<int> newCompressedData,
+    required int newUncompressedSize,
+    required int newCompressionMethod,
+  }) {
+    final dataStart =
+        localHeaderOffset + 30 + localFileNameLen + localExtraLen;
+    final oldDataEnd = dataStart + oldCompressedSize;
+    final sizeDelta = newCompressedData.length - oldCompressedSize;
+
+    // Build new byte array
+    final newSize = original.length + sizeDelta;
+    final out = Uint8List(newSize);
+
+    // Copy everything before compressed data
+    out.setRange(0, dataStart, original, 0);
+
+    // Patch local header: compression method, compressed size, uncompressed size
+    _writeUint16LE(out, localHeaderOffset + 8, newCompressionMethod);
+    _writeUint32LE(out, localHeaderOffset + 18, newCompressedData.length);
+    _writeUint32LE(out, localHeaderOffset + 22, newUncompressedSize);
+
+    // Write new compressed data
+    out.setRange(dataStart, dataStart + newCompressedData.length,
+        newCompressedData);
+
+    // Copy everything after old compressed data up to central directory
+    final afterOldData = oldDataEnd;
+    final beforeCd = cdOffset;
+    if (beforeCd > afterOldData) {
+      out.setRange(dataStart + newCompressedData.length,
+          dataStart + newCompressedData.length + (beforeCd - afterOldData),
+          original, afterOldData);
+    }
+
+    // Rewrite central directory, adjusting offsets for entries after the patched one
+    final newCdOffset = cdOffset + sizeDelta;
+    int readPos = cdOffset;
+    int writePos = newCdOffset;
+
+    for (int e = 0; e < entryCount; e++) {
+      if (original[readPos] != 0x50 || original[readPos + 1] != 0x4B ||
+          original[readPos + 2] != 0x01 || original[readPos + 3] != 0x02) { break; }
+
+      final fnLen = _readUint16LE(original, readPos + 28);
+      final extLen = _readUint16LE(original, readPos + 30);
+      final cmtLen = _readUint16LE(original, readPos + 32);
+      final entrySize = 46 + fnLen + extLen + cmtLen;
+      final entryLocalOffset = _readUint32LE(original, readPos + 42);
+
+      out.setRange(writePos, writePos + entrySize, original, readPos);
+
+      // Patch compressed/uncompressed size and compression method for styles entry
+      if (entryLocalOffset == localHeaderOffset) {
+        _writeUint16LE(out, writePos + 10, newCompressionMethod);
+        _writeUint32LE(out, writePos + 20, newCompressedData.length);
+        _writeUint32LE(out, writePos + 24, newUncompressedSize);
+      }
+
+      // Adjust local header offset if this entry comes after the patched entry
+      if (entryLocalOffset > localHeaderOffset) {
+        _writeUint32LE(
+            out, writePos + 42, entryLocalOffset + sizeDelta);
+      }
+
+      readPos += entrySize;
+      writePos += entrySize;
+    }
+
+    // Write EOCD with updated CD offset
+    final newEocdOffset = eocdOffset + sizeDelta;
+    out.setRange(newEocdOffset, newEocdOffset + 22, original, eocdOffset);
+    _writeUint32LE(out, newEocdOffset + 16, newCdOffset);
+
+    return out;
   }
 }
 
@@ -1435,5 +1731,23 @@ class _DailyColumnIndexes {
     this.rateIndex,
     this.gstIndex,
     this.totalIndex,
+  });
+}
+
+enum _UpdateStatus { updated, notFound, zeroPriceSkipped, error }
+
+class _PriceUpdateResult {
+  final String excelName;
+  final String? dbName;
+  final double? newPrice;
+  final _UpdateStatus status;
+  final String? errorMsg;
+
+  const _PriceUpdateResult({
+    required this.excelName,
+    this.dbName,
+    this.newPrice,
+    required this.status,
+    this.errorMsg,
   });
 }

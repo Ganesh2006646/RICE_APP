@@ -71,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
                   label: 'packing_10kg'.tr(ref),
                   value: settings.packing10Price,
                   onChanged: (v) => notifier.setPacking10Price(v),
-                  suffix: '₹/bag',
+                  suffix: '₹/qtl',
                 ),
                 const SizedBox(height: 16),
                 _buildNumberField(
@@ -79,7 +79,7 @@ class SettingsScreen extends ConsumerWidget {
                   label: 'packing_5kg'.tr(ref),
                   value: settings.packing5Price,
                   onChanged: (v) => notifier.setPacking5Price(v),
-                  suffix: '₹/bag',
+                  suffix: '₹/qtl',
                 ),
                 const SizedBox(height: 16),
                 _buildNumberField(
@@ -216,9 +216,6 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // SECTION 4: DATA & SAFETY
             _buildSectionHeader(context, 'data_safety'.tr(ref)),
             _buildSettingsCard(
               context: context,

@@ -128,16 +128,206 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
   Future<void> _handleImport(
       BuildContext context, AppDatabase db, WidgetRef ref) async {
-    // Always use the Mill Daily Price Sheet (complex) format
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Reading price list…'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     final result = await ExcelService.importDailyPriceListFromExcel(db);
 
-    if (context.mounted) {
+    if (!context.mounted) return;
+    Navigator.pop(context); // close loading dialog
+
+    final success = result['success'] as bool? ?? false;
+
+    if (!success) {
+      // Simple error snackbar for file-level failures
       SafeSnackBar.show(
         context,
-        result['message'] as String? ?? 'Import done',
-        isError: !(result['success'] as bool? ?? false),
+        result['message'] as String? ?? 'Import failed',
+        isError: true,
       );
+      return;
     }
+
+    // Show detailed results dialog
+    _showImportResultDialog(context, result, ref);
+  }
+
+  void _showImportResultDialog(
+      BuildContext context, Map<String, dynamic> result, WidgetRef ref) {
+    final updated = result['updated'] as int? ?? 0;
+    final notFound = (result['notFound'] as List?)?.cast<String>() ?? [];
+    final zeroPriced = (result['zeroPriced'] as List?)?.cast<String>() ?? [];
+    final errors = (result['errors'] as List?)?.cast<String>() ?? [];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: Row(
+          children: [
+            Icon(
+              updated > 0 ? Icons.check_circle : Icons.warning_amber_rounded,
+              color: updated > 0 ? Colors.green : Colors.orange,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                updated > 0 ? 'Price Update Complete' : 'Nothing Updated',
+                style: const TextStyle(fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ✅ Updated section
+              if (updated > 0) ...[
+                _resultChip(
+                  context,
+                  '✅  $updated ${updated == 1 ? 'variety' : 'varieties'} updated',
+                  Colors.green,
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // ⚠️ Not found section
+              if (notFound.isNotEmpty) ...[
+                _resultChip(
+                  context,
+                  '⚠️  ${notFound.length} not found in your database',
+                  Colors.orange,
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 160),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.2)),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    itemCount: notFound.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1),
+                    itemBuilder: (context, i) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fiber_manual_record,
+                              size: 8, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              notFound[i],
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tap "+" to add these varieties manually, then re-import.',
+                  style: TextStyle(
+                      fontSize: 11, color: Colors.orange.shade700),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // ⏭ Zero-price skipped
+              if (zeroPriced.isNotEmpty) ...[
+                _resultChip(
+                  context,
+                  '⏭  ${zeroPriced.length} skipped (price = 0)',
+                  Colors.grey,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  zeroPriced.take(5).join(', ') +
+                      (zeroPriced.length > 5 ? '…' : ''),
+                  style: const TextStyle(
+                      fontSize: 11, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // ❌ Errors
+              if (errors.isNotEmpty) ...[
+                _resultChip(context, '❌  ${errors.length} errors',
+                    Colors.red),
+                const SizedBox(height: 4),
+                Text(
+                  errors.join('\n'),
+                  style: const TextStyle(
+                      fontSize: 11, color: Colors.red),
+                ),
+              ],
+
+              // All good message
+              if (updated > 0 && notFound.isEmpty && errors.isEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'All varieties in the price sheet were matched and updated successfully.',
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.green.shade700),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resultChip(
+      BuildContext context, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            fontWeight: FontWeight.bold, color: color, fontSize: 13),
+      ),
+    );
   }
 
   Widget _buildProductCard(

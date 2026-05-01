@@ -33,11 +33,11 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   @override
   void initState() {
     super.initState();
-    // Capture Flutter framework errors - use addPostFrameCallback to avoid
-    // setState during build phase
+    // Capture Flutter framework errors
     FlutterError.onError = (details) {
-      FlutterError.presentError(details);
-      // Schedule setState for next frame to avoid calling during build
+      // Print to console but do NOT call presentError — it re-invokes onError
+      // and causes infinite recursion → Stack Overflow.
+      debugPrint('[ErrorBoundary] Flutter Error: ${details.exception}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
@@ -177,8 +177,7 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
 /// Call this in main() before runApp() to catch all errors
 class GlobalErrorHandler {
   static bool _initialized = false;
-  static final void Function(FlutterErrorDetails)? _originalHandler =
-      FlutterError.onError;
+  static bool _handling = false; // re-entrancy guard
 
   /// Initialize global error handling
   /// Must be called before runApp()
@@ -186,13 +185,17 @@ class GlobalErrorHandler {
     if (_initialized) return;
     _initialized = true;
 
-    // Note: ErrorBoundary will override this, which is fine
-    // This serves as a fallback for errors before ErrorBoundary mounts
     FlutterError.onError = (FlutterErrorDetails details) {
-      // Call original handler if exists
-      _originalHandler?.call(details);
-      FlutterError.presentError(details);
-      debugPrint('[GlobalErrorHandler] Flutter Error: ${details.exception}');
+      // Guard against recursive calls (e.g., presentError re-firing onError)
+      if (_handling) return;
+      _handling = true;
+      try {
+        debugPrint('[GlobalErrorHandler] Flutter Error: ${details.exception}');
+        // Use dumpErrorToConsole instead of presentError to avoid re-entrancy
+        FlutterError.dumpErrorToConsole(details);
+      } finally {
+        _handling = false;
+      }
     };
   }
 

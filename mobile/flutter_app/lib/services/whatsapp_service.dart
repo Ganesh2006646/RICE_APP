@@ -41,6 +41,8 @@ class WhatsAppService {
     double totalAmt = 0;
 
     for (var item in items) {
+      if (item.bags26 == 0 && item.bags10 == 0 && item.bags5 == 0) continue;
+
       final product = products.firstWhere((p) => p.id == item.productId,
           orElse: () => Product(
               id: '', name: 'Rice', defaultPrice: 0, gstRateDefault: 0,
@@ -107,6 +109,8 @@ class WhatsAppService {
       msg.writeln('*$partyNo. ${customer.shopName}* ${customer.place != null ? '· ${customer.place}' : ''}');
 
       for (var item in customerItems) {
+        if (item.bags26 == 0 && item.bags10 == 0 && item.bags5 == 0) continue;
+
         final product = allProducts.firstWhere((p) => p.id == item.productId,
             orElse: () => Product(
                 id: '', name: 'Rice', defaultPrice: 0, gstRateDefault: 0,

@@ -1,16 +1,19 @@
 @echo off
-REM Build Release APK with Material Icons tree-shaking enabled
-REM This reduces APK size by ~99.4% for Material Icons font
+REM Build Release APK with size optimizations
+REM - split-per-abi: Produces separate APKs per CPU architecture (~18MB each instead of ~65MB fat APK)
+REM - tree-shake-icons: Removes unused Material Icons (default in release)
 
-echo Building Release APK with icon tree-shaking optimization...
+echo Building Release APK with split-per-abi optimization...
 echo.
 
-flutter build apk --release
+flutter build apk --release --split-per-abi
 
 echo.
 echo Build complete!
-echo APK location: build\app\outputs\flutter-apk\app-release.apk
 echo.
-echo Note: Material Icons font was tree-shaken (reduced from 1.6MB to ~10KB)
-echo This optimization is enabled by default in Flutter release builds.
-
+echo APK locations (install the arm64-v8a one for modern phones):
+echo   build\app\outputs\flutter-apk\app-arm64-v8a-release.apk  (modern phones)
+echo   build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk (old 32-bit phones)
+echo   build\app\outputs\flutter-apk\app-x86_64-release.apk     (emulators only)
+echo.
+echo Tip: For Google Play, use 'flutter build appbundle' instead (even smaller downloads).
