@@ -63,7 +63,7 @@ class OrderItemFormData {
 
   // 10 KG LOGIC: Configurable Packing, AMC, GST
   double get baseValue10 => (rate / 100.0) * 10.0 * applicableBags10;
-  double get packing10 => packingPrice10 * applicableBags10;
+  double get packing10 => packingPrice10 * (applicableBags10 * 10.0 / 100.0);
   double get subtotal10 => baseValue10 + packing10;
   double get amc10 => subtotal10 * _fixedAmcRate;
   double get gst10 => (subtotal10 + amc10) * effectiveGstRate;
@@ -71,7 +71,7 @@ class OrderItemFormData {
 
   // 5 KG LOGIC: Configurable Packing, AMC, GST
   double get baseValue5 => (rate / 100.0) * 5.0 * applicableBags5;
-  double get packing5 => packingPrice5 * applicableBags5;
+  double get packing5 => packingPrice5 * (applicableBags5 * 5.0 / 100.0);
   double get subtotal5 => baseValue5 + packing5;
   double get amc5 => subtotal5 * _fixedAmcRate;
   double get gst5 => (subtotal5 + amc5) * effectiveGstRate;

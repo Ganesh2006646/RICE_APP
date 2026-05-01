@@ -128,10 +128,15 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
   Future<void> _handleImport(
       BuildContext context, AppDatabase db, WidgetRef ref) async {
+    // Always use the Mill Daily Price Sheet (complex) format
     final result = await ExcelService.importDailyPriceListFromExcel(db);
+
     if (context.mounted) {
-      SafeSnackBar.show(context, result['message'],
-          isError: !result['success']);
+      SafeSnackBar.show(
+        context,
+        result['message'] as String? ?? 'Import done',
+        isError: !(result['success'] as bool? ?? false),
+      );
     }
   }
 
