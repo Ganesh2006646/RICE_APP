@@ -822,37 +822,40 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   Widget _buildItemRow(
       CustomerLoadFormData data, int index, OrderItemFormData item) {
     final theme = Theme.of(context);
-    final productsStream = ref
-        .read(databaseProvider)
-        .select(ref.read(databaseProvider).products)
-        .get();
+      final productsStream = ref
+          .read(databaseProvider)
+          .select(ref.read(databaseProvider).products)
+          .get();
 
-    return FutureBuilder<List<Product>>(
-        future: productsStream,
-        builder: (context, snapshot) {
-          final list = snapshot.data ?? [];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 140,
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButtonFormField<Product>(
-                      initialValue: item.product,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.zero,
-                          border: InputBorder.none),
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: theme.textTheme.bodyLarge?.color),
-                      items: list
-                          .map((p) => DropdownMenuItem(
-                              value: p,
-                              child: Text(p.name,
-                                  overflow: TextOverflow.ellipsis)))
-                          .toList(),
+      return FutureBuilder<List<Product>>(
+          future: productsStream,
+          builder: (context, snapshot) {
+            final list = (snapshot.data ?? [])
+                .where((p) => p.defaultPrice > 0)
+                .toList();
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 140,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButtonFormField<Product>(
+                        initialValue: item.product,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.zero,
+                            border: InputBorder.none),
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: theme.textTheme.bodyLarge?.color),
+                        items: list
+                            .map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Text(p.name,
+                                    overflow: TextOverflow.ellipsis)))
+                            .toList(),
                       onChanged: (val) => setState(() {
                         item.product = val;
                         item.rate = val?.defaultPrice ?? 0;

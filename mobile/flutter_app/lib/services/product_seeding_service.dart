@@ -8,10 +8,21 @@ class ProductSeedingService {
     if (count.isNotEmpty) return; // Only seed if empty
 
     final products = [
-      {'name': 'Galaxy Sona Rice', 'price': 4800.0, 'gst': 0.0},
-      {'name': 'Raw Non Basmati Rice', 'price': 5200.0, 'gst': 0.0},
-      {'name': 'Non Basmati Parboiled Rice', 'price': 4800.0, 'gst': 0.0},
-      {'name': 'Raw Broken Rice', 'price': 3200.0, 'gst': 0.0},
+      {'name': 'HMT GREEN GALAXY CLOTH', 'price': 5400.0, 'pack10': true, 'pack5': true},
+      {'name': 'HMT BLUE GALAXY', 'price': 4900.0, 'pack10': false, 'pack5': false},
+      {'name': 'HMT ORANGE AMARAVATHI CLOTH', 'price': 4900.0, 'pack10': false, 'pack5': false},
+      {'name': 'JEERA COPPER', 'price': 4900.0, 'pack10': true, 'pack5': true},
+      {'name': 'HMT GOLD CROP', 'price': 0.0, 'pack10': false, 'pack5': false},
+      {'name': 'BPT BLUE GALAXY', 'price': 4500.0, 'pack10': true, 'pack5': true},
+      {'name': 'BPT RED GALAXY', 'price': 4400.0, 'pack10': true, 'pack5': true},
+      {'name': 'BPT ORANGE GOLD', 'price': 4400.0, 'pack10': false, 'pack5': false},
+      {'name': 'BPT GOLD CROP', 'price': 4150.0, 'pack10': false, 'pack5': false},
+      {'name': 'BROWN RICE', 'price': 5150.0, 'pack10': true, 'pack5': true},
+      {'name': 'OLD BPT RAW RICE', 'price': 4950.0, 'pack10': false, 'pack5': false},
+      {'name': 'RGL', 'price': 4050.0, 'pack10': false, 'pack5': false},
+      {'name': 'KARTHIKA BLUE', 'price': 0.0, 'pack10': false, 'pack5': false},
+      {'name': 'KARTHIKA BROWN', 'price': 0.0, 'pack10': false, 'pack5': false},
+      {'name': 'THICK GRADER TEJA', 'price': 3750.0, 'pack10': false, 'pack5': false},
     ];
 
     await db.batch((batch) {
@@ -19,20 +30,29 @@ class ProductSeedingService {
         final p = products[i];
         batch.insert(
             db.products,
-            _p(p['name'] as String, p['price'] as double, p['gst'] as double,
-                i));
+            _p(
+                p['name'] as String,
+                p['price'] as double,
+                p['pack10'] as bool,
+                p['pack5'] as bool));
       }
     });
   }
 
   static ProductsCompanion _p(
-      String name, double price, double gst, int index) {
+      String name, double price, bool pack10, bool pack5) {
+    
+    String unitMeta = 'qtl|p10:${pack10 ? 1 : 0}|p5:${pack5 ? 1 : 0}';
+
     return ProductsCompanion.insert(
       id: generateId(),
       name: name,
       defaultPrice: price,
-      gstRateDefault: Value(gst),
+      gstRateDefault: const Value(0.0), // GST is calculated based on packing in NewOrderScreen
+      unit: Value(unitMeta),
       updatedAt: DateTime.now(),
     );
+
+
   }
 }
