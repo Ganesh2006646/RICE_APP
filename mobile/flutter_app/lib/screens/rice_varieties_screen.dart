@@ -128,7 +128,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
   Future<void> _handleImport(
       BuildContext context, AppDatabase db, WidgetRef ref) async {
-    // Show loading indicator
+    // ── STEP 1: dry-run to build preview ────────────────────────────────────
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -149,24 +149,91 @@ class RiceVarietiesScreen extends ConsumerWidget {
       ),
     );
 
-    final result = await ExcelService.importDailyPriceListFromExcel(db);
+    final preview =
+        await ExcelService.importDailyPriceListFromExcel(db, dryRun: true);
 
     if (!context.mounted) return;
-    Navigator.pop(context); // close loading dialog
+    Navigator.pop(context); // close loading spinner
 
-    final success = result['success'] as bool? ?? false;
-
+    final success = preview['success'] as bool? ?? false;
     if (!success) {
-      // Simple error snackbar for file-level failures
       SafeSnackBar.show(
         context,
-        result['message'] as String? ?? 'Import failed',
+        preview['message'] as String? ?? 'Import failed',
         isError: true,
       );
       return;
     }
 
-    // Show detailed results dialog
+    // ── STEP 2: show review sheet; only commit if user confirms ──────────────
+    await _showReviewSheet(context, db, preview, ref);
+  }
+
+  /// Shows a bottom sheet listing every proposed price change.
+  /// Tapping "Apply" triggers the real DB commit; "Cancel" discards everything.
+  Future<void> _showReviewSheet(BuildContext context, AppDatabase db,
+      Map<String, dynamic> preview, WidgetRef ref) async {
+    final previewList =
+        (preview['preview'] as List?)?.cast<PriceChangePreview>() ?? [];
+    final notFound = (preview['notFound'] as List?)?.cast<String>() ?? [];
+    final willUpdate = preview['updated'] as int? ?? 0;
+
+    if (willUpdate == 0 && notFound.isEmpty) {
+      SafeSnackBar.show(context,
+          'Nothing to update — all prices already match your database.');
+      return;
+    }
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _ReviewBottomSheet(
+        previewList: previewList,
+        notFound: notFound,
+        willUpdate: willUpdate,
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // ── STEP 3: commit ───────────────────────────────────────────────────────
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Applying price updates…'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final result =
+        await ExcelService.importDailyPriceListFromExcel(db, dryRun: false);
+
+    if (!context.mounted) return;
+    Navigator.pop(context); // close commit spinner
+
+    final commitSuccess = result['success'] as bool? ?? false;
+    if (!commitSuccess) {
+      SafeSnackBar.show(context,
+          result['message'] as String? ?? 'Commit failed', isError: true);
+      return;
+    }
+
     _showImportResultDialog(context, result, ref);
   }
 
@@ -689,6 +756,242 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 }
               },
               child: Text(isEditing ? 'update'.tr(ref) : 'save'.tr(ref)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Review Bottom Sheet
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Bottom sheet that shows a "Review Changes" list before committing.
+class _ReviewBottomSheet extends StatelessWidget {
+  final List<PriceChangePreview> previewList;
+  final List<String> notFound;
+  final int willUpdate;
+
+  const _ReviewBottomSheet({
+    required this.previewList,
+    required this.notFound,
+    required this.willUpdate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final matched = previewList.where((p) => p.isMatched).toList();
+    final theme = Theme.of(context);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, controller) => Column(
+        children: [
+          // ── Handle ──
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // ── Title ──
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.preview_outlined, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Review Price Changes',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$willUpdate to update',
+                    style: const TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // ── List ──
+          Expanded(
+            child: ListView(
+              controller: controller,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              children: [
+                if (matched.isNotEmpty)
+                  ...matched.map((p) => _PriceChangeTile(p)),
+
+                if (notFound.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      '⚠️ ${notFound.length} not found in your database — add manually then re-import',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.orange.shade700),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...notFound.take(10).map((name) => Padding(
+                        padding: const EdgeInsets.only(left: 12, bottom: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.fiber_manual_record,
+                                size: 7, color: Colors.orange),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(name,
+                                    style:
+                                        const TextStyle(fontSize: 12))),
+                          ],
+                        ),
+                      )),
+                  if (notFound.length > 10)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20),
+                      child: Text('+ ${notFound.length - 10} more…',
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey)),
+                    ),
+                ],
+
+                const SizedBox(height: 80), // space for buttons
+              ],
+            ),
+          ),
+
+          // ── Action buttons ──
+          SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: willUpdate > 0
+                          ? () => Navigator.pop(context, true)
+                          : null,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: Text('Apply $willUpdate Updates'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A single row in the review sheet showing old → new price with colour coding.
+class _PriceChangeTile extends StatelessWidget {
+  final PriceChangePreview preview;
+  const _PriceChangeTile(this.preview);
+
+  @override
+  Widget build(BuildContext context) {
+    final dir = preview.priceDirection;
+    final arrowColor = dir > 0
+        ? Colors.red.shade600    // price up → red (costs more)
+        : dir < 0
+            ? Colors.green.shade600 // price down → green (cheaper)
+            : Colors.grey;
+    final arrowIcon = dir > 0
+        ? Icons.arrow_upward
+        : dir < 0
+            ? Icons.arrow_downward
+            : Icons.remove;
+
+    final gstLabel = (preview.newGst ?? 0) > 0 ? 'GST 5%' : 'GST 0%';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest
+          .withValues(alpha: 0.4),
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Icon(arrowIcon, size: 18, color: arrowColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    preview.dbName ?? preview.excelName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  if (preview.dbName != null &&
+                      preview.dbName != preview.excelName)
+                    Text(
+                      'Excel: ${preview.excelName}',
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.grey),
+                    ),
+                  Text(
+                    gstLabel,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: (preview.newGst ?? 0) > 0
+                            ? Colors.orange.shade700
+                            : Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              preview.priceDelta,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: arrowColor,
+              ),
             ),
           ],
         ),

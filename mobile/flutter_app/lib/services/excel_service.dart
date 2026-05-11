@@ -475,7 +475,11 @@ class ExcelService {
                 cellValue.contains('cell')) {
               headers['phone'] = i;
               detectedHeaderRow = true;
-            } else if (cellValue.contains('gst') || cellValue.contains('tin')) {
+            } else if (cellValue.contains('gstin') ||
+                cellValue.contains('gst') ||
+                cellValue.contains('tin')) {
+              // 'gstin' must be checked before 'gst' since 'gstin'.contains('gst')
+              // is also true — explicit ordering ensures clarity.
               headers['gst'] = i;
               detectedHeaderRow = true;
             }
@@ -573,8 +577,12 @@ class ExcelService {
 
   /// Import Products from Excel
   /// Expected Column Headers: Name, SKU, Price, GST
+  ///
+  /// When [dryRun] is true, the DB is NOT written. Instead, 'preview' key in
+  /// the result contains a List<_PriceUpdateResult> so the UI can display a
+  /// "Review Changes" confirmation screen before committing.
   static Future<Map<String, dynamic>> importDailyPriceListFromExcel(
-      AppDatabase db) async {
+      AppDatabase db, {bool dryRun = false}) async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -784,102 +792,142 @@ class ExcelService {
       int skippedCount = 0; // rate is 0 or no db match found
       final List<_PriceUpdateResult> updateResults = [];
 
-      await db.transaction(() async {
-        final now = DateTime.now();
-        final existingProducts = await db.select(db.products).get();
+      // Always load existing products for matching (needed for both dry-run and commit).
+      final now = DateTime.now();
+      final existingProducts = await db.select(db.products).get();
 
-        // Build lookup maps: normalized name → product
-        final productsByNormalizedName = <String, Product>{};
-        final productsBySku = <String, Product>{};
+      // Build lookup maps: normalized name → product
+      final productsByNormalizedName = <String, Product>{};
+      final productsBySku = <String, Product>{};
 
-        for (final product in existingProducts) {
-          productsByNormalizedName[_normalizeProductName(product.name)] =
-              product;
-          final sku = product.sku;
-          if (sku != null && sku.isNotEmpty) {
-            productsBySku[sku] = product;
-          }
+      for (final product in existingProducts) {
+        productsByNormalizedName[_normalizeProductName(product.name)] = product;
+        final sku = product.sku;
+        if (sku != null && sku.isNotEmpty) {
+          productsBySku[sku] = product;
+        }
+      }
+
+      for (final row in baseRowsByName.values) {
+        // Skip zero-price rows (e.g., out-of-stock items with 0.00)
+        if (row.ratePerQtl <= 0) {
+          updateResults.add(_PriceUpdateResult(
+            excelName: row.name,
+            status: _UpdateStatus.zeroPriceSkipped,
+          ));
+          skippedCount++;
+          continue;
         }
 
-        for (final row in baseRowsByName.values) {
-          // Skip zero-price rows (e.g., out-of-stock items with 0.00)
-          if (row.ratePerQtl <= 0) {
-            updateResults.add(_PriceUpdateResult(
-              excelName: row.name,
-              status: _UpdateStatus.zeroPriceSkipped,
-            ));
-            skippedCount++;
-            continue;
-          }
+        // Try to find a matching product in DB
+        // 1. Exact normalized name match
+        // 2. SKU match (for previously imported varieties)
+        // 3. Fuzzy: DB name contains all words from Excel name (or vice versa)
+        final sku = _buildDailyPriceSku(row.normalizedName);
+        Product? matchedProduct = productsByNormalizedName[row.normalizedName]
+            ?? productsBySku[sku]
+            ?? _fuzzyMatchProduct(row.normalizedName, productsByNormalizedName);
 
-          // Try to find a matching product in DB
-          // 1. Exact normalized name match
-          // 2. SKU match (for previously imported varieties)
-          // 3. Fuzzy: DB name contains all words from Excel name (or vice versa)
-          final sku = _buildDailyPriceSku(row.normalizedName);
-          Product? matchedProduct = productsByNormalizedName[row.normalizedName]
-              ?? productsBySku[sku]
-              ?? _fuzzyMatchProduct(row.normalizedName, productsByNormalizedName);
+        if (matchedProduct == null) {
+          // Not found in DB — report for the user to add manually
+          updateResults.add(_PriceUpdateResult(
+            excelName: row.name,
+            status: _UpdateStatus.notFound,
+          ));
+          skippedCount++;
+          continue;
+        }
 
-          if (matchedProduct == null) {
-            // Not found in DB — report for the user to add manually
-            updateResults.add(_PriceUpdateResult(
-              excelName: row.name,
-              status: _UpdateStatus.notFound,
-            ));
-            skippedCount++;
-            continue;
-          }
+        final gstRate =
+            gstEligibleNames.contains(row.normalizedName) ? 5.0 : 0.0;
+        final supports10Kg = has10KgNames.contains(row.normalizedName);
+        final supports5Kg = has5KgNames.contains(row.normalizedName);
+        final unitMeta = _buildUnitWithPackSupport(
+          supports10Kg: supports10Kg,
+          supports5Kg: supports5Kg,
+        );
 
-          final gstRate =
-              gstEligibleNames.contains(row.normalizedName) ? 5.0 : 0.0;
-          final supports10Kg = has10KgNames.contains(row.normalizedName);
-          final supports5Kg = has5KgNames.contains(row.normalizedName);
-          final unitMeta = _buildUnitWithPackSupport(
-            supports10Kg: supports10Kg,
-            supports5Kg: supports5Kg,
-          );
+        // Record the proposed change (old price vs new price) for the preview.
+        updateResults.add(_PriceUpdateResult(
+          excelName: row.name,
+          dbName: matchedProduct.name,
+          oldPrice: matchedProduct.defaultPrice,
+          newPrice: row.ratePerQtl,
+          newGst: gstRate,
+          newUnit: unitMeta,
+          newSku: sku,
+          dbProductId: matchedProduct.id,
+          status: _UpdateStatus.pending, // pending until committed
+        ));
+        updatedCount++;
 
+        // Keep the preview map fresh for subsequent fuzzy lookups.
+        productsByNormalizedName[_normalizeProductName(matchedProduct.name)] =
+            matchedProduct.copyWith(defaultPrice: row.ratePerQtl);
+      }
+
+      // ── DRY-RUN MODE: return preview without touching DB ─────────────────────
+      if (dryRun) {
+        final notFoundDry = updateResults
+            .where((r) => r.status == _UpdateStatus.notFound)
+            .map((r) => r.excelName)
+            .toList();
+        final zeroDry = updateResults
+            .where((r) => r.status == _UpdateStatus.zeroPriceSkipped)
+            .map((r) => r.excelName)
+            .toList();
+
+        // Convert to the public PriceChangePreview type for the UI.
+        final publicPreview = updateResults.map((r) => PriceChangePreview(
+          excelName: r.excelName,
+          dbName: r.dbName,
+          oldPrice: r.oldPrice,
+          newPrice: r.newPrice,
+          newGst: r.newGst,
+          isMatched: r.status == _UpdateStatus.pending,
+        )).toList();
+
+        return {
+          'success': true,
+          'dryRun': true,
+          'updated': updatedCount,
+          'skipped': skippedCount,
+          'parsedRows': parsedRows,
+          'notFound': notFoundDry,
+          'zeroPriced': zeroDry,
+          'errors': rowErrors,
+          'preview': publicPreview,   // List<PriceChangePreview> for UI review
+          'message': 'Preview ready. $updatedCount ${updatedCount == 1 ? 'variety' : 'varieties'} will be updated.',
+        };
+      }
+
+      // ── COMMIT MODE: write changes to DB inside a transaction ─────────────────
+      await db.transaction(() async {
+        for (final r in updateResults) {
+          if (r.status != _UpdateStatus.pending) continue;
+          final dbId = r.dbProductId;
+          if (dbId == null) continue;
           try {
-            // Only update price, GST rate, unit meta, and SKU — never rename
             await (db.update(db.products)
-                  ..where((tbl) => tbl.id.equals(matchedProduct.id)))
+                  ..where((tbl) => tbl.id.equals(dbId)))
                 .write(ProductsCompanion(
-              sku: drift.Value(sku),
-              defaultPrice: drift.Value(row.ratePerQtl),
-              gstRateDefault: drift.Value(gstRate),
-              unit: drift.Value(unitMeta),
+              sku: drift.Value(r.newSku),
+              defaultPrice: drift.Value(r.newPrice!),
+              gstRateDefault: drift.Value(r.newGst ?? 0.0),
+              unit: drift.Value(r.newUnit ?? 'qtl'),
               updatedAt: drift.Value(now),
             ));
-
-            updateResults.add(_PriceUpdateResult(
-              excelName: row.name,
-              dbName: matchedProduct.name,
-              newPrice: row.ratePerQtl,
-              status: _UpdateStatus.updated,
-            ));
-            updatedCount++;
-
-            // Keep maps fresh
-            final refreshed = matchedProduct.copyWith(
-              defaultPrice: row.ratePerQtl,
-              gstRateDefault: gstRate,
-              unit: unitMeta,
-              updatedAt: now,
-            );
-            productsByNormalizedName[_normalizeProductName(matchedProduct.name)] =
-                refreshed;
+            r.markCommitted();
           } on Exception catch (e) {
-            updateResults.add(_PriceUpdateResult(
-              excelName: row.name,
-              status: _UpdateStatus.error,
-              errorMsg: e.toString(),
-            ));
-            if (rowErrors.length < 5) rowErrors.add('${row.name}: $e');
+            r.markError(e.toString());
+            if (rowErrors.length < 5) rowErrors.add('${r.excelName}: $e');
             skippedCount++;
           }
         }
       });
+
+      final committedCount =
+          updateResults.where((r) => r.status == _UpdateStatus.updated).length;
 
       final notFoundList = updateResults
           .where((r) => r.status == _UpdateStatus.notFound)
@@ -893,15 +941,15 @@ class ExcelService {
 
       return {
         'success': true,
-        'updated': updatedCount,
+        'updated': committedCount,
         'skipped': skippedCount,
         'parsedRows': parsedRows,
-        'notFound': notFoundList,       // List<String> — varieties in Excel not in DB
-        'zeroPriced': zeroList,         // List<String> — varieties with 0 price
+        'notFound': notFoundList,
+        'zeroPriced': zeroList,
         'errors': rowErrors,
-        'updateResults': updateResults, // full detail list
-        'message': updatedCount > 0
-            ? '✅ $updatedCount ${updatedCount == 1 ? 'variety' : 'varieties'} updated'
+        'updateResults': updateResults,
+        'message': committedCount > 0
+            ? '✅ $committedCount ${committedCount == 1 ? 'variety' : 'varieties'} updated'
                 '${notFoundList.isNotEmpty ? '\n⚠️ ${notFoundList.length} not found in your database' : ''}'
             : 'No varieties were updated. Check that variety names in the Excel match your database.',
       };
@@ -1419,22 +1467,24 @@ class ExcelService {
   }
 
   static Excel? _decodeExcelSafe(List<int> bytes) {
-    // First attempt: direct decode
-    try {
-      return Excel.decodeBytes(bytes);
-    } catch (e) {
-      debugPrint('Excel decode attempt 1 failed: $e');
-    }
-
-    // Second attempt: sanitize styles.xml inside the xlsx zip to fix numFmtId
-    // mismatches (common in WPS/LibreOffice saved files).
+    // Attempt 1: Pre-sanitise styles.xml first (primary path for WPS/LibreOffice
+    // files that embed built-in numFmtIds < 164 as custom entries, which crashes
+    // the excel package). This is safe for all valid xlsx files.
     try {
       final patched = _patchXlsxStyles(bytes);
       if (patched != null) {
         return Excel.decodeBytes(patched);
       }
     } catch (e) {
-      debugPrint('Excel decode attempt 2 (patched) failed: $e');
+      debugPrint('Excel decode attempt 1 (patched) failed: $e');
+    }
+
+    // Attempt 2: Fallback — plain decode without patching (for files whose
+    // zip structure _patchXlsxStyles cannot parse, e.g. zip64 or encrypted).
+    try {
+      return Excel.decodeBytes(bytes);
+    } catch (e) {
+      debugPrint('Excel decode attempt 2 (plain) failed: $e');
     }
 
     return null;
@@ -1574,16 +1624,31 @@ class ExcelService {
   }
 
   /// Removes numFmt XML elements whose numFmtId is in the built-in range (< 164).
+  /// Handles both self-closing (<numFmt ... />) and non-self-closing
+  /// (<numFmt ...>...</numFmt>) forms produced by WPS Office / LibreOffice.
   static String _sanitizeNumFmts(String xml) {
-    // Match <numFmt ... numFmtId="NNN" .../> or <numFmt ...numFmtId="NNN"...></numFmt>
-    // and remove those where NNN < 164.
-    return xml.replaceAllMapped(
-      RegExp(r'<numFmt\s[^>]*numFmtId="(\d+)"[^/]*/>', multiLine: true),
+    // Step 1: Remove self-closing <numFmt ... numFmtId="NNN" ... />
+    var result = xml.replaceAllMapped(
+      RegExp(r'<numFmt\s[^>]*numFmtId="(\d+)"[^>]*/>', multiLine: true),
       (m) {
         final id = int.tryParse(m.group(1) ?? '') ?? 999;
         return id < 164 ? '' : m.group(0)!;
       },
     );
+
+    // Step 2: Remove non-self-closing <numFmt numFmtId="NNN" ...>...</numFmt>
+    result = result.replaceAllMapped(
+      RegExp(
+          r'<numFmt\s[^>]*numFmtId="(\d+)"[^>]*>.*?</numFmt>',
+          multiLine: true,
+          dotAll: true),
+      (m) {
+        final id = int.tryParse(m.group(1) ?? '') ?? 999;
+        return id < 164 ? '' : m.group(0)!;
+      },
+    );
+
+    return result;
   }
 
   static int _readUint16LE(Uint8List data, int offset) {
@@ -1698,6 +1763,43 @@ class ExcelService {
   }
 }
 
+/// Public data class surfaced by the dry-run preview.
+/// The screen uses this instead of the private _PriceUpdateResult.
+class PriceChangePreview {
+  final String excelName;    // Name as it appears in the Excel file
+  final String? dbName;      // Matched name in the database
+  final double? oldPrice;    // Current price in DB
+  final double? newPrice;    // Price from Excel
+  final double? newGst;
+  final bool isMatched;      // false → not found in DB
+
+  const PriceChangePreview({
+    required this.excelName,
+    this.dbName,
+    this.oldPrice,
+    this.newPrice,
+    this.newGst,
+    required this.isMatched,
+  });
+
+  /// e.g. "3200 → 3450"
+  String get priceDelta {
+    final o = oldPrice;
+    final n = newPrice;
+    if (o == null || n == null) return n?.toStringAsFixed(0) ?? '-';
+    return '${o.toStringAsFixed(0)} → ${n.toStringAsFixed(0)}';
+  }
+
+  /// 1 = price went up, -1 = went down, 0 = unchanged
+  int get priceDirection {
+    final o = oldPrice ?? 0;
+    final n = newPrice ?? 0;
+    if (n > o) return 1;
+    if (n < o) return -1;
+    return 0;
+  }
+}
+
 enum _DailyPriceSection { none, exempted, gst5 }
 
 class _DailyBaseRow {
@@ -1734,20 +1836,55 @@ class _DailyColumnIndexes {
   });
 }
 
-enum _UpdateStatus { updated, notFound, zeroPriceSkipped, error }
+enum _UpdateStatus { pending, updated, notFound, zeroPriceSkipped, error }
 
+/// Holds one proposed or committed price change for a single product.
+/// Mutable so it can transition: pending → updated | error after commit.
 class _PriceUpdateResult {
   final String excelName;
   final String? dbName;
-  final double? newPrice;
-  final _UpdateStatus status;
-  final String? errorMsg;
+  final String? dbProductId;
+  final double? oldPrice;   // current price in DB (null if not matched)
+  final double? newPrice;   // price from Excel
+  final double? newGst;
+  final String? newUnit;
+  final String? newSku;
+  _UpdateStatus status;
+  String? errorMsg;
 
-  const _PriceUpdateResult({
+  _PriceUpdateResult({
     required this.excelName,
     this.dbName,
+    this.dbProductId,
+    this.oldPrice,
     this.newPrice,
+    this.newGst,
+    this.newUnit,
+    this.newSku,
     required this.status,
     this.errorMsg,
   });
+
+  void markCommitted() => status = _UpdateStatus.updated;
+  void markError(String msg) {
+    status = _UpdateStatus.error;
+    errorMsg = msg;
+  }
+
+  /// Human-readable price delta string, e.g. "3200 → 3450"
+  String get priceDelta {
+    final o = oldPrice;
+    final n = newPrice;
+    if (o == null || n == null) return n?.toStringAsFixed(0) ?? '-';
+    return '${o.toStringAsFixed(0)} → ${n.toStringAsFixed(0)}';
+  }
+
+  /// Whether the new price is higher, lower, or unchanged
+  int get priceDirection {
+    final o = oldPrice ?? 0;
+    final n = newPrice ?? 0;
+    if (n > o) return 1;   // up
+    if (n < o) return -1;  // down
+    return 0;              // same
+  }
 }
