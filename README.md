@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./mobile/flutter_app/assets/images/sri_balaji_logo.png" alt="RiceAgent Logo" width="120" />
+  <img src="./assets/images/sri_balaji_logo.png" alt="RiceAgent Logo" width="120" />
   <h1>RiceAgent Pro</h1>
   <p><em>Empowering Tradition with Digital Intelligence</em></p>
 
@@ -39,14 +39,6 @@ By developing this offline-first mobile solution, I transitioned his entire offi
 ---
 
 ## ✨ Key Features
-
-### 📸 Feature Showcases
-| Core Business Management | Advanced Data Services |
-| :---: | :---: |
-| <img src="./mobile/flutter_app/assets/images/placeholder_gif.gif" alt="Business Management" width="250"/> | <img src="./mobile/flutter_app/assets/images/placeholder_gif.gif" alt="Data Services" width="250"/> |
-| **Operational Efficiency** | **System Stability & UX** |
-| <img src="./mobile/flutter_app/assets/images/placeholder_gif.gif" alt="Operational Efficiency" width="250"/> | <img src="./mobile/flutter_app/assets/images/placeholder_gif.gif" alt="System Stability" width="250"/> |
-> *(Note: Replace placeholder image paths with actual feature demonstration GIFs)*
 
 ### 🏢 1. Core Business & Logistics Management
 - **150+ Wholesaler Directory:** Centralizes dealer data (names, precise addresses, contacts), eliminating laptop dependency.

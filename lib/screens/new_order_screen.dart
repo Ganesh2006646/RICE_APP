@@ -618,7 +618,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                 ),
               ],
             ),
-          ),
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.05, curve: Curves.easeOut),
           const SizedBox(height: 8),
 
           // Customers Header
@@ -631,7 +631,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               icon: const Icon(Icons.person_add, size: 20),
               label: Text('add_party'.tr(ref)),
             ),
-          ),
+          ).animate().fadeIn(delay: 150.ms).slideX(begin: -0.05, curve: Curves.easeOut),
           const SizedBox(height: 12),
 
           // Customer Cards

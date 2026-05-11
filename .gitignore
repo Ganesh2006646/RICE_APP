@@ -4,6 +4,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+*.iml
 
 # Flutter / Dart
 .dart_tool/
@@ -13,11 +14,7 @@ Thumbs.db
 build/
 .pub/
 .pub-cache/
-
-# Android-specific
-**/android/local.properties
-**/android/.gradle
-**/android/*.iml
+*.g.dart
 
 # Unused platforms (Windows + Android only)
 ios/
@@ -25,5 +22,11 @@ linux/
 macos/
 web/
 
-# Agent specific
+# Android-specific
+**/android/local.properties
+**/android/.gradle
+**/android/*.iml
+
+# Agent / IDE
 .agent/
+devtools_options.yaml

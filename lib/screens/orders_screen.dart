@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:lottie/lottie.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
@@ -134,7 +135,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: orders.length,
                       itemBuilder: (context, index) =>
-                          _buildOrderCard(orders[index], db),
+                          _buildOrderCard(orders[index], db)
+                              .animate(delay: (index * 50).ms)
+                              .fadeIn(duration: 400.ms)
+                              .slideX(begin: 0.1, curve: Curves.easeOut),
                     ),
                   ],
                 );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../theme.dart';
 import '../services/translation_service.dart';
 import '../widgets/safe_widgets.dart';
@@ -50,7 +51,7 @@ class ProductGalleryScreen extends ConsumerWidget {
               description: 'lineup_desc'.tr(ref),
               imagePath: 'assets/images/product_lineup_full.png',
               height: 200,
-            ),
+            ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.1, curve: Curves.easeOutQuad),
 
             const SizedBox(height: 24),
 
@@ -62,7 +63,7 @@ class ProductGalleryScreen extends ConsumerWidget {
               description: 'premium_desc'.tr(ref),
               imagePath: 'assets/images/galaxy_trio_premium.png',
               height: 250,
-            ),
+            ).animate().fadeIn(duration: 600.ms, delay: 200.ms).slideY(begin: 0.1, curve: Curves.easeOutQuad),
 
             const SizedBox(height: 24),
 
@@ -161,7 +162,7 @@ class ProductGalleryScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-            ),
+            ).animate().fadeIn(duration: 600.ms, delay: 400.ms).scale(begin: const Offset(0.95, 0.95)),
             const SizedBox(height: 32),
           ],
         ),
@@ -330,7 +331,7 @@ class ProductGalleryScreen extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
+          ).animate(delay: (index * 150).ms).fadeIn(duration: 500.ms).scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutQuad),
         );
       },
     );

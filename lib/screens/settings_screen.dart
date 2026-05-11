@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../theme.dart';
 import '../main.dart';
 import '../providers/settings_provider.dart';
@@ -422,44 +423,46 @@ class SettingsScreen extends ConsumerWidget {
               child: SafeColumn(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                  ...[
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Image.asset(
+                        'assets/images/sri_balaji_logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.business,
+                            size: 50,
+                            color: theme.primaryColor),
+                      ),
                     ),
-                    padding: const EdgeInsets.all(8),
-                    child: Image.asset(
-                      'assets/images/sri_balaji_logo.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.business,
-                          size: 50,
-                          color: theme.primaryColor),
+                    const SizedBox(height: 16),
+                    SafeText(
+                      'RiceAgent Pro',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: theme.primaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  SafeText(
-                    'RiceAgent Pro',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
+                    const SizedBox(height: 8),
+                    SafeText(
+                      'app_version'.tr(ref),
+                      style: const TextStyle(fontSize: 14, color: AppTheme.grey),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  SafeText(
-                    'app_version'.tr(ref),
-                    style: const TextStyle(fontSize: 14, color: AppTheme.grey),
-                  ),
+                  ].animate(interval: 100.ms).fadeIn().slideY(begin: 0.1),
                   const SizedBox(height: 16),
                   SafeText(
                     'app_desc'.tr(ref),
@@ -617,7 +620,7 @@ class SettingsScreen extends ConsumerWidget {
           ...children,
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, curve: Curves.easeOut);
   }
 
   Widget _buildDropdown({
