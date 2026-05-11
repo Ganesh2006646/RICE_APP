@@ -66,20 +66,25 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.calculate_outlined,
               title: 'pricing_config'.tr(ref),
               children: [
+                // ── Packing Surcharges ──────────────────────────────────────
                 _buildNumberField(
                   context: context,
-                  label: 'packing_10kg'.tr(ref),
+                  label: '10 KG Surcharge (₹/Qtl)',
                   value: settings.packing10Price,
                   onChanged: (v) => notifier.setPacking10Price(v),
                   suffix: '₹/qtl',
+                  helperText:
+                      'Added to base rate for 10 kg bags. e.g. rate ₹5000 → effective ₹${(settings.packing10Price + 5000).toStringAsFixed(0)}/Qtl',
                 ),
                 const SizedBox(height: 16),
                 _buildNumberField(
                   context: context,
-                  label: 'packing_5kg'.tr(ref),
+                  label: '5 KG Surcharge (₹/Qtl)',
                   value: settings.packing5Price,
                   onChanged: (v) => notifier.setPacking5Price(v),
                   suffix: '₹/qtl',
+                  helperText:
+                      'Added to base rate for 5 kg bags. e.g. rate ₹5000 → effective ₹${(settings.packing5Price + 5000).toStringAsFixed(0)}/Qtl',
                 ),
                 const SizedBox(height: 16),
                 _buildNumberField(
@@ -708,6 +713,7 @@ class SettingsScreen extends ConsumerWidget {
     required double value,
     required ValueChanged<double> onChanged,
     String? suffix,
+    String? helperText,
   }) {
     return SafeColumn(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -740,6 +746,13 @@ class SettingsScreen extends ConsumerWidget {
             }
           },
         ),
+        if (helperText != null) ...[
+          const SizedBox(height: 6),
+          SafeText(
+            helperText,
+            style: const TextStyle(fontSize: 12, color: AppTheme.grey),
+          ),
+        ],
       ],
     );
   }

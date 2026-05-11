@@ -640,7 +640,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           customers: item.customers,
           items: orderItems,
           products: products,
-          orderNumber: item.order.notes ?? 'N/A');
+          orderNumber: item.order.notes ?? 'N/A',
+          settings: ref.read(settingsProvider));
       final finalPath = await ExcelService.copyToDownloads(path,
           customPath: ref.read(settingsProvider).excelSavePath);
       if (mounted) {
@@ -668,13 +669,14 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             ..where((tbl) => tbl.orderId.equals(item.order.id)))
           .get();
       final products = await db.select(db.products).get();
+      final settings = ref.read(settingsProvider);
       final path = await ExcelService.generateLorryExcel(
           order: item.order,
           customers: item.customers,
           items: orderItems,
           products: products,
-          orderNumber: item.order.notes ?? 'N/A');
-      final settings = ref.read(settingsProvider);
+          orderNumber: item.order.notes ?? 'N/A',
+          settings: settings);
       await EmailService.shareOrderExcel(
         filePath: path,
         orderNumber: item.order.notes ?? 'N/A',

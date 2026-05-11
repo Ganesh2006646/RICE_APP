@@ -430,6 +430,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
           customers: validCustomers,
           products: products,
           orderNumber: orderNum,
+          settings: ref.read(settingsProvider),
         );
 
         final finalPath = await ExcelService.copyToDownloads(path,

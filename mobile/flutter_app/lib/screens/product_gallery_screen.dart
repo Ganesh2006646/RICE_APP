@@ -241,22 +241,22 @@ class ProductGalleryScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final products = [
       {
-        'name': 'galaxy_sona'.tr(ref),
-        'image': 'assets/images/galaxy_sona_rice.png',
+        'name': 'galaxy_sona_blue'.tr(ref),
+        'image': 'assets/images/galaxy_blue_sona.png',
         'description': 'common_rice_desc'.tr(ref),
       },
       {
-        'name': 'raw_non_basmati'.tr(ref),
-        'image': 'assets/images/galaxy_hmt_jeera_yellow.png',
+        'name': 'galaxy_sona_green'.tr(ref),
+        'image': 'assets/images/galaxy_green_sona.png',
         'description': 'common_rice_desc'.tr(ref),
       },
       {
-        'name': 'parboiled_rice'.tr(ref),
-        'image': 'assets/images/hmt_jeera_rice.png',
+        'name': 'amaravathi'.tr(ref),
+        'image': 'assets/images/amaravati.png',
         'description': 'common_rice_desc'.tr(ref),
       },
       {
-        'name': 'broken_rice'.tr(ref),
+        'name': 'brown_rice'.tr(ref),
         'image': 'assets/images/brown_rice.png',
         'description': 'common_rice_desc'.tr(ref),
       },

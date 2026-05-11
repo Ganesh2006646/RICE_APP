@@ -41,10 +41,15 @@ class AppSettings {
   final String millName;    // Mill name for headers
 
   // Configurable Business Logic (previously hardcoded)
-  final double packing10Price; // Packing cost per 10kg bag
-  final double packing5Price;  // Packing cost per 5kg bag
+  final double packing10Price; // Packing surcharge per 10kg bag (₹/Qtl added to base rate)
+  final double packing5Price;  // Packing surcharge per 5kg bag  (₹/Qtl added to base rate)
   final double amcPercent;     // AMC percentage (e.g. 1.0 = 1%)
   final double gstPercent;     // GST percentage (e.g. 5.0 = 5%)
+
+  /// Alias: surcharge applied per quintal for 10 KG packing (same storage as packing10Price)
+  double get surcharge10kgPerQtl => packing10Price;
+  /// Alias: surcharge applied per quintal for 5 KG packing (same storage as packing5Price)
+  double get surcharge5kgPerQtl => packing5Price;
 
   const AppSettings({
     this.language = AppLanguage.english,

@@ -12,14 +12,16 @@ import '../providers/settings_provider.dart';
 /// Service for generating Excel files matching the strict rice mill order format.
 /// Supports multi-customer lorry loads with grouping and exact visual alignment.
 class ExcelService {
-  /// Generate Excel file for a multi-customer lorry order
-  /// Matches the strict provided mill format exactly.
+  /// Generate Excel file for a multi-customer lorry order.
+  /// [settings] is used to apply packing surcharges to the displayed rate
+  /// for 10 KG and 5 KG bags (surcharge10kgPerQtl / surcharge5kgPerQtl).
   static Future<String> generateLorryExcel({
     required Order order,
     required List<OrderItem> items,
     required List<Customer> customers,
     required List<Product> products,
     required String orderNumber,
+    AppSettings? settings,
   }) async {
     final excel = Excel.createExcel();
     final sheetName = 'ORDER_$orderNumber';
@@ -210,10 +212,28 @@ class ExcelService {
 
         final isFirstRow = i == 0;
 
+        // Packing surcharges from settings (default to stored values if no settings passed)
+        final surcharge10 = settings?.surcharge10kgPerQtl ?? 200.0;
+        final surcharge5  = settings?.surcharge5kgPerQtl  ?? 250.0;
+
         // Calculations (Strict Mill Logic)
         final qtl26 = item.bags26 > 0 ? (item.bags26 * 26.0) / 100.0 : 0.0;
         final qtl10 = item.bags10 > 0 ? (item.bags10 * 10.0) / 100.0 : 0.0;
-        final qtl5 = item.bags5 > 0 ? (item.bags5 * 5.0) / 100.0 : 0.0;
+        final qtl5  = item.bags5  > 0 ? (item.bags5  * 5.0)  / 100.0 : 0.0;
+
+        // Effective rate shown in RATE column:
+        //  - 26 KG bags: base rate (no surcharge)
+        //  - 10 KG bags: base rate + surcharge10kgPerQtl
+        //  -  5 KG bags: base rate + surcharge5kgPerQtl
+        final baseRate = item.ratePerQtl;
+        double effectiveRate = baseRate;
+        if (item.bags10 > 0 && item.bags26 == 0 && item.bags5 == 0) {
+          effectiveRate = baseRate + surcharge10;
+        } else if (item.bags5 > 0 && item.bags26 == 0 && item.bags10 == 0) {
+          effectiveRate = baseRate + surcharge5;
+        }
+        // Mixed-bag rows show the base rate; each section's surcharge is
+        // already baked into item.netAmount stored at order-save time.
 
         final rowData = [
           isFirstRow ? slNo.toString() : '', // 0: SL
@@ -234,9 +254,9 @@ class ExcelService {
                   ? qtl5.toInt().toString()
                   : qtl5.toStringAsFixed(2))
               : '-', // 9: 5 KG QTL
-          item.ratePerQtl > 0
-              ? rateNf.format(item.ratePerQtl)
-              : '-', // 10: RATE
+          effectiveRate > 0
+              ? rateNf.format(effectiveRate)
+              : '-', // 10: RATE (effective = base + surcharge for small packs)
           item.amcPercent > 0 ? '${item.amcPercent.toInt()}%' : '0%', // 11: AMC
           item.gstPercent > 0 ? '${item.gstPercent.toInt()}%' : '0%', // 12: GST
           nf.format(item.netAmount), // 13: EX INFO (Grand Total for line)
@@ -1862,7 +1882,6 @@ class _PriceUpdateResult {
     this.newUnit,
     this.newSku,
     required this.status,
-    this.errorMsg,
   });
 
   void markCommitted() => status = _UpdateStatus.updated;
