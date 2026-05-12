@@ -18,6 +18,7 @@
 
 ## 📖 Table of Contents
 - [The Project Mission](#-the-project-mission)
+- [App Screenshots](#-app-screenshots)
 - [Key Features](#-key-features)
 - [Tech Stack](#-tech-stack)
 - [System Architecture](#-system-architecture)
@@ -35,6 +36,33 @@
 Managing over 150 wholesalers and fulfilling bulk 150-quintal lorry loads previously required a constant dependency on a physical laptop and manual paperwork. 
 
 By developing this offline-first mobile solution, I transitioned his entire office into his pocket. My father can now look up customer GSTINs, verify shop addresses, and generate professional, mill-standard order forms instantly from the field, ensuring he is always *'one step ahead'* of the supply chain.
+
+---
+
+## 📱 App Screenshots
+
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center"><img src="./assets/playstore_screenshots/01_splash_screen.png" width="280" /><br/><b>Splash Screen</b><br/><sub>Brand identity & loading</sub></td>
+    <td align="center"><img src="./assets/playstore_screenshots/02_dashboard.png" width="280" /><br/><b>Smart Dashboard</b><br/><sub>Track orders & daily stats at a glance</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./assets/playstore_screenshots/03_order_builder.png" width="280" /><br/><b>Lorry Order Builder</b><br/><sub>Multi-customer bulk orders with auto GST</sub></td>
+    <td align="center"><img src="./assets/playstore_screenshots/04_customers.png" width="280" /><br/><b>150+ Wholesaler Directory</b><br/><sub>Names, addresses, GSTINs at your fingertips</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./assets/playstore_screenshots/05_orders_history.png" width="280" /><br/><b>Order History & Export</b><br/><sub>Excel, WhatsApp & Email from one screen</sub></td>
+    <td align="center"><img src="./assets/playstore_screenshots/06_product_gallery.png" width="280" /><br/><b>Product Showcase</b><br/><sub>Premium rice varieties with FSSAI quality</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./assets/playstore_screenshots/07_rice_varieties.png" width="280" /><br/><b>Rice Variety Manager</b><br/><sub>Daily price sync from Excel sheets</sub></td>
+    <td align="center"><img src="./assets/playstore_screenshots/08_settings.png" width="280" /><br/><b>Full Control Settings</b><br/><sub>Bilingual, pricing config & data safety</sub></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
