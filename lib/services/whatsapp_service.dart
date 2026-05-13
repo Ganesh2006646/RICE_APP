@@ -22,8 +22,8 @@ class WhatsAppService {
       return;
     }
 
-    // Format phone number (ensure no spaces and has country code)
-    String formattedPhone = phone.replaceAll(RegExp(r'\s+'), '');
+    // Format phone number (ensure only digits and country code)
+    String formattedPhone = phone.replaceAll(RegExp(r'\D'), '');
     if (formattedPhone.length == 10) formattedPhone = '91$formattedPhone';
 
     final nf = NumberFormat('#,##0', 'en_US');
@@ -82,7 +82,7 @@ class WhatsAppService {
     String millName = 'Sri Balaji Boiled and Raw Rice Mill',
   }) async {
     // Format phone number
-    String formattedPhone = millContactPhone.replaceAll(RegExp(r'\s+'), '');
+    String formattedPhone = millContactPhone.replaceAll(RegExp(r'\D'), '');
     if (formattedPhone.length == 10) formattedPhone = '91$formattedPhone';
 
     final nf = NumberFormat('#,##0', 'en_US');

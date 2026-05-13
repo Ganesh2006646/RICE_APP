@@ -10,6 +10,7 @@ import '../db/database.dart';
 import '../services/excel_service.dart';
 import '../services/email_service.dart';
 import '../services/whatsapp_service.dart';
+import '../services/pdf_service.dart';
 import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
 import '../services/translation_service.dart';
@@ -717,7 +718,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
         final allProducts = await db.select(db.products).get();
 
-        await WhatsAppService.sendOrderMessage(
+        await PdfService.generateAndShareInvoice(
           customer: customer,
           items: customerItems,
           products: allProducts,

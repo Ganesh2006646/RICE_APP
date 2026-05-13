@@ -127,9 +127,9 @@ class NewOrderScreen extends ConsumerStatefulWidget {
 
 class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   int _currentStep = 1;
-  DateTime _loadingDate = DateTime.now();
+  DateTime _loadingDate = DateTime.now().add(const Duration(days: 1));
   final TextEditingController _capacityController =
-      TextEditingController(text: '110.0');
+      TextEditingController(text: '120.0');
   final TextEditingController _orderNumberController = TextEditingController();
   final Map<String, int> _inputFieldRevisions = {};
   final List<CustomerLoadFormData> _customers = [];
@@ -156,7 +156,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     _isSaving = false;
     _customers.clear();
     _inputFieldRevisions.clear();
-    _loadingDate = DateTime.now();
+    _loadingDate = DateTime.now().add(const Duration(days: 1));
     _orderNumber = null;
   }
 
@@ -694,7 +694,12 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                           ),
                           suggestionsBuilder: (context, controller) {
                             final keyword = controller.text.toLowerCase();
+                            final selectedIds = _customers
+                                .where((cx) => cx.customer != null && cx != data)
+                                .map((cx) => cx.customer!.id)
+                                .toSet();
                             final filtered = allCustomers.where((c) {
+                              if (selectedIds.contains(c.id)) return false;
                               return c.shopName
                                       .toLowerCase()
                                       .contains(keyword) ||
@@ -943,9 +948,11 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       required String fieldKey,
       bool enabled = true}) {
     final theme = Theme.of(context);
-    final initial = value == 0
-        ? ''
-        : (isDouble ? value.toStringAsFixed(0) : value.toString());
+    final initial = !enabled 
+        ? '-' 
+        : (value == 0
+            ? ''
+            : (isDouble ? value.toStringAsFixed(0) : value.toString()));
     final revision = _inputFieldRevisions[fieldKey] ?? 0;
     return Container(
       width: width,
@@ -955,15 +962,19 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         initialValue: initial,
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
-        style: const TextStyle(fontSize: 13),
+        style: TextStyle(
+          fontSize: 13,
+          color: enabled ? null : AppTheme.grey,
+        ),
         enabled: enabled,
+        readOnly: !enabled,
         decoration: InputDecoration(
           contentPadding: const EdgeInsets.symmetric(vertical: 8),
           isDense: true,
           filled: true,
           fillColor: enabled
               ? (theme.inputDecorationTheme.fillColor ?? Colors.white)
-              : AppTheme.lightGrey.withValues(alpha: 0.35),
+              : AppTheme.lightGrey.withValues(alpha: 0.5),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
               borderSide: const BorderSide(color: AppTheme.lightGrey)),
