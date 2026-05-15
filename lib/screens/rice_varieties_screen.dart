@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lottie/lottie.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
@@ -9,6 +8,8 @@ import '../services/translation_service.dart';
 import '../providers/settings_provider.dart';
 import '../services/excel_service.dart';
 import '../widgets/safe_widgets.dart';
+import '../widgets/empty_state_widget.dart';
+import '../widgets/variety_card.dart';
 
 /// Screen for managing rice varieties (products) with full CRUD operations
 /// Renamed from ProductsScreen to better match domain terminology
@@ -72,57 +73,12 @@ class RiceVarietiesScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, AppDatabase db, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 200,
-              height: 200,
-              child: Lottie.asset(
-                'assets/lottie/empty.json',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'no_rice_varieties'.tr(ref),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.grey,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'add_rice_helper'.tr(ref),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.grey,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _showProductDialog(context, db, ref),
-                  icon: const Icon(Icons.add),
-                  label: Text('add_first_variety'.tr(ref)),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _handleImport(context, db, ref),
-                  icon: const Icon(Icons.file_upload_outlined),
-                  label: Text('import_excel'.tr(ref)),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return EmptyStateWidget(
+      icon: Icons.grass_outlined,
+      title: 'no_rice_varieties'.tr(ref),
+      description: 'add_rice_helper'.tr(ref),
+      actionLabel: 'add_first_variety'.tr(ref),
+      onAction: () => _showProductDialog(context, db, ref),
     );
   }
 
@@ -229,8 +185,9 @@ class RiceVarietiesScreen extends ConsumerWidget {
 
     final commitSuccess = result['success'] as bool? ?? false;
     if (!commitSuccess) {
-      SafeSnackBar.show(context,
-          result['message'] as String? ?? 'Commit failed', isError: true);
+      SafeSnackBar.show(
+          context, result['message'] as String? ?? 'Commit failed',
+          isError: true);
       return;
     }
 
@@ -292,16 +249,15 @@ class RiceVarietiesScreen extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.2)),
+                    border:
+                        Border.all(color: Colors.orange.withValues(alpha: 0.2)),
                   ),
                   child: ListView.separated(
                     shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     itemCount: notFound.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 1),
+                    separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, i) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
@@ -323,8 +279,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 const SizedBox(height: 6),
                 Text(
                   'Tap "+" to add these varieties manually, then re-import.',
-                  style: TextStyle(
-                      fontSize: 11, color: Colors.orange.shade700),
+                  style: TextStyle(fontSize: 11, color: Colors.orange.shade700),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -340,21 +295,18 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 Text(
                   zeroPriced.take(5).join(', ') +
                       (zeroPriced.length > 5 ? '…' : ''),
-                  style: const TextStyle(
-                      fontSize: 11, color: Colors.grey),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
               ],
 
               // ❌ Errors
               if (errors.isNotEmpty) ...[
-                _resultChip(context, '❌  ${errors.length} errors',
-                    Colors.red),
+                _resultChip(context, '❌  ${errors.length} errors', Colors.red),
                 const SizedBox(height: 4),
                 Text(
                   errors.join('\n'),
-                  style: const TextStyle(
-                      fontSize: 11, color: Colors.red),
+                  style: const TextStyle(fontSize: 11, color: Colors.red),
                 ),
               ],
 
@@ -363,8 +315,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(
                   'All varieties in the price sheet were matched and updated successfully.',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.green.shade700),
+                  style: TextStyle(fontSize: 12, color: Colors.green.shade700),
                 ),
               ],
             ],
@@ -380,8 +331,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _resultChip(
-      BuildContext context, String label, Color color) {
+  Widget _resultChip(BuildContext context, String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -391,176 +341,19 @@ class RiceVarietiesScreen extends ConsumerWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-            fontWeight: FontWeight.bold, color: color, fontSize: 13),
+        style:
+            TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13),
       ),
     );
   }
 
   Widget _buildProductCard(
       BuildContext context, Product product, AppDatabase db, WidgetRef ref) {
-    final hasGst = product.gstRateDefault > 0;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Rice Icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.grass,
-                color: Theme.of(context).primaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .primaryColor
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${ref.watch(settingsProvider).currencySymbol}${product.defaultPrice.toStringAsFixed(0)} / ${'qtl_short'.tr(ref)}',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: hasGst
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.grey.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          hasGst ? 'GST 5%' : 'GST 0%',
-                          style: TextStyle(
-                            color:
-                                hasGst ? Colors.orange.shade700 : AppTheme.grey,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (product.sku != null && product.sku!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'SKU: ${product.sku}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.grey,
-                          ),
-                    ),
-                  ],
-                  if (!product.isGalaxy) ...[
-                    const SizedBox(height: 4),
-                    const Row(
-                      children: [
-                        Icon(Icons.block, size: 14, color: AppTheme.error),
-                        SizedBox(width: 4),
-                        Text(
-                          'Discount Excluded',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.error,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            // Actions
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'edit':
-                    _showProductDialog(context, db, ref, product: product);
-                    break;
-                  case 'delete':
-                    _confirmDelete(context, product, db, ref);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.edit, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'edit'.tr(ref),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.delete, size: 20, color: AppTheme.error),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text('delete'.tr(ref),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppTheme.error)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return VarietyCard(
+      product: product,
+      currencySymbol: ref.watch(settingsProvider).currencySymbol,
+      onEdit: () => _showProductDialog(context, db, ref, product: product),
+      onDelete: () => _confirmDelete(context, product, db, ref),
     );
   }
 
@@ -677,76 +470,80 @@ class RiceVarietiesScreen extends ConsumerWidget {
                   ),
                   keyboardType: TextInputType.number,
                 ),
-                    const SizedBox(height: 16),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.lightGrey,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SwitchListTile(
-                        title: Row(
-                          children: [
-                            Icon(Icons.discount, size: 18, color: Colors.green.shade700),
-                            const SizedBox(width: 8),
-                            const Text('Eligible for Discount'),
-                          ],
-                        ),
-                        subtitle: Text(
-                          isGalaxy ? 'Bulk discount will apply' : 'Excluded from bulk discount',
-                          style: TextStyle(
-                            color: isGalaxy ? Colors.green.shade700 : AppTheme.error,
-                            fontSize: 12,
-                          ),
-                        ),
-                        value: isGalaxy,
-                        activeTrackColor: Colors.green.shade200,
-                        activeThumbColor: Colors.green.shade700,
-                        onChanged: (val) => setState(() => isGalaxy = val),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightGrey,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SwitchListTile(
+                    title: Row(
+                      children: [
+                        Icon(Icons.discount,
+                            size: 18, color: Colors.green.shade700),
+                        const SizedBox(width: 8),
+                        const Text('Eligible for Discount'),
+                      ],
                     ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.lightGrey,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SwitchListTile(
-                        title: const Text('GST 5%'),
-                        subtitle: Text(
-                          isGst5 ? 'branded_rice'.tr(ref) : 'loose_rice'.tr(ref),
-                          style: TextStyle(
-                            color: isGst5 ? Colors.orange.shade700 : AppTheme.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        value: isGst5,
-                        activeThumbColor: Theme.of(context).primaryColor,
-                        onChanged: (val) => setState(() => isGst5 = val),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    subtitle: Text(
+                      isGalaxy
+                          ? 'Bulk discount will apply'
+                          : 'Excluded from bulk discount',
+                      style: TextStyle(
+                        color:
+                            isGalaxy ? Colors.green.shade700 : AppTheme.error,
+                        fontSize: 12,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'gst_note'.tr(ref),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.grey,
-                            fontStyle: FontStyle.italic,
-                          ),
+                    value: isGalaxy,
+                    activeTrackColor: Colors.green.shade200,
+                    activeThumbColor: Colors.green.shade700,
+                    onChanged: (val) => setState(() => isGalaxy = val),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.orange.shade800,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightGrey,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SwitchListTile(
+                    title: const Text('GST 5%'),
+                    subtitle: Text(
+                      isGst5 ? 'branded_rice'.tr(ref) : 'loose_rice'.tr(ref),
+                      style: TextStyle(
+                        color: isGst5 ? Colors.orange.shade700 : AppTheme.grey,
+                        fontSize: 12,
+                      ),
                     ),
+                    value: isGst5,
+                    activeThumbColor: Theme.of(context).primaryColor,
+                    onChanged: (val) => setState(() => isGst5 = val),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'gst_note'.tr(ref),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.orange.shade800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ],
             ),
           ),
@@ -858,8 +655,7 @@ class _ReviewBottomSheet extends StatelessWidget {
 
           // ── Title ──
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
                 const Icon(Icons.preview_outlined, size: 22),
@@ -872,8 +668,8 @@ class _ReviewBottomSheet extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
@@ -895,8 +691,7 @@ class _ReviewBottomSheet extends StatelessWidget {
           Expanded(
             child: ListView(
               controller: controller,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               children: [
                 if (matched.isNotEmpty)
                   ...matched.map((p) => _PriceChangeTile(p)),
@@ -921,8 +716,7 @@ class _ReviewBottomSheet extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                                 child: Text(name,
-                                    style:
-                                        const TextStyle(fontSize: 12))),
+                                    style: const TextStyle(fontSize: 12))),
                           ],
                         ),
                       )),
@@ -943,8 +737,7 @@ class _ReviewBottomSheet extends StatelessWidget {
           // ── Action buttons ──
           SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -983,7 +776,7 @@ class _PriceChangeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final dir = preview.priceDirection;
     final arrowColor = dir > 0
-        ? Colors.red.shade600    // price up → red (costs more)
+        ? Colors.red.shade600 // price up → red (costs more)
         : dir < 0
             ? Colors.green.shade600 // price down → green (cheaper)
             : Colors.grey;
@@ -1003,8 +796,7 @@ class _PriceChangeTile extends StatelessWidget {
           .surfaceContainerHighest
           .withValues(alpha: 0.4),
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
             Icon(arrowIcon, size: 18, color: arrowColor),
@@ -1022,8 +814,7 @@ class _PriceChangeTile extends StatelessWidget {
                       preview.dbName != preview.excelName)
                     Text(
                       'Excel: ${preview.excelName}',
-                      style: const TextStyle(
-                          fontSize: 11, color: Colors.grey),
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   Text(
                     gstLabel,

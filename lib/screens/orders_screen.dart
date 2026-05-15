@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lottie/lottie.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
@@ -16,6 +14,8 @@ import 'new_order_screen.dart';
 import '../services/translation_service.dart';
 import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
+import '../widgets/empty_state_widget.dart';
+import '../widgets/order_card.dart';
 
 /// Orders History Screen with filters and actions
 class OrdersScreen extends ConsumerStatefulWidget {
@@ -136,10 +136,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: orders.length,
                       itemBuilder: (context, index) =>
-                          _buildOrderCard(orders[index], db)
-                              .animate(delay: (index * 50).ms)
-                              .fadeIn(duration: 400.ms)
-                              .slideX(begin: 0.1, curve: Curves.easeOut),
+                          _buildOrderCard(orders[index], db),
                     ),
                   ],
                 );
@@ -214,125 +211,16 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   }
 
   Widget _buildOrderCard(OrderWithDetails item, AppDatabase db) {
-    final theme = Theme.of(context);
-    return SafeCard(
-      padding: EdgeInsets.zero,
-      color: theme.cardColor,
-      child: InkWell(
-        onTap: () => _showOrderDetails(item, db),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: SafeColumn(
-            children: [
-              SafeRow(
-                leading: SafeColumn(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SafeText(
-                        '${'order_no'.tr(ref)}: ${item.order.notes ?? 'no_order_no'.tr(ref)}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            size: 14, color: AppTheme.grey),
-                        const SizedBox(width: 6),
-                        SafeText(_dateFormat.format(item.order.loadingDate),
-                            style: const TextStyle(
-                                fontSize: 12, color: AppTheme.grey)),
-                      ],
-                    ),
-                  ],
-                ),
-                trailing: SafeColumn(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SafeText(
-                        '${ref.watch(settingsProvider).currencySymbol}${item.order.totalAmount.toStringAsFixed(0)}',
-                        style: TextStyle(
-                            color: theme.primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18)),
-                    if (item.items.isNotEmpty)
-                      SafeText(
-                          '${item.items.fold<double>(0, (s, oi) => s + oi.qtyQtl).toStringAsFixed(1)} QTL',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.grey)),
-                    if (item.customers.length > 1)
-                      SafeText(
-                          '${item.customers.length} ${'customers'.tr(ref)}',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.grey)),
-                  ],
-                ),
-              ),
-              const Divider(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _actionBtn(Icons.edit, 'edit'.tr(ref),
-                        _isProcessing ? null : () => _duplicateOrder(item)),
-                    _actionBtn(Icons.download, 'excel'.tr(ref),
-                        _isProcessing ? null : () => _downloadExcel(item, db),
-                        isLoading:
-                            _processingOrderId == '${item.order.id}_excel'),
-                    _actionBtn(Icons.email, 'email'.tr(ref),
-                        _isProcessing ? null : () => _resendEmail(item, db),
-                        isLoading:
-                            _processingOrderId == '${item.order.id}_email'),
-                    _actionBtn(Icons.send, 'whatsapp'.tr(ref),
-                        _isProcessing ? null : () => _sendWhatsApp(item, db)),
-                    _actionBtn(
-                        Icons.delete_outline,
-                        'delete'.tr(ref),
-                        _isProcessing
-                            ? null
-                            : () => _confirmDeleteOrder(item, db),
-                        isError: true),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _actionBtn(IconData icon, String label, VoidCallback? onTap,
-      {bool isError = false, bool isLoading = false}) {
-    final theme = Theme.of(context);
-    final color = onTap == null
-        ? AppTheme.grey
-        : (isError ? AppTheme.error : theme.primaryColor);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: SafeColumn(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (isLoading)
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: theme.primaryColor,
-                ),
-              )
-            else
-              Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
-            SafeText(label,
-                style: TextStyle(
-                    color: color, fontSize: 11, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
+    return OrderCard(
+      orderDetails: item,
+      currencySymbol: ref.watch(settingsProvider).currencySymbol,
+      onTap: () => _showOrderDetails(item, db),
+      onEdit: _isProcessing ? null : () => _duplicateOrder(item),
+      onExport: _isProcessing ? null : () => _downloadExcel(item, db),
+      onEmail: _isProcessing ? null : () => _resendEmail(item, db),
+      onShare: _isProcessing ? null : () => _sendWhatsApp(item, db),
+      onDelete: _isProcessing ? null : () => _confirmDeleteOrder(item, db),
+      isProcessing: _processingOrderId == '${item.order.id}_excel',
     );
   }
 
@@ -481,9 +369,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                                       fontSize: 16)),
                               trailing: SafeWrap(
                                 children: [
-                                  SafeText('${customerQtl.toStringAsFixed(2)} QTL',
+                                  SafeText(
+                                      '${customerQtl.toStringAsFixed(2)} QTL',
                                       style: const TextStyle(
-                                          fontWeight: FontWeight.bold, fontSize: 13)),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13)),
                                   const SizedBox(width: 8),
                                   SafeText(
                                       '$currency${customerTotal.toStringAsFixed(0)}',
@@ -564,20 +454,30 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                               (p) => p.id == oi.productId,
                               orElse: () => _fallbackProd());
                           final name = prod.name;
-                          varietyQtls[name] = (varietyQtls[name] ?? 0.0) + oi.qtyQtl;
+                          varietyQtls[name] =
+                              (varietyQtls[name] ?? 0.0) + oi.qtyQtl;
                         }
                         return varietyQtls.entries.map((e) {
-                          final pct = orderItems.fold<double>(0, (s, oi) => s + oi.qtyQtl) > 0
-                              ? (e.value / orderItems.fold<double>(0, (s, oi) => s + oi.qtyQtl) * 100)
+                          final pct = orderItems.fold<double>(
+                                      0, (s, oi) => s + oi.qtyQtl) >
+                                  0
+                              ? (e.value /
+                                  orderItems.fold<double>(
+                                      0, (s, oi) => s + oi.qtyQtl) *
+                                  100)
                               : 0.0;
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: SafeRow(
                               leading: SafeText(e.key,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500)),
                               trailing: SafeText(
                                   '${e.value.toStringAsFixed(2)} QTL (${pct.toStringAsFixed(0)}%)',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold)),
                             ),
                           );
                         }).toList();
@@ -597,8 +497,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                           SafeText(
                               '${orderItems.fold<double>(0, (sum, oi) => sum + oi.qtyQtl).toStringAsFixed(2)} QTL',
                               style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold)),
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
                           SafeText(
                               '$currency${item.order.totalAmount.toStringAsFixed(0)}',
                               style: TextStyle(
@@ -819,7 +718,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   onPressed: () => Navigator.pop(ctx, true),
                   icon: const Icon(Icons.chat, size: 18),
                   label: const Text('Send Text'),
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366)),
                 ),
               ],
             ),
@@ -963,12 +863,16 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-        child:
-            SafeColumn(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Lottie.asset('assets/lottie/empty.json', width: 180),
-      const SizedBox(height: 16),
-      SafeText('no_orders'.tr(ref))
-    ]));
+    return EmptyStateWidget(
+      icon: Icons.receipt_long_outlined,
+      title: 'no_orders'.tr(ref),
+      description:
+          'New lorry orders will appear here with export and sharing status.',
+      actionLabel: 'New Order',
+      onAction: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const NewOrderScreen()),
+      ),
+    );
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_colors.dart';
+
+import '../theme.dart';
 import 'home_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -13,149 +13,170 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeIn;
-  late Animation<double> _slideUp;
+  late final AnimationController _controller;
+  late final Animation<double> _fadeIn;
+  late final Animation<Offset> _slideUp;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
+    _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1300),
     );
     _fadeIn = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      parent: _controller,
+      curve: const Interval(0, 0.75, curve: Curves.easeOut),
     );
-    _slideUp = Tween<double>(begin: 30, end: 0).animate(
+    _slideUp = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(
       CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 0.7, curve: Curves.easeOutCubic),
+        parent: _controller,
+        curve: const Interval(0.15, 0.9, curve: Curves.easeOutCubic),
       ),
     );
-    _animationController.forward();
+
+    _controller.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) => _navigateToHome());
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   Future<void> _navigateToHome() async {
-    await Future.delayed(const Duration(milliseconds: 2500));
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const HomeScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    }
+    await Future.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+
+    await Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const HomeScreen(),
+        transitionDuration: const Duration(milliseconds: 520),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          );
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       body: Container(
+        width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              AppColors.primary,
               AppColors.primaryDark,
+              AppColors.primary,
+              Color(0xFF1F6A50),
             ],
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(flex: 2),
-                FadeTransition(
-                  opacity: _fadeIn,
-                  child: SlideTransition(
-                    position: _slideUp as Animation<Offset>,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.15),
-                          ),
-                          padding: const EdgeInsets.all(16),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/sri_balaji_logo.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                Icons.agriculture,
-                                size: 60,
-                                color: AppColors.secondaryLight,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        Text(
-                          'RiceAgent Pro',
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Empowering Tradition with Digital Intelligence',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.white.withValues(alpha: 0.75),
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
+          child: FadeTransition(
+            opacity: _fadeIn,
+            child: SlideTransition(
+              position: _slideUp,
+              child: Column(
+                children: [
+                  const Spacer(),
+                  Container(
+                    width: 128,
+                    height: 128,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(AppRadius.xxl),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 34,
+                          offset: const Offset(0, 18),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const Spacer(flex: 2),
-                FadeTransition(
-                  opacity: _fadeIn,
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.secondaryLight.withValues(alpha: 0.8),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Image.asset(
+                          'assets/images/sri_balaji_logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                            Icons.agriculture_outlined,
+                            size: 58,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 32),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.xl),
+                  Text(
+                    'RiceAgent Pro',
+                    style: textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                    child: Text(
+                      'Empowering Tradition with Digital Intelligence',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  SizedBox(
+                    width: 132,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: LinearProgressIndicator(
+                        minHeight: 4,
+                        color: AppColors.secondaryLight,
+                        backgroundColor: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+                    child: Text(
+                      'Offline-first mill operations',
+                      style: textTheme.labelMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

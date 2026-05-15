@@ -15,6 +15,7 @@ class ConfirmDialog {
   }) {
     return showDialog<bool>(
       context: context,
+      barrierDismissible: !isDanger,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),

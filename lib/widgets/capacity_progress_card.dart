@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_spacing.dart';
-import '../theme/app_radius.dart';
+
+import '../theme.dart';
+import 'capacity_progress_bar.dart';
+import 'dashboard_card.dart';
 
 class CapacityProgressCard extends StatelessWidget {
   final double currentQtl;
@@ -15,34 +16,16 @@ class CapacityProgressCard extends StatelessWidget {
     this.label,
   });
 
-  double get _progress => maxCapacity > 0 ? (currentQtl / maxCapacity).clamp(0.0, 1.0) : 0.0;
+  bool get _isOverCapacity => (currentQtl - maxCapacity) > 0.001;
   double get _remaining => (maxCapacity - currentQtl).clamp(0, maxCapacity);
-  bool get _isOverCapacity => currentQtl > maxCapacity;
-  bool get _isNearCapacity => _progress >= 0.85 && !_isOverCapacity;
-
-  Color get _barColor {
-    if (_isOverCapacity) return AppColors.error;
-    if (_isNearCapacity) return AppColors.warning;
-    return AppColors.primary;
-  }
-
-  Color get _bgColor {
-    if (_isOverCapacity) return AppColors.errorLight;
-    if (_isNearCapacity) return AppColors.warningLight;
-    return AppColors.primarySurface;
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final color = _isOverCapacity ? AppColors.error : AppColors.primary;
+
+    return DashboardCard(
+      color: _isOverCapacity ? AppColors.errorLight : AppColors.surface,
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: _bgColor,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: _barColor.withValues(alpha: 0.2),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -52,54 +35,36 @@ class CapacityProgressCard extends StatelessWidget {
               Icon(
                 _isOverCapacity
                     ? Icons.warning_amber_rounded
-                    : Icons.local_shipping,
-                size: 18,
-                color: _barColor,
+                    : Icons.local_shipping_outlined,
+                size: 20,
+                color: color,
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                label ?? 'Lorry Capacity',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _barColor,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${currentQtl.toStringAsFixed(1)} / ${maxCapacity.toStringAsFixed(0)} QTL',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _barColor,
+              Expanded(
+                child: Text(
+                  label ?? 'Lorry Capacity',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: color,
+                      ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          CapacityProgressBar(
+            currentQtl: currentQtl,
+            maxCapacity: maxCapacity,
+            label: 'Fill progress',
           ),
           const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: _isOverCapacity ? 1.0 : _progress,
-              minHeight: 10,
-              backgroundColor: AppColors.border,
-              valueColor: AlwaysStoppedAnimation(_barColor),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              Text(
-                _isOverCapacity
-                    ? '⚠ Capacity exceeded by ${(currentQtl - maxCapacity).toStringAsFixed(1)} QTL'
-                    : '${_remaining.toStringAsFixed(1)} QTL remaining',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: _barColor,
+          Text(
+            _isOverCapacity
+                ? 'Capacity exceeded by ${(currentQtl - maxCapacity).toStringAsFixed(1)} QTL'
+                : '${_remaining.toStringAsFixed(1)} QTL remaining',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
                 ),
-              ),
-            ],
           ),
         ],
       ),

@@ -1,16 +1,37 @@
- import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lottie/lottie.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../widgets/safe_widgets.dart';
+import '../widgets/customer_card.dart';
+import '../widgets/empty_state_widget.dart';
+import '../widgets/search_bar_widget.dart';
 import 'new_order_screen.dart';
 import '../services/excel_service.dart';
 import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
+
+String? _validateGstin(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final cleaned = value.trim().toUpperCase();
+  if (cleaned.length != 15) return 'GSTIN must be exactly 15 characters';
+  if (!RegExp(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$')
+      .hasMatch(cleaned)) {
+    return 'Invalid GSTIN format';
+  }
+  return null;
+}
+
+String? _validatePhone(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final cleaned = value.replaceAll(RegExp(r'\D'), '');
+  if (cleaned.isEmpty) return null;
+  if (cleaned.length < 10) return 'Phone number must have at least 10 digits';
+  return null;
+}
 
 /// Screen for managing customers with full CRUD operations
 /// REFACTORED FOR STABILITY - NO OVERFLOW ERRORS
@@ -64,21 +85,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: TextField(
+              child: SearchBarWidget(
                 controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'search_hint'.tr(ref),
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                ),
+                hintText: 'search_hint'.tr(ref),
+                onClear: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
                 onChanged: (value) =>
                     setState(() => _searchQuery = value.toLowerCase()),
               ),
@@ -89,11 +102,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _filterChip('All', _CustomerFilter.all, Icons.all_inclusive),
+                    _filterChip(
+                        'All', _CustomerFilter.all, Icons.all_inclusive),
                     const SizedBox(width: 8),
                     _filterChip('Name', _CustomerFilter.name, Icons.store),
                     const SizedBox(width: 8),
-                    _filterChip('Place', _CustomerFilter.place, Icons.location_on),
+                    _filterChip(
+                        'Place', _CustomerFilter.place, Icons.location_on),
                     const SizedBox(width: 8),
                     _filterChip('Phone', _CustomerFilter.phone, Icons.phone),
                   ],
@@ -117,24 +132,42 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     if (aPlace.isNotEmpty && bPlace.isEmpty) return -1;
                     final placeCompare = aPlace.compareTo(bPlace);
                     if (placeCompare != 0) return placeCompare;
-                    return a.shopName.toLowerCase().compareTo(b.shopName.toLowerCase());
+                    return a.shopName
+                        .toLowerCase()
+                        .compareTo(b.shopName.toLowerCase());
                   });
 
                   if (_searchQuery.isNotEmpty) {
                     customers = customers.where((c) {
                       switch (_filter) {
                         case _CustomerFilter.name:
-                          return c.shopName.toLowerCase().contains(_searchQuery) ||
-                              (c.ownerName ?? '').toLowerCase().contains(_searchQuery);
+                          return c.shopName
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (c.ownerName ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery);
                         case _CustomerFilter.place:
-                          return (c.place ?? '').toLowerCase().contains(_searchQuery);
+                          return (c.place ?? '')
+                              .toLowerCase()
+                              .contains(_searchQuery);
                         case _CustomerFilter.phone:
-                          return (c.phone ?? '').toLowerCase().contains(_searchQuery);
+                          return (c.phone ?? '')
+                              .toLowerCase()
+                              .contains(_searchQuery);
                         case _CustomerFilter.all:
-                          return c.shopName.toLowerCase().contains(_searchQuery) ||
-                              (c.phone ?? '').toLowerCase().contains(_searchQuery) ||
-                              (c.ownerName ?? '').toLowerCase().contains(_searchQuery) ||
-                              (c.place ?? '').toLowerCase().contains(_searchQuery);
+                          return c.shopName
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (c.phone ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (c.ownerName ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (c.place ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery);
                       }
                     }).toList();
                   }
@@ -147,7 +180,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   for (var c in customers) {
                     final place = c.place?.trim().toUpperCase() ?? '';
                     final letter = place.isNotEmpty ? place[0] : '#';
-                    final key = RegExp(r'[A-Z]').hasMatch(letter) ? letter : '#';
+                    final key =
+                        RegExp(r'[A-Z]').hasMatch(letter) ? letter : '#';
                     groupedCustomers.putIfAbsent(key, () => []).add(c);
                     if (!_letterKeys.containsKey(key)) {
                       _letterKeys[key] = GlobalKey();
@@ -168,16 +202,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                             key: _letterKeys[letter],
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(top: 16.0, bottom: 8.0, left: 4.0),
+                                padding: const EdgeInsets.only(
+                                    top: 16.0, bottom: 8.0, left: 4.0),
                                 child: Text(letter,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.grey
-                                  )
-                                ),
+                                    style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.grey)),
                               ),
-                              ...group.map((customer) => _buildCustomerCard(customer, db)),
+                              ...group.map((customer) =>
+                                  _buildCustomerCard(customer, db)),
                             ],
                           );
                         },
@@ -190,7 +224,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           child: Center(
                             child: SingleChildScrollView(
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 4),
                                 decoration: BoxDecoration(
                                   color: theme.cardColor.withValues(alpha: 0.8),
                                   borderRadius: BorderRadius.circular(16),
@@ -204,20 +239,20 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                         if (key?.currentContext != null) {
                                           Scrollable.ensureVisible(
                                             key!.currentContext!,
-                                            duration: const Duration(milliseconds: 300),
+                                            duration: const Duration(
+                                                milliseconds: 300),
                                             curve: Curves.easeInOut,
                                           );
                                         }
                                       },
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 4.0, horizontal: 4.0),
                                         child: Text(letter,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: theme.primaryColor
-                                          )
-                                        ),
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.primaryColor)),
                                       ),
                                     );
                                   }).toList(),
@@ -249,9 +284,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: isSelected ? Colors.white : theme.primaryColor),
+          Icon(icon,
+              size: 14, color: isSelected ? Colors.white : theme.primaryColor),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : null)),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12, color: isSelected ? Colors.white : null)),
         ],
       ),
       selected: isSelected,
@@ -266,170 +304,31 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: SafeColumn(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 180,
-            height: 180,
-            child:
-                Lottie.asset('assets/lottie/empty.json', fit: BoxFit.contain),
-          ),
-          const SizedBox(height: 16),
-          SafeText(
-            _searchQuery.isEmpty
-                ? 'no_customers'.tr(ref)
-                : 'none_found'.tr(ref),
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: AppTheme.grey),
-          ),
-          const SizedBox(height: 8),
-          if (_searchQuery.isEmpty)
-            SafeText(
-              'add_first'.tr(ref),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppTheme.grey),
-              textAlign: TextAlign.center,
-            ),
-        ],
-      ),
+    return EmptyStateWidget(
+      icon: _searchQuery.isEmpty
+          ? Icons.people_outline
+          : Icons.search_off_outlined,
+      title:
+          _searchQuery.isEmpty ? 'no_customers'.tr(ref) : 'none_found'.tr(ref),
+      description: _searchQuery.isEmpty
+          ? 'add_first'.tr(ref)
+          : 'Try a different customer name, place, GSTIN, or phone number.',
+      actionLabel: _searchQuery.isEmpty ? 'add_customer'.tr(ref) : null,
+      onAction: _searchQuery.isEmpty
+          ? () => _showCustomerDialog(context, ref.read(databaseProvider))
+          : null,
     );
   }
 
   Widget _buildCustomerCard(Customer customer, AppDatabase db) {
-    final theme = Theme.of(context);
-    return SafeCard(
-      padding: EdgeInsets.zero,
-      margin: const EdgeInsets.only(bottom: 12),
-      color: theme.cardColor,
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: CustomerCard(
+        customer: customer,
         onTap: () => _navigateToNewOrder(customer),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: SafeRow(
-            leading: Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
-                  child: Text(
-                    customer.shopName.isNotEmpty
-                        ? customer.shopName[0].toUpperCase()
-                        : '?',
-                    style: TextStyle(
-                        color: theme.primaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SafeColumn(
-                    children: [
-                      SafeText(customer.shopName,
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: theme.primaryColor)),
-                      if (customer.place != null && customer.place!.isNotEmpty)
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on,
-                                size: 12, color: AppTheme.grey),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: SafeText(customer.place!,
-                                  style: const TextStyle(
-                                      fontSize: 12, color: AppTheme.grey)),
-                            ),
-                          ],
-                        ),
-                      if (customer.phone != null && customer.phone!.isNotEmpty)
-                        Row(
-                          children: [
-                            const Icon(Icons.phone,
-                                size: 12, color: AppTheme.grey),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: SafeText(customer.phone!,
-                                  style: const TextStyle(
-                                      fontSize: 12, color: AppTheme.grey)),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'order':
-                    _navigateToNewOrder(customer);
-                    break;
-                  case 'edit':
-                    _showCustomerDialog(context, db, customer: customer);
-                    break;
-                  case 'delete':
-                    _confirmDelete(customer, db);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                    value: 'order',
-                    child: Row(
-                        children: [
-                          const Icon(Icons.add_shopping_cart, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'new_order'.tr(ref),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          )
-                        ])),
-                PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                        children: [
-                          const Icon(Icons.edit, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'edit'.tr(ref),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          )
-                        ])),
-                PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                        children: [
-                          const Icon(Icons.delete,
-                              size: 20, color: AppTheme.error),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text('delete'.tr(ref),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: AppTheme.error)),
-                          )
-                        ])),
-              ],
-            ),
-          ),
-        ),
+        onNewOrder: () => _navigateToNewOrder(customer),
+        onEdit: () => _showCustomerDialog(context, db, customer: customer),
+        onDelete: () => _confirmDelete(customer, db),
       ),
     );
   }
@@ -495,15 +394,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             await (db.delete(db.payments)
                   ..where((tbl) => tbl.orderId.equals(orderId)))
                 .go();
-            await (db.delete(db.orders)
-                  ..where((tbl) => tbl.id.equals(orderId)))
+            await (db.delete(db.orders)..where((tbl) => tbl.id.equals(orderId)))
                 .go();
           } else {
             // Recalculate total from remaining items
             final newTotal =
                 remainingItems.fold(0.0, (sum, item) => sum + item.netAmount);
-            await (db.update(db.orders)
-                  ..where((tbl) => tbl.id.equals(orderId)))
+            await (db.update(db.orders)..where((tbl) => tbl.id.equals(orderId)))
                 .write(OrdersCompanion(
               totalAmount: drift.Value(newTotal),
               updatedAt: drift.Value(DateTime.now()),
@@ -535,72 +432,96 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final placeController = TextEditingController(text: customer?.place ?? '');
     final phoneController = TextEditingController(text: customer?.phone ?? '');
     final gstController = TextEditingController(text: customer?.tinGst ?? '');
+    String? phoneError;
+    String? gstError;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        scrollable: true,
-        title:
-            Text(isEditing ? 'edit_customer'.tr(ref) : 'add_customer'.tr(ref)),
-        content: SingleChildScrollView(
-          child: SafeColumn(
-            children: [
-              TextField(
-                  controller: shopNameController,
-                  decoration: InputDecoration(
-                      labelText: '${'shop_name'.tr(ref)} *',
-                      prefixIcon: const Icon(Icons.store)),
-                  textCapitalization: TextCapitalization.words),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: placeController,
-                  decoration: InputDecoration(
-                      labelText: 'place'.tr(ref),
-                      prefixIcon: const Icon(Icons.location_on)),
-                  textCapitalization: TextCapitalization.words),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: phoneController,
-                  decoration: InputDecoration(
-                      labelText: 'phone'.tr(ref),
-                      prefixIcon: const Icon(Icons.phone)),
-                  keyboardType: TextInputType.phone),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: gstController,
-                  decoration: const InputDecoration(
-                      labelText: 'GST / TIN', prefixIcon: Icon(Icons.receipt)),
-                  textCapitalization: TextCapitalization.characters),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
+          title: Text(
+              isEditing ? 'edit_customer'.tr(ref) : 'add_customer'.tr(ref)),
+          content: SingleChildScrollView(
+            child: SafeColumn(
+              children: [
+                TextField(
+                    controller: shopNameController,
+                    decoration: InputDecoration(
+                        labelText: '${'shop_name'.tr(ref)} *',
+                        prefixIcon: const Icon(Icons.store)),
+                    textCapitalization: TextCapitalization.words),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: placeController,
+                    decoration: InputDecoration(
+                        labelText: 'place'.tr(ref),
+                        prefixIcon: const Icon(Icons.location_on)),
+                    textCapitalization: TextCapitalization.words),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: phoneController,
+                    decoration: InputDecoration(
+                        labelText: 'phone'.tr(ref),
+                        prefixIcon: const Icon(Icons.phone),
+                        errorText: phoneError),
+                    keyboardType: TextInputType.phone,
+                    onChanged: (_) {
+                      setDialogState(() {
+                        phoneError = _validatePhone(phoneController.text);
+                      });
+                    }),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: gstController,
+                    decoration: InputDecoration(
+                        labelText: 'GST / TIN',
+                        prefixIcon: const Icon(Icons.receipt),
+                        errorText: gstError),
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) {
+                      setDialogState(() {
+                        gstError = _validateGstin(gstController.text);
+                      });
+                    }),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('cancel'.tr(ref))),
+            FilledButton(
+              onPressed: () async {
+                if (shopNameController.text.trim().isEmpty) return;
+                final phoneErr = _validatePhone(phoneController.text);
+                final gstErr = _validateGstin(gstController.text);
+                setDialogState(() {
+                  phoneError = phoneErr;
+                  gstError = gstErr;
+                });
+                if (phoneErr != null || gstErr != null) return;
+                final companion = CustomersCompanion(
+                  shopName: drift.Value(shopNameController.text.trim()),
+                  place: drift.Value(placeController.text.trim()),
+                  phone: drift.Value(phoneController.text.trim()),
+                  tinGst: drift.Value(gstController.text.trim()),
+                  updatedAt: drift.Value(DateTime.now()),
+                );
+                if (isEditing) {
+                  await (db.update(db.customers)
+                        ..where((tbl) => tbl.id.equals(customer.id)))
+                      .write(companion);
+                } else {
+                  await db.into(db.customers).insert(
+                      companion.copyWith(id: drift.Value(generateId())));
+                }
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: Text(isEditing ? 'update'.tr(ref) : 'save'.tr(ref)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('cancel'.tr(ref))),
-          FilledButton(
-            onPressed: () async {
-              if (shopNameController.text.trim().isEmpty) return;
-              final companion = CustomersCompanion(
-                shopName: drift.Value(shopNameController.text.trim()),
-                place: drift.Value(placeController.text.trim()),
-                phone: drift.Value(phoneController.text.trim()),
-                tinGst: drift.Value(gstController.text.trim()),
-                updatedAt: drift.Value(DateTime.now()),
-              );
-              if (isEditing) {
-                await (db.update(db.customers)
-                      ..where((tbl) => tbl.id.equals(customer.id)))
-                    .write(companion);
-              } else {
-                await db.into(db.customers).insert(companion.copyWith(
-                    id: drift.Value(generateId())));
-              }
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: Text(isEditing ? 'update'.tr(ref) : 'save'.tr(ref)),
-          ),
-        ],
       ),
     );
   }

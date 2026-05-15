@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:convert';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -226,15 +227,14 @@ class ExcelService {
         //  - 26 KG bags: base rate (no surcharge)
         //  - 10 KG bags: base rate + surcharge10kgPerQtl
         //  -  5 KG bags: base rate + surcharge5kgPerQtl
+        // For mixed bags, compute a weighted average surcharge.
         final baseRate = item.ratePerQtl;
         double effectiveRate = baseRate;
-        if (item.bags10 > 0 && item.bags26 == 0 && item.bags5 == 0) {
-          effectiveRate = baseRate + surcharge10;
-        } else if (item.bags5 > 0 && item.bags26 == 0 && item.bags10 == 0) {
-          effectiveRate = baseRate + surcharge5;
+        final totalKg = item.bags26 * 26.0 + item.bags10 * 10.0 + item.bags5 * 5.0;
+        if (totalKg > 0) {
+          final surchargePerKg = (item.bags10 * 10.0 * surcharge10 + item.bags5 * 5.0 * surcharge5) / totalKg;
+          effectiveRate = baseRate + surchargePerKg;
         }
-        // Mixed-bag rows show the base rate; each section's surcharge is
-        // already baked into item.netAmount stored at order-save time.
 
         final rowData = [
           isFirstRow ? slNo.toString() : '', // 0: SL
@@ -308,10 +308,14 @@ class ExcelService {
     }
 
     if (Platform.isAndroid) {
-      final directory = Directory('/storage/emulated/0/Download');
-      if (await directory.exists()) {
-        return directory.path;
-      }
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final downloadDir = Directory('${directory.path}/exports');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+        return downloadDir.path;
+      } catch (_) {}
     }
     final directory = await getApplicationDocumentsDirectory();
     return directory.path;
@@ -1441,10 +1445,13 @@ class ExcelService {
       // We'll work at the raw byte level using a simple ZIP parser.
       final data = Uint8List.fromList(bytes);
 
-      // Find central directory by scanning from end for EOCD signature
+      // Find central directory by scanning from end for EOCD signature.
+      // Per ZIP spec, EOCD must be within the last 65557 bytes (64KB comment + 22 byte EOCD).
+      // Restricting the search prevents false matches in large file data.
       const eocdSig = [0x50, 0x4B, 0x05, 0x06];
+      final searchStart = math.max(0, data.length - 65557);
       int eocdOffset = -1;
-      for (int i = data.length - 22; i >= 0; i--) {
+      for (int i = data.length - 22; i >= searchStart; i--) {
         if (data[i] == eocdSig[0] &&
             data[i + 1] == eocdSig[1] &&
             data[i + 2] == eocdSig[2] &&

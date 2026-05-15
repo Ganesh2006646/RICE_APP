@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/crash_reporting_service.dart';
 
 /// ErrorBoundary - Global error handler widget for uncaught exceptions
 ///
@@ -29,15 +30,18 @@ class ErrorBoundary extends StatefulWidget {
 class _ErrorBoundaryState extends State<ErrorBoundary> {
   FlutterErrorDetails? _errorDetails;
   bool _hasError = false;
+  int _retryCount = 0;
+  static const int _maxRetries = 3;
 
   @override
   void initState() {
     super.initState();
-    // Capture Flutter framework errors
     FlutterError.onError = (details) {
-      // Print to console but do NOT call presentError — it re-invokes onError
-      // and causes infinite recursion → Stack Overflow.
-      debugPrint('[ErrorBoundary] Flutter Error: ${details.exception}');
+      CrashReportingService.reportError(
+        details.exception,
+        details.stack,
+        context: 'ErrorBoundary',
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
@@ -50,7 +54,11 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   }
 
   void _resetError() {
+    if (_retryCount >= _maxRetries) {
+      return;
+    }
     setState(() {
+      _retryCount++;
       _errorDetails = null;
       _hasError = false;
     });
@@ -60,12 +68,12 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   Widget build(BuildContext context) {
     if (_hasError && _errorDetails != null) {
       return widget.errorBuilder?.call(_errorDetails!) ??
-          _buildDefaultErrorScreen(_errorDetails!);
+          _buildDefaultErrorScreen();
     }
     return widget.child;
   }
 
-  Widget _buildDefaultErrorScreen(FlutterErrorDetails details) {
+  Widget _buildDefaultErrorScreen() {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
@@ -129,37 +137,15 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Technical Details (collapsed by default)
-                    ExpansionTile(
-                      title: Text(
-                        'Technical Details',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'If this keeps happening, restart the app and check Settings > Backup before making more changes.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        height: 1.4,
                       ),
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            details.exceptionAsString(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'monospace',
-                              color: Color(0xFF333333),
-                            ),
-                            maxLines: 10,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
