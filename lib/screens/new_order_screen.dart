@@ -325,7 +325,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   void _applyBulkDiscounts() {
     int discountAppliedCount = 0;
-    final List<String> galaxyNames = [];
     final List<String> discountLog = [];
 
     setState(() {
@@ -345,24 +344,26 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
           }
         }
 
-        // 2. Determine galaxy varieties and their Qtls
-        final galaxyVarieties = <String, double>{};
+        // 2. Determine discount-eligible varieties (all except excluded ones)
+        final eligibleVarieties = <String, double>{};
+        final excludedNames = <String>[];
         for (var entry in varietyQtl.entries) {
           final prod = varietyProduct[entry.key];
-          if (prod != null && prod.isGalaxy) {
-            galaxyVarieties[entry.key] = entry.value;
-            if (!galaxyNames.contains(prod.name)) {
-              galaxyNames.add(prod.name);
+          if (prod != null) {
+            if (prod.isGalaxy) {
+              eligibleVarieties[entry.key] = entry.value;
+            } else {
+              excludedNames.add(prod.name);
             }
           }
         }
 
-        // 3. Determine applicable galaxy discount rate
-        double galaxyDiscountRate = 0.0;
+        // 3. Determine applicable discount rate
+        double discountRate = 0.0;
         if (customerTotalQtl >= 100.0) {
-          galaxyDiscountRate = 75.0;
+          discountRate = 75.0;
         } else if (customerTotalQtl >= 50.0) {
-          galaxyDiscountRate = 50.0;
+          discountRate = 50.0;
         }
 
         // 4. Apply discounts per item
@@ -379,10 +380,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             itemDiscount = math.max(itemDiscount, 100.0);
           }
 
-          // Rule B: Total >= 100 QTL → ₹75/qtl on GALAXY varieties
-          // Rule A: Total >= 50 QTL → ₹50/qtl on GALAXY varieties
-          if (galaxyDiscountRate > 0 && galaxyVarieties.containsKey(pid)) {
-            itemDiscount = math.max(itemDiscount, galaxyDiscountRate);
+          // Rule B: Total >= 100 QTL → ₹75/qtl on eligible varieties
+          // Rule A: Total >= 50 QTL → ₹50/qtl on eligible varieties
+          if (discountRate > 0 && eligibleVarieties.containsKey(pid)) {
+            itemDiscount = math.max(itemDiscount, discountRate);
           }
 
           if (itemDiscount > 0) {
@@ -399,13 +400,24 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     });
 
     // Build summary message
+    final excludedLog = <String>[];
+    for (var customerData in _customers) {
+      for (var item in customerData.items) {
+        if (item.product != null && !item.product!.isGalaxy) {
+          if (!excludedLog.contains(item.product!.name)) {
+            excludedLog.add(item.product!.name);
+          }
+        }
+      }
+    }
+
     final buffer = StringBuffer();
     buffer.writeln('Bulk Discounts Applied: $discountAppliedCount items');
-    if (galaxyNames.isNotEmpty) {
+    if (excludedLog.isNotEmpty) {
       buffer.writeln('');
-      buffer.writeln('Galaxy varieties eligible:');
-      for (var name in galaxyNames) {
-        buffer.writeln('  ⭐ $name');
+      buffer.writeln('Excluded from discount:');
+      for (var name in excludedLog) {
+        buffer.writeln('  ⊘ $name');
       }
     }
     if (discountLog.isNotEmpty) {

@@ -490,18 +490,18 @@ class RiceVarietiesScreen extends ConsumerWidget {
                           ),
                     ),
                   ],
-                  if (product.isGalaxy) ...[
+                  if (!product.isGalaxy) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.star, size: 14, color: Colors.amber.shade700),
+                        Icon(Icons.block, size: 14, color: AppTheme.error),
                         const SizedBox(width: 4),
                         Text(
-                          'GALAXY',
+                          'Discount Excluded',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber.shade800,
+                            color: AppTheme.error,
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -677,30 +677,60 @@ class RiceVarietiesScreen extends ConsumerWidget {
                   ),
                   keyboardType: TextInputType.number,
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightGrey,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SwitchListTile(
-                    title: const Text('GST 5%'),
-                    subtitle: Text(
-                      isGst5 ? 'branded_rice'.tr(ref) : 'loose_rice'.tr(ref),
-                      style: TextStyle(
-                        color: isGst5 ? Colors.orange.shade700 : AppTheme.grey,
-                        fontSize: 12,
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGrey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SwitchListTile(
+                        title: Row(
+                          children: [
+                            Icon(Icons.discount, size: 18, color: Colors.green.shade700),
+                            const SizedBox(width: 8),
+                            const Text('Eligible for Discount'),
+                          ],
+                        ),
+                        subtitle: Text(
+                          isGalaxy ? 'Bulk discount will apply' : 'Excluded from bulk discount',
+                          style: TextStyle(
+                            color: isGalaxy ? Colors.green.shade700 : AppTheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                        value: isGalaxy,
+                        activeTrackColor: Colors.green.shade200,
+                        activeThumbColor: Colors.green.shade700,
+                        onChanged: (val) => setState(() => isGalaxy = val),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                    ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGrey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SwitchListTile(
+                        title: const Text('GST 5%'),
+                        subtitle: Text(
+                          isGst5 ? 'branded_rice'.tr(ref) : 'loose_rice'.tr(ref),
+                          style: TextStyle(
+                            color: isGst5 ? Colors.orange.shade700 : AppTheme.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                        value: isGst5,
+                        activeThumbColor: Theme.of(context).primaryColor,
+                        onChanged: (val) => setState(() => isGst5 = val),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                    value: isGst5,
-                    activeThumbColor: Theme.of(context).primaryColor,
-                    onChanged: (val) => setState(() => isGst5 = val),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'gst_note'.tr(ref),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -716,35 +746,6 @@ class RiceVarietiesScreen extends ConsumerWidget {
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.lightGrey,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SwitchListTile(
-                        title: Row(
-                          children: [
-                            Icon(Icons.star, size: 18, color: Colors.amber.shade700),
-                            const SizedBox(width: 8),
-                            const Text('Galaxy Variety'),
-                          ],
-                        ),
-                        subtitle: Text(
-                          isGalaxy ? 'Eligible for bulk discount' : 'Not eligible for bulk discount',
-                          style: TextStyle(
-                            color: isGalaxy ? Colors.amber.shade700 : AppTheme.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        value: isGalaxy,
-                        activeTrackColor: Colors.amber.shade200, activeThumbColor: Colors.amber.shade700,
-                        onChanged: (val) => setState(() => isGalaxy = val),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                     ),
               ],
             ),

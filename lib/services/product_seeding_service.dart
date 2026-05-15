@@ -39,17 +39,22 @@ class ProductSeedingService {
     });
   }
 
+  static bool _isExcludedFromDiscount(String name) {
+    final upper = name.toUpperCase();
+    return upper == 'KARTHIKA BLUE' || upper == 'KARTHIKA BROWN' || upper == 'RGL';
+  }
+
   static ProductsCompanion _p(
       String name, double price, bool pack10, bool pack5) {
     
     String unitMeta = 'qtl|p10:${pack10 ? 1 : 0}|p5:${pack5 ? 1 : 0}';
-    bool isGalaxy = name.toUpperCase().contains('GALAXY');
+    bool isGalaxy = !_isExcludedFromDiscount(name);
 
     return ProductsCompanion.insert(
       id: generateId(),
       name: name,
       defaultPrice: price,
-      gstRateDefault: const Value(0.0), // GST is calculated based on packing in NewOrderScreen
+      gstRateDefault: const Value(0.0),
       unit: Value(unitMeta),
       isGalaxy: Value(isGalaxy),
       updatedAt: DateTime.now(),
