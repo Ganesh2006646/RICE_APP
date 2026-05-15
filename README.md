@@ -69,26 +69,33 @@ By developing this offline-first mobile solution, I transitioned his entire offi
 ## ✨ Key Features
 
 ### 🏢 1. Core Business & Logistics Management
-- **150+ Wholesaler Directory:** Centralizes dealer data (names, precise addresses, contacts), eliminating laptop dependency.
-- **Bulk Order Management:** Built for heavy lifting—seamlessly handles multi-customer 150-quintal lorry shipments.
+- **150+ Wholesaler Directory:** Centralizes dealer data (names, precise addresses, contacts, phone), eliminating laptop dependency.
+- **Smart Customer Search:** Filter customers by Name, Place, or Phone with dedicated filter chips + alphabet scroll bar sorted by area.
+- **Bulk Order Management:** Built for heavy lifting—seamlessly handles multi-customer lorry shipments with default 120 QTL capacity.
+- **Master Bulk Discount Engine:** Auto-applies tiered discounts — ₹50/qtl (50+ QTL total) or ₹75/qtl (100+ QTL total) on GALAXY varieties, plus ₹100/qtl exclusive discount on any single variety reaching 100 QTL.
+- **Galaxy Variety Management:** Mark any rice variety as GALAXY via toggle; discount eligibility auto-detected and stored in DB.
 - **Dynamic Surcharges:** Automatically bills complex orders via industrial surcharges (₹200/Qtl for 10kg, ₹250/Qtl for 5kg).
 - **GST-Compliant Billing:** Auto-calculates tax rates (e.g., 5% branded vs. 0% exempted 26kg bags).
 
 ### 📡 2. Advanced Data Services
 - **Offline-First Reliability:** Fully functional SQLite (Drift) backend guarantees zero downtime in network dead-zones.
-- **Intelligent Excel Import:** A flexible header-detection system dynamically parses varied formats (e.g., "GSTIN" or "PACKING IN KGS").
+- **Intelligent Excel Import:** A flexible header-detection system dynamically parses varied formats (e.g., "GSTIN" or "PACKING IN KGS") with phone number sanitization.
 - **Automated Backups:** Silently backs up databases on startup and retains the last 5 states to prevent data loss.
-- **Smart Product Seeding:** Pre-loaded with standard rice varieties (HMT, BPT, Sona) for immediate operational readiness.
+- **Deleted Data Audit:** Deleted customers and varieties are logged to Excel files saved at your configured settings path.
+- **Smart Product Seeding:** Pre-loaded with 15 standard rice varieties (HMT, BPT, Sona) marked with GALAXY flag where applicable.
 
 ### ⚡ 3. Operational Efficiency
-- **Mill-Standard Exports:** Generates professional `.xlsx` order forms matching the exact visual alignment demanded by mills.
-- **WhatsApp Integration (Planned):** Instant generation and delivery of order summaries to shop owners to close the communication loop.
+- **Mill-Standard Exports:** Generates professional `.xlsx` order forms matching the exact visual alignment demanded by mills, saved to your custom folder.
+- **WhatsApp Integration:** Send lorry summaries to mill + individual PDF invoices per customer with text message fallback option.
 - **Daily Price Sync:** Rapidly imports mill-style sheets with "EXEMPTED" and "GST 5%" segment recognition.
+- **Tomorrow-First Default:** Orders page defaults loading date filter to tomorrow; new orders preset to next day.
+- **Order QTL Analytics:** View per-item, per-customer, per-variety, and total QTL breakdowns in order details.
 
 ### 🛡️ 4. System Stability & UX
 - **Robust Error Handling:** Employs `runZonedGuarded` and strict ErrorBoundaries to prevent crashes during critical tasks.
 - **XML Data Sanitization:** Custom parsing engine neutralizes `invalid numFmtId` crashes from LibreOffice/WPS Excel files.
-- **Professional Aesthetics:** Modern, premium UI equipped with font scaling and multi-language support (English & Telugu).
+- **Professional Aesthetics:** Modern, premium UI equipped with font scaling and multi-language support (English, Telugu, Hindi, Tamil).
+- **Custom Save Location:** All Excel exports (orders, deleted records) saved to user-defined directory from Settings.
 
 ---
 ## 🛠️ Tech Stack
@@ -192,9 +199,12 @@ lib/
 
 ## 🔮 Roadmap & Next Steps
 
-**"My Strong Next:"**
-Building on this robust, offline-first foundation, the next evolution involves introducing secure, **low-bandwidth cloud synchronization**. 
-This will allow multi-device support (e.g., syncing orders between the field agent's phone and the mill's desktop) without compromising the critical offline capabilities required when traveling through dead zones.
+- ✅ **WhatsApp Integration** — Lorry summaries & individual PDF invoices with text fallback
+- ✅ **Bulk Discount Engine** — Tiered GALAXY discounts with override logic
+- ✅ **Custom Save Path** — All exports to user-defined location
+- 🔲 **Cloud Synchronization** — Low-bandwidth sync for multi-device support between field agents and mill desktop
+- 🔲 **Payment Tracking** — Track partial/full payments per customer per order
+- 🔲 **Advanced Analytics** — Sales trends, variety-wise popularity, customer purchase history
 
 ---
 

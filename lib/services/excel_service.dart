@@ -193,7 +193,7 @@ class ExcelService {
           updatedAt: DateTime.now(),
         ),
       );
-      final customerItems = groupedItems[customerId]!;
+        final customerItems = groupedItems[customerId]!;
 
       for (int i = 0; i < customerItems.length; i++) {
         final item = customerItems[i];
@@ -205,6 +205,7 @@ class ExcelService {
             defaultPrice: 0,
             gstRateDefault: 0,
             unit: 'qtl',
+            isGalaxy: false,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           ),
@@ -240,7 +241,7 @@ class ExcelService {
           isFirstRow ? (customer.shopName) : '', // 1: PARTY NAME
           isFirstRow ? (customer.place ?? '') : '', // 2: PLACE
           isFirstRow ? (customer.tinGst ?? '') : '', // 3: TIN / GST
-          isFirstRow ? ((customer.phone?.endsWith('.0') == true) ? customer.phone!.substring(0, customer.phone!.length - 2) : (customer.phone ?? '')) : '', // 4: CELL
+          isFirstRow ? _sanitizePhone(customer.phone) : '', // 4: CELL
           product.name, // 5: TYPE OF RICE
           item.bags26 > 0 ? item.bags26.toString() : '-', // 6: 26 KG BAGS
           qtl26 > 0 ? qtl26.toStringAsFixed(2) : '-', // 7: 26 KG QTL
@@ -288,11 +289,22 @@ class ExcelService {
     return filePath;
   }
 
+  static String _sanitizePhone(String? phone) {
+    if (phone == null || phone.isEmpty) return '';
+    String cleaned = phone.trim();
+    if (cleaned.endsWith('.0')) cleaned = cleaned.substring(0, cleaned.length - 2);
+    if (cleaned.endsWith('.00')) cleaned = cleaned.substring(0, cleaned.length - 3);
+    return cleaned;
+  }
+
   /// Get the downloads directory path for the user
   static Future<String> getDownloadsPath({String? customPath}) async {
     if (customPath != null && customPath.isNotEmpty) {
       final dir = Directory(customPath);
-      if (await dir.exists()) return customPath;
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      return customPath;
     }
 
     if (Platform.isAndroid) {
@@ -335,103 +347,6 @@ class ExcelService {
       // print('Excel Copy Failed: $e');
       return sourcePath;
     }
-  }
-
-  /// Generate a summary Excel for ALL orders (Statement)
-  static Future<String> generateAllOrdersExcel({
-    required List<OrderWithDetails> orders,
-    required List<Product> products,
-  }) async {
-    final excel = Excel.createExcel();
-    final sheet = excel['Orders Summary'];
-    excel.rename('Sheet1', 'Orders Summary');
-
-    final headerStyle = CellStyle(
-        bold: true,
-        horizontalAlign: HorizontalAlign.Center,
-        bottomBorder: Border(borderStyle: BorderStyle.Thin));
-    final moneyStyle = CellStyle(horizontalAlign: HorizontalAlign.Right);
-
-    // Headers
-    final headers = [
-      'DATE',
-      'ORDER #',
-      'CUSTOMERS',
-      'B10',
-      'B26',
-      'B5',
-      'QTL',
-      'TOTAL AMT'
-    ];
-    for (int i = 0; i < headers.length; i++) {
-      final cell =
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
-      cell.value = TextCellValue(headers[i]);
-      cell.cellStyle = headerStyle;
-    }
-
-    double grandTotalQtl = 0;
-    double grandTotalAmt = 0;
-
-    for (int i = 0; i < orders.length; i++) {
-      final item = orders[i];
-      final row = i + 1;
-
-      final custNames = item.customers.map((c) => c.shopName).join(', ');
-      final date = DateFormat('dd-MM-yyyy').format(item.order.loadingDate);
-
-      // Sum items
-      double orderQtl = 0;
-      int b10 = 0, b26 = 0, b5 = 0;
-      for (var oi in item.items) {
-        b10 += oi.bags10;
-        b26 += oi.bags26;
-        b5 += oi.bags5;
-        orderQtl += oi.qtyQtl;
-      }
-
-      final data = [
-        date,
-        item.order.notes ?? item.order.id,
-        custNames,
-        b10.toString(),
-        b26.toString(),
-        b5.toString(),
-        orderQtl.toStringAsFixed(2),
-        item.order.totalAmount.toStringAsFixed(2)
-      ];
-
-      for (int j = 0; j < data.length; j++) {
-        final cell = sheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: j, rowIndex: row));
-        cell.value = TextCellValue(data[j]);
-        if (j >= 6) cell.cellStyle = moneyStyle;
-      }
-
-      grandTotalQtl += orderQtl;
-      grandTotalAmt += item.order.totalAmount;
-    }
-
-    // Totals Row
-    final totalRowIdx = orders.length + 1;
-    sheet
-        .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: totalRowIdx))
-        .value = TextCellValue('GRAND TOTAL:');
-    sheet
-        .cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: totalRowIdx))
-        .value = TextCellValue(grandTotalQtl.toStringAsFixed(2));
-    sheet
-        .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: totalRowIdx))
-        .value = TextCellValue(grandTotalAmt.toStringAsFixed(2));
-
-    final directory = await getApplicationDocumentsDirectory();
-    final fileName =
-        'All_Orders_Statement_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-    final filePath = '${directory.path}/$fileName';
-
-    final bytes = excel.save();
-    if (bytes != null) await File(filePath).writeAsBytes(bytes);
-    return filePath;
   }
 
   /// Import Customers from an Excel file
@@ -936,6 +851,7 @@ class ExcelService {
               defaultPrice: drift.Value(r.newPrice!),
               gstRateDefault: drift.Value(r.newGst ?? 0.0),
               unit: drift.Value(r.newUnit ?? 'qtl'),
+              isGalaxy: drift.Value(r.excelName.toUpperCase().contains('GALAXY')),
               updatedAt: drift.Value(now),
             ));
             r.markCommitted();
@@ -1116,18 +1032,19 @@ class ExcelService {
             final price = _toNumber(priceStr) ?? 0.0;
             final gst = _toNumber(gstStr) ?? 0.0;
 
-            try {
-              final id = generateId();
-              await db.into(db.products).insert(
-                    ProductsCompanion(
-                      id: drift.Value(id),
-                      sku: drift.Value(sku.isEmpty ? null : sku),
-                      name: drift.Value(name),
-                      defaultPrice: drift.Value(price),
-                      gstRateDefault: drift.Value(gst),
-                      updatedAt: drift.Value(DateTime.now()),
-                    ),
-                  );
+              try {
+                  final id = generateId();
+                  await db.into(db.products).insert(
+                        ProductsCompanion(
+                          id: drift.Value(id),
+                          sku: drift.Value(sku.isEmpty ? null : sku),
+                          name: drift.Value(name),
+                          defaultPrice: drift.Value(price),
+                          gstRateDefault: drift.Value(gst),
+                          isGalaxy: drift.Value(name.toUpperCase().contains('GALAXY')),
+                          updatedAt: drift.Value(DateTime.now()),
+                        ),
+                      );
               importedCount++;
               existingNames.add(normalizedName);
               if (normalizedSku.isNotEmpty) {

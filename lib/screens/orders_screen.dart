@@ -14,7 +14,6 @@ import '../services/pdf_service.dart';
 import '../widgets/safe_widgets.dart';
 import 'new_order_screen.dart';
 import '../services/translation_service.dart';
-import 'package:share_plus/share_plus.dart';
 import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
 
@@ -177,9 +176,20 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             .add(row.readTable(db.customers));
       }
 
+      // Load order items for QTL display
+      final allItems = await (db.select(db.orderItems)
+            ..where((tbl) => tbl.orderId.isIn(orderIds)))
+          .get();
+      final orderItems = <String, List<OrderItem>>{};
+      for (var oi in allItems) {
+        orderItems.putIfAbsent(oi.orderId, () => []).add(oi);
+      }
+
       final results = orders
           .map((order) => OrderWithDetails(
-              order: order, customers: orderCustomers[order.id] ?? []))
+              order: order,
+              customers: orderCustomers[order.id] ?? [],
+              items: orderItems[order.id] ?? []))
           .toList();
       var filtered = results;
       if (_filterDate != null) {
@@ -244,6 +254,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                             color: theme.primaryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 18)),
+                    if (item.items.isNotEmpty)
+                      SafeText(
+                          '${item.items.fold<double>(0, (s, oi) => s + oi.qtyQtl).toStringAsFixed(1)} QTL',
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.grey)),
                     if (item.customers.length > 1)
                       SafeText(
                           '${item.customers.length} ${'customers'.tr(ref)}',
@@ -533,7 +548,43 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       );
                     }),
 
-                    const Divider(height: 48),
+                    // Variety-wise QTL summary
+                    const Divider(height: 32),
+                    SafeText('RICE VARIETY SUMMARY',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 8),
+                    ...[
+                      () {
+                        final varietyQtls = <String, double>{};
+                        for (var oi in orderItems) {
+                          final prod = products.firstWhere(
+                              (p) => p.id == oi.productId,
+                              orElse: () => _fallbackProd());
+                          final name = prod.name;
+                          varietyQtls[name] = (varietyQtls[name] ?? 0.0) + oi.qtyQtl;
+                        }
+                        return varietyQtls.entries.map((e) {
+                          final pct = orderItems.fold<double>(0, (s, oi) => s + oi.qtyQtl) > 0
+                              ? (e.value / orderItems.fold<double>(0, (s, oi) => s + oi.qtyQtl) * 100)
+                              : 0.0;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: SafeRow(
+                              leading: SafeText(e.key,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                              trailing: SafeText(
+                                  '${e.value.toStringAsFixed(2)} QTL (${pct.toStringAsFixed(0)}%)',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            ),
+                          );
+                        }).toList();
+                      }(),
+                    ].expand((w) => w),
+                    const SizedBox(height: 8),
+                    const Divider(height: 16),
                     SafeRow(
                       leading: SafeText('total_value'.tr(ref).toUpperCase(),
                           style: const TextStyle(
@@ -639,6 +690,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       defaultPrice: 0,
       gstRateDefault: 0,
       unit: 'qtl',
+      isGalaxy: false,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now());
 
@@ -647,7 +699,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         context: context,
         initialDate: _filterDate ?? DateTime.now(),
         firstDate: DateTime(2020),
-        lastDate: DateTime.now());
+        lastDate: DateTime(2030));
     if (picked != null) setState(() => _filterDate = picked);
   }
 
@@ -739,6 +791,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
         final allProducts = await db.select(db.products).get();
 
+        // 1. Share PDF via system sheet (WhatsApp, email, etc.)
         await PdfService.generateAndShareInvoice(
           customer: customer,
           items: customerItems,
@@ -748,6 +801,42 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           agentName: localization.agentName,
           millName: localization.millName,
         );
+
+        // 2. Also offer to send a text message via WhatsApp
+        if (mounted && customer.phone != null && customer.phone!.isNotEmpty) {
+          final sendText = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              scrollable: true,
+              title: const Text('WhatsApp'),
+              content: const Text('Also send a text message via WhatsApp?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('No'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  icon: const Icon(Icons.chat, size: 18),
+                  label: const Text('Send Text'),
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
+                ),
+              ],
+            ),
+          );
+
+          if (sendText == true && mounted) {
+            await WhatsAppService.sendOrderMessage(
+              customer: customer,
+              order: item.order,
+              items: customerItems,
+              products: allProducts,
+              currencySymbol: currency,
+              agentName: localization.agentName,
+              millName: localization.millName,
+            );
+          }
+        }
       } catch (e) {
         _showError('WhatsApp failed: $e');
       }

@@ -30,6 +30,7 @@ class Products extends Table {
   RealColumn get defaultPrice => real()(); // Rate per QTL
   RealColumn get gstRateDefault => real().withDefault(const Constant(0.0))();
   TextColumn get unit => text().withDefault(const Constant('qtl'))();
+  BoolColumn get isGalaxy => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime()();
 
@@ -58,7 +59,7 @@ class Orders extends Table {
   TextColumn get notes => text().nullable()(); // Used for Order Number
   RealColumn get totalAmount => real()();
   RealColumn get lorryCapacity =>
-      real().withDefault(const Constant(210.0))(); // Default capacity
+      real().withDefault(const Constant(120.0))(); // Default capacity
 
   // Payment tracking fields
   RealColumn get amountPaid => real().withDefault(const Constant(0.0))();
@@ -152,7 +153,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -181,6 +182,9 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS products_name_idx ON products (name)');
           await m.database.customStatement(
               'CREATE INDEX IF NOT EXISTS orders_date_idx ON orders (loading_date)');
+        }
+        if (from < 5) {
+          await m.addColumn(products, products.isGalaxy);
         }
       },
     );

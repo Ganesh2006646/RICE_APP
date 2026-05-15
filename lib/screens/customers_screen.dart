@@ -21,9 +21,12 @@ class CustomersScreen extends ConsumerStatefulWidget {
   ConsumerState<CustomersScreen> createState() => _CustomersScreenState();
 }
 
+enum _CustomerFilter { all, name, place, phone }
+
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  _CustomerFilter _filter = _CustomerFilter.all;
   final Map<String, GlobalKey> _letterKeys = {};
 
   @override
@@ -59,167 +62,206 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'search_hint'.tr(ref),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'search_hint'.tr(ref),
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (value) =>
+                    setState(() => _searchQuery = value.toLowerCase()),
               ),
-              onChanged: (value) =>
-                  setState(() => _searchQuery = value.toLowerCase()),
             ),
-          ),
-
-          // Customer List taking available height based on contents within scrollable page
-          StreamBuilder<List<Customer>>(
-            stream: db.select(db.customers).watch(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                var customers = snapshot.data!;
-                
-                // Sort by place (area) then shop name
-                customers.sort((a, b) {
-                  final aPlace = a.place?.trim().toLowerCase() ?? '';
-                  final bPlace = b.place?.trim().toLowerCase() ?? '';
-                  if (aPlace.isEmpty && bPlace.isNotEmpty) return 1;
-                  if (aPlace.isNotEmpty && bPlace.isEmpty) return -1;
-                  final placeCompare = aPlace.compareTo(bPlace);
-                  if (placeCompare != 0) return placeCompare;
-                  return a.shopName.toLowerCase().compareTo(b.shopName.toLowerCase());
-                });
-
-                if (_searchQuery.isNotEmpty) {
-                  customers = customers.where((c) {
-                    final shopMatch =
-                        c.shopName.toLowerCase().contains(_searchQuery);
-                    final phoneMatch =
-                        (c.phone ?? '').toLowerCase().contains(_searchQuery);
-                    final ownerMatch = (c.ownerName ?? '')
-                        .toLowerCase()
-                        .contains(_searchQuery);
-                    final placeMatch = 
-                        (c.place ?? '').toLowerCase().contains(_searchQuery);
-                    return shopMatch || phoneMatch || ownerMatch || placeMatch;
-                  }).toList();
-                }
-
-                if (customers.isEmpty) {
-                  return _buildEmptyState();
-                }
-                
-                // Group by first letter of place
-                final groupedCustomers = <String, List<Customer>>{};
-                for (var c in customers) {
-                  final place = c.place?.trim().toUpperCase() ?? '';
-                  final letter = place.isNotEmpty ? place[0] : '#';
-                  final key = RegExp(r'[A-Z]').hasMatch(letter) ? letter : '#';
-                  groupedCustomers.putIfAbsent(key, () => []).add(c);
-                  if (!_letterKeys.containsKey(key)) {
-                    _letterKeys[key] = GlobalKey();
-                  }
-                }
-                final sortedKeys = groupedCustomers.keys.toList()..sort();
-
-                return Stack(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 0, 40, 80), // right padding for scroller, bottom for FAB
-                      itemCount: sortedKeys.length,
-                      itemBuilder: (context, index) {
-                        final letter = sortedKeys[index];
-                        final group = groupedCustomers[letter]!;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          key: _letterKeys[letter],
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0, left: 4.0),
-                              child: Text(letter, 
-                                style: const TextStyle(
-                                  fontSize: 16, 
-                                  fontWeight: FontWeight.bold, 
-                                  color: AppTheme.grey
-                                )
+                    _filterChip('All', _CustomerFilter.all, Icons.all_inclusive),
+                    const SizedBox(width: 8),
+                    _filterChip('Name', _CustomerFilter.name, Icons.store),
+                    const SizedBox(width: 8),
+                    _filterChip('Place', _CustomerFilter.place, Icons.location_on),
+                    const SizedBox(width: 8),
+                    _filterChip('Phone', _CustomerFilter.phone, Icons.phone),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<Customer>>(
+                stream: db.select(db.customers).watch(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  var customers = snapshot.data!;
+
+                  customers.sort((a, b) {
+                    final aPlace = a.place?.trim().toLowerCase() ?? '';
+                    final bPlace = b.place?.trim().toLowerCase() ?? '';
+                    if (aPlace.isEmpty && bPlace.isNotEmpty) return 1;
+                    if (aPlace.isNotEmpty && bPlace.isEmpty) return -1;
+                    final placeCompare = aPlace.compareTo(bPlace);
+                    if (placeCompare != 0) return placeCompare;
+                    return a.shopName.toLowerCase().compareTo(b.shopName.toLowerCase());
+                  });
+
+                  if (_searchQuery.isNotEmpty) {
+                    customers = customers.where((c) {
+                      switch (_filter) {
+                        case _CustomerFilter.name:
+                          return c.shopName.toLowerCase().contains(_searchQuery) ||
+                              (c.ownerName ?? '').toLowerCase().contains(_searchQuery);
+                        case _CustomerFilter.place:
+                          return (c.place ?? '').toLowerCase().contains(_searchQuery);
+                        case _CustomerFilter.phone:
+                          return (c.phone ?? '').toLowerCase().contains(_searchQuery);
+                        case _CustomerFilter.all:
+                          return c.shopName.toLowerCase().contains(_searchQuery) ||
+                              (c.phone ?? '').toLowerCase().contains(_searchQuery) ||
+                              (c.ownerName ?? '').toLowerCase().contains(_searchQuery) ||
+                              (c.place ?? '').toLowerCase().contains(_searchQuery);
+                      }
+                    }).toList();
+                  }
+
+                  if (customers.isEmpty) {
+                    return _buildEmptyState();
+                  }
+
+                  final groupedCustomers = <String, List<Customer>>{};
+                  for (var c in customers) {
+                    final place = c.place?.trim().toUpperCase() ?? '';
+                    final letter = place.isNotEmpty ? place[0] : '#';
+                    final key = RegExp(r'[A-Z]').hasMatch(letter) ? letter : '#';
+                    groupedCustomers.putIfAbsent(key, () => []).add(c);
+                    if (!_letterKeys.containsKey(key)) {
+                      _letterKeys[key] = GlobalKey();
+                    }
+                  }
+                  final sortedKeys = groupedCustomers.keys.toList()..sort();
+
+                  return Stack(
+                    children: [
+                      ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 40, 80),
+                        itemCount: sortedKeys.length,
+                        itemBuilder: (context, index) {
+                          final letter = sortedKeys[index];
+                          final group = groupedCustomers[letter]!;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            key: _letterKeys[letter],
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16.0, bottom: 8.0, left: 4.0),
+                                child: Text(letter,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.grey
+                                  )
+                                ),
                               ),
-                            ),
-                            ...group.map((customer) => _buildCustomerCard(customer, db)),
-                          ],
-                        );
-                      },
-                    ),
-                    if (_searchQuery.isEmpty && sortedKeys.length > 2)
-                      Positioned(
-                        right: 4,
-                        top: 0,
-                        bottom: 80,
-                        child: Center(
-                          child: SingleChildScrollView(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                              decoration: BoxDecoration(
-                                color: theme.cardColor.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: sortedKeys.map((letter) {
-                                  return InkWell(
-                                    onTap: () {
-                                      final key = _letterKeys[letter];
-                                      if (key?.currentContext != null) {
-                                        Scrollable.ensureVisible(
-                                          key!.currentContext!,
-                                          duration: const Duration(milliseconds: 300),
-                                          curve: Curves.easeInOut,
-                                        );
-                                      }
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
-                                      child: Text(letter, 
-                                        style: TextStyle(
-                                          fontSize: 11, 
-                                          fontWeight: FontWeight.bold, 
-                                          color: theme.primaryColor
-                                        )
+                              ...group.map((customer) => _buildCustomerCard(customer, db)),
+                            ],
+                          );
+                        },
+                      ),
+                      if (_searchQuery.isEmpty && sortedKeys.length > 2)
+                        Positioned(
+                          right: 4,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: theme.cardColor.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: sortedKeys.map((letter) {
+                                    return InkWell(
+                                      onTap: () {
+                                        final key = _letterKeys[letter];
+                                        if (key?.currentContext != null) {
+                                          Scrollable.ensureVisible(
+                                            key!.currentContext!,
+                                            duration: const Duration(milliseconds: 300),
+                                            curve: Curves.easeInOut,
+                                          );
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
+                                        child: Text(letter,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: theme.primaryColor
+                                          )
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                }).toList(),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
-        ],
-      ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCustomerDialog(context, db),
         icon: const Icon(Icons.add),
         label: Text('add_customer'.tr(ref)),
       ),
+    );
+  }
+
+  Widget _filterChip(String label, _CustomerFilter filter, IconData icon) {
+    final theme = Theme.of(context);
+    final isSelected = _filter == filter;
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: isSelected ? Colors.white : theme.primaryColor),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : null)),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _filter = filter),
+      selectedColor: theme.primaryColor,
+      checkmarkColor: Colors.white,
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
     );
   }
 

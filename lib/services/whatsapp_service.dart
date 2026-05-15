@@ -46,7 +46,7 @@ class WhatsAppService {
       final product = products.firstWhere((p) => p.id == item.productId,
           orElse: () => Product(
               id: '', name: 'Rice', defaultPrice: 0, gstRateDefault: 0,
-              unit: 'qtl', createdAt: DateTime.now(), updatedAt: DateTime.now()));
+              unit: 'qtl', isGalaxy: false, createdAt: DateTime.now(), updatedAt: DateTime.now()));
 
       // Compact bag summary: "HMT GREEN GALAXY: 10×26kg 5×10kg"
       List<String> bagParts = [];
@@ -114,7 +114,7 @@ class WhatsAppService {
         final product = allProducts.firstWhere((p) => p.id == item.productId,
             orElse: () => Product(
                 id: '', name: 'Rice', defaultPrice: 0, gstRateDefault: 0,
-                unit: 'qtl', createdAt: DateTime.now(), updatedAt: DateTime.now()));
+                unit: 'qtl', isGalaxy: false, createdAt: DateTime.now(), updatedAt: DateTime.now()));
 
         // Super compact: "HMT GREEN: 10×26kg = 2.6Q"
         List<String> bags = [];

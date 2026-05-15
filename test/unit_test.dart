@@ -12,6 +12,7 @@ Product makeProduct({
   double gst = 0.0,
   String unit = 'qtl',
   String? sku,
+  bool isGalaxy = false,
 }) =>
     Product(
       id: id,
@@ -20,6 +21,7 @@ Product makeProduct({
       gstRateDefault: gst,
       unit: unit,
       sku: sku,
+      isGalaxy: isGalaxy,
       createdAt: DateTime(2024),
       updatedAt: DateTime(2024),
     );

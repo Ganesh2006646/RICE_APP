@@ -43,6 +43,7 @@ class ProductSeedingService {
       String name, double price, bool pack10, bool pack5) {
     
     String unitMeta = 'qtl|p10:${pack10 ? 1 : 0}|p5:${pack5 ? 1 : 0}';
+    bool isGalaxy = name.toUpperCase().contains('GALAXY');
 
     return ProductsCompanion.insert(
       id: generateId(),
@@ -50,6 +51,7 @@ class ProductSeedingService {
       defaultPrice: price,
       gstRateDefault: const Value(0.0), // GST is calculated based on packing in NewOrderScreen
       unit: Value(unitMeta),
+      isGalaxy: Value(isGalaxy),
       updatedAt: DateTime.now(),
     );
 

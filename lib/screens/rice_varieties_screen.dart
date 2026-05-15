@@ -490,6 +490,24 @@ class RiceVarietiesScreen extends ConsumerWidget {
                           ),
                     ),
                   ],
+                  if (product.isGalaxy) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.star, size: 14, color: Colors.amber.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          'GALAXY',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -617,6 +635,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
       text: product != null ? product.defaultPrice.toStringAsFixed(0) : '',
     );
     bool isGst5 = product?.gstRateDefault == 5.0;
+    bool isGalaxy = product?.isGalaxy ?? false;
 
     showDialog(
       context: context,
@@ -682,22 +701,51 @@ class RiceVarietiesScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'gst_note'.tr(ref),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.grey,
-                        fontStyle: FontStyle.italic,
+                    Text(
+                      'gst_note'.tr(ref),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.orange.shade800,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGrey,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.orange.shade800,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                      child: SwitchListTile(
+                        title: Row(
+                          children: [
+                            Icon(Icons.star, size: 18, color: Colors.amber.shade700),
+                            const SizedBox(width: 8),
+                            const Text('Galaxy Variety'),
+                          ],
+                        ),
+                        subtitle: Text(
+                          isGalaxy ? 'Eligible for bulk discount' : 'Not eligible for bulk discount',
+                          style: TextStyle(
+                            color: isGalaxy ? Colors.amber.shade700 : AppTheme.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                        value: isGalaxy,
+                        activeTrackColor: Colors.amber.shade200, activeThumbColor: Colors.amber.shade700,
+                        onChanged: (val) => setState(() => isGalaxy = val),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                ),
+                    ),
               ],
             ),
           ),
@@ -731,6 +779,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                         : skuController.text.trim()),
                     defaultPrice: drift.Value(price),
                     gstRateDefault: drift.Value(isGst5 ? 5.0 : 0.0),
+                    isGalaxy: drift.Value(isGalaxy),
                     updatedAt: drift.Value(DateTime.now()),
                   ));
                 } else {
@@ -742,6 +791,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                             : skuController.text.trim()),
                         defaultPrice: drift.Value(price),
                         gstRateDefault: drift.Value(isGst5 ? 5.0 : 0.0),
+                        isGalaxy: drift.Value(isGalaxy),
                         updatedAt: drift.Value(DateTime.now()),
                       ));
                 }

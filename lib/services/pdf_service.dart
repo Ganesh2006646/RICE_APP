@@ -122,7 +122,7 @@ class PdfService {
               // Table Rows
               ...items.where((i) => i.bags26 > 0 || i.bags10 > 0 || i.bags5 > 0).map((item) {
                 final product = products.firstWhere((p) => p.id == item.productId,
-                    orElse: () => Product(id: '', name: 'Rice', defaultPrice: 0, gstRateDefault: 0, unit: 'qtl', createdAt: DateTime.now(), updatedAt: DateTime.now()));
+                    orElse: () => Product(id: '', name: 'Rice', defaultPrice: 0, gstRateDefault: 0, unit: 'qtl', isGalaxy: false, createdAt: DateTime.now(), updatedAt: DateTime.now()));
                 
                 List<String> bagParts = [];
                 if (item.bags26 > 0) bagParts.add('${item.bags26}x26kg');
@@ -179,7 +179,7 @@ class PdfService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Caution: Auto generated document.', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic)),
+                      const pw.Text('Caution: Auto generated document.', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic)),
                     ],
                   ),
                   pw.Column(
@@ -198,15 +198,16 @@ class PdfService {
       ),
     );
 
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getTemporaryDirectory();
     final safeName = customer.shopName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
     final safeOrderNo = (order.notes ?? safeName).replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-    final file = File('${dir.path}/Invoice_$safeOrderNo.pdf');
+    final fileName = 'Invoice_${safeOrderNo}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
     
-    // Share the PDF
+    // Share the PDF via system share sheet with proper MIME type
     await Share.shareXFiles(
-      [XFile(file.path)],
+      [XFile(file.path, mimeType: 'application/pdf')],
       text: 'Invoice for ${customer.shopName} from $millName',
     );
   }

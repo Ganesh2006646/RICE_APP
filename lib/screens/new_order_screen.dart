@@ -264,6 +264,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       defaultPrice: 0,
       gstRateDefault: 0,
       unit: '',
+      isGalaxy: false,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now());
 
@@ -324,63 +325,121 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   void _applyBulkDiscounts() {
     int discountAppliedCount = 0;
-    
+    final List<String> galaxyNames = [];
+    final List<String> discountLog = [];
+
     setState(() {
       for (var customerData in _customers) {
         if (!customerData.isValid) continue;
 
         double customerTotalQtl = customerData.totalQtl;
-        
-        // 1. Calculate global galaxy discount
-        double galaxyDiscount = 0.0;
-        if (customerTotalQtl >= 100.0) {
-          galaxyDiscount = 75.0;
-        } else if (customerTotalQtl >= 50.0) {
-          galaxyDiscount = 50.0;
-        }
 
-        // 2. Group Qtl by variety to check for single-variety 100+ qtl discount
+        // 1. Group Qtl by variety (including 5kg & 10kg packs — already in qtlTotal)
         Map<String, double> varietyQtl = {};
+        Map<String, Product> varietyProduct = {};
         for (var item in customerData.items) {
           if (item.product != null) {
-            varietyQtl[item.product!.id] = (varietyQtl[item.product!.id] ?? 0.0) + item.qtlTotal;
+            final pid = item.product!.id;
+            varietyQtl[pid] = (varietyQtl[pid] ?? 0.0) + item.qtlTotal;
+            varietyProduct[pid] = item.product!;
           }
         }
 
-        // 3. Apply discounts
+        // 2. Determine galaxy varieties and their Qtls
+        final galaxyVarieties = <String, double>{};
+        for (var entry in varietyQtl.entries) {
+          final prod = varietyProduct[entry.key];
+          if (prod != null && prod.isGalaxy) {
+            galaxyVarieties[entry.key] = entry.value;
+            if (!galaxyNames.contains(prod.name)) {
+              galaxyNames.add(prod.name);
+            }
+          }
+        }
+
+        // 3. Determine applicable galaxy discount rate
+        double galaxyDiscountRate = 0.0;
+        if (customerTotalQtl >= 100.0) {
+          galaxyDiscountRate = 75.0;
+        } else if (customerTotalQtl >= 50.0) {
+          galaxyDiscountRate = 50.0;
+        }
+
+        // 4. Apply discounts per item
         for (var item in customerData.items) {
           if (item.product == null) continue;
-          
+
           double originalRate = item.product!.defaultPrice;
           double itemDiscount = 0.0;
-          
-          // Single-variety >= 100 QTL discount (Rs 100)
-          double myVarietyQtl = varietyQtl[item.product!.id] ?? 0.0;
-          if (myVarietyQtl >= 100.0) {
+          final pid = item.product!.id;
+          double itemVarietyQtl = varietyQtl[pid] ?? 0.0;
+
+          // Rule C: Single variety >= 100 QTL → ₹100/qtl on that variety (highest priority)
+          if (itemVarietyQtl >= 100.0) {
             itemDiscount = math.max(itemDiscount, 100.0);
           }
-          
-          // Global Galaxy discount (Rs 50 or Rs 75)
-          if (item.product!.name.toUpperCase().contains('GALAXY')) {
-            itemDiscount = math.max(itemDiscount, galaxyDiscount);
+
+          // Rule B: Total >= 100 QTL → ₹75/qtl on GALAXY varieties
+          // Rule A: Total >= 50 QTL → ₹50/qtl on GALAXY varieties
+          if (galaxyDiscountRate > 0 && galaxyVarieties.containsKey(pid)) {
+            itemDiscount = math.max(itemDiscount, galaxyDiscountRate);
           }
-          
+
           if (itemDiscount > 0) {
             double newRate = math.max(0.0, originalRate - itemDiscount);
-            if (item.rate != newRate) {
+            if ((item.rate - newRate).abs() > 0.01) {
               item.rate = newRate;
               _bumpInputRevision('${item.hashCode}_rate');
               discountAppliedCount++;
+              discountLog.add('${item.product!.name}: ${item.qtlTotal.toStringAsFixed(1)}QTL → ₹$itemDiscount off (${originalRate.toStringAsFixed(0)} → ${newRate.toStringAsFixed(0)})');
             }
           }
         }
       }
     });
-    
-    if (discountAppliedCount > 0) {
-      SafeSnackBar.show(context, 'Applied $discountAppliedCount bulk discounts successfully!');
-    } else {
-      SafeSnackBar.show(context, 'No eligible bulk discounts found or already applied.', isError: true);
+
+    // Build summary message
+    final buffer = StringBuffer();
+    buffer.writeln('Bulk Discounts Applied: $discountAppliedCount items');
+    if (galaxyNames.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('Galaxy varieties eligible:');
+      for (var name in galaxyNames) {
+        buffer.writeln('  ⭐ $name');
+      }
+    }
+    if (discountLog.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('Discounts:');
+      for (var log in discountLog.take(5)) {
+        buffer.writeln('  ✓ $log');
+      }
+      if (discountLog.length > 5) {
+        buffer.writeln('  ... and ${discountLog.length - 5} more');
+      }
+    }
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          scrollable: true,
+          title: Row(
+            children: [
+              Icon(Icons.discount, color: Colors.green.shade700),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Bulk Discount Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          content: Text(buffer.toString(), style: const TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace')),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
