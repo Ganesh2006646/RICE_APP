@@ -35,6 +35,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   String? _processingOrderId;
 
   @override
+  void initState() {
+    super.initState();
+    _filterDate = DateTime.now().add(const Duration(days: 1));
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -58,11 +64,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     : Icons.calendar_today,
                 color: _filterDate != null ? theme.primaryColor : null),
             onPressed: () => _selectDate(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.description_outlined),
-            tooltip: 'export_all'.tr(ref),
-            onPressed: () => _exportAllOrders(db),
           ),
           if (_filterDate != null)
             IconButton(
@@ -444,6 +445,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       final customerItems = groupedItems[customer.id] ?? [];
                       final customerTotal = customerItems.fold<double>(
                           0, (sum, oi) => sum + oi.netAmount);
+                      final customerQtl = customerItems.fold<double>(
+                          0, (sum, oi) => sum + oi.qtyQtl);
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,11 +464,19 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16)),
-                              trailing: SafeText(
-                                  '$currency${customerTotal.toStringAsFixed(0)}',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.primaryColor)),
+                              trailing: SafeWrap(
+                                children: [
+                                  SafeText('${customerQtl.toStringAsFixed(2)} QTL',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const SizedBox(width: 8),
+                                  SafeText(
+                                      '$currency${customerTotal.toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.primaryColor)),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -529,12 +540,22 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                               letterSpacing: 1.2)),
-                      trailing: SafeText(
-                          '$currency${item.order.totalAmount.toStringAsFixed(0)}',
-                          style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: theme.primaryColor)),
+                      trailing: SafeColumn(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          SafeText(
+                              '${orderItems.fold<double>(0, (sum, oi) => sum + oi.qtyQtl).toStringAsFixed(2)} QTL',
+                              style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
+                          SafeText(
+                              '$currency${item.order.totalAmount.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.primaryColor)),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 40),
                     SizedBox(
@@ -850,29 +871,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         context,
         MaterialPageRoute(
             builder: (_) => NewOrderScreen(duplicateOrderId: item.order.id)));
-  }
-
-  Future<void> _exportAllOrders(AppDatabase db) async {
-    try {
-      // Get all current orders in the stream (using the same query filter)
-      final orders = await _buildOrdersQuery(db).first;
-      if (orders.isEmpty) {
-        _showError('No orders to export');
-        return;
-      }
-
-      final products = await db.select(db.products).get();
-      final path = await ExcelService.generateAllOrdersExcel(
-          orders: orders, products: products);
-
-      final finalPath = await ExcelService.copyToDownloads(path,
-          customPath: ref.read(settingsProvider).excelSavePath);
-      await Share.shareXFiles([XFile(finalPath)],
-          text: 'orders_statement'.tr(ref));
-      _showSuccess('${'saved_successfully'.tr(ref)}: $finalPath');
-    } catch (e) {
-      _showError('${'export_failed'.tr(ref)}: $e');
-    }
   }
 
   Widget _buildEmptyState() {

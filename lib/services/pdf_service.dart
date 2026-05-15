@@ -200,7 +200,8 @@ class PdfService {
 
     final dir = await getApplicationDocumentsDirectory();
     final safeName = customer.shopName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-    final file = File('${dir.path}/Invoice_${order.notes ?? safeName}.pdf');
+    final safeOrderNo = (order.notes ?? safeName).replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+    final file = File('${dir.path}/Invoice_$safeOrderNo.pdf');
     await file.writeAsBytes(await pdf.save());
     
     // Share the PDF

@@ -240,7 +240,7 @@ class ExcelService {
           isFirstRow ? (customer.shopName) : '', // 1: PARTY NAME
           isFirstRow ? (customer.place ?? '') : '', // 2: PLACE
           isFirstRow ? (customer.tinGst ?? '') : '', // 3: TIN / GST
-          isFirstRow ? (customer.phone ?? '') : '', // 4: CELL
+          isFirstRow ? ((customer.phone?.endsWith('.0') == true) ? customer.phone!.substring(0, customer.phone!.length - 2) : (customer.phone ?? '')) : '', // 4: CELL
           product.name, // 5: TYPE OF RICE
           item.bags26 > 0 ? item.bags26.toString() : '-', // 6: 26 KG BAGS
           qtl26 > 0 ? qtl26.toStringAsFixed(2) : '-', // 7: 26 KG QTL
@@ -550,7 +550,8 @@ class ExcelService {
             }
 
             final place = _valueAt(row, headers['place'] ?? -1).trim();
-            final phone = _valueAt(row, headers['phone'] ?? -1).trim();
+            String phone = _valueAt(row, headers['phone'] ?? -1).trim();
+            if (phone.endsWith('.0')) phone = phone.substring(0, phone.length - 2);
             final gst = _valueAt(row, headers['gst'] ?? -1).trim();
 
             // Insert

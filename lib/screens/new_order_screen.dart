@@ -129,7 +129,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   int _currentStep = 1;
   DateTime _loadingDate = DateTime.now().add(const Duration(days: 1));
   final TextEditingController _capacityController =
-      TextEditingController(text: '120.0');
+      TextEditingController(text: '120');
   final TextEditingController _orderNumberController = TextEditingController();
   final Map<String, int> _inputFieldRevisions = {};
   final List<CustomerLoadFormData> _customers = [];
@@ -309,7 +309,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   double get _totalQtl => _customers.fold(0.0, (sum, c) => sum + c.totalQtl);
   double get _totalAmount =>
       _customers.fold(0.0, (sum, c) => sum + (c.isValid ? c.totalAmount : 0.0));
-  double get _capacity => double.tryParse(_capacityController.text) ?? 110.0;
+  double get _capacity => double.tryParse(_capacityController.text) ?? 120.0;
 
   void _bumpInputRevision(String fieldKey) {
     _inputFieldRevisions[fieldKey] = (_inputFieldRevisions[fieldKey] ?? 0) + 1;
@@ -320,6 +320,68 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     _inputFieldRevisions.remove('${item.hashCode}_bags10');
     _inputFieldRevisions.remove('${item.hashCode}_bags5');
     _inputFieldRevisions.remove('${item.hashCode}_rate');
+  }
+
+  void _applyBulkDiscounts() {
+    int discountAppliedCount = 0;
+    
+    setState(() {
+      for (var customerData in _customers) {
+        if (!customerData.isValid) continue;
+
+        double customerTotalQtl = customerData.totalQtl;
+        
+        // 1. Calculate global galaxy discount
+        double galaxyDiscount = 0.0;
+        if (customerTotalQtl >= 100.0) {
+          galaxyDiscount = 75.0;
+        } else if (customerTotalQtl >= 50.0) {
+          galaxyDiscount = 50.0;
+        }
+
+        // 2. Group Qtl by variety to check for single-variety 100+ qtl discount
+        Map<String, double> varietyQtl = {};
+        for (var item in customerData.items) {
+          if (item.product != null) {
+            varietyQtl[item.product!.id] = (varietyQtl[item.product!.id] ?? 0.0) + item.qtlTotal;
+          }
+        }
+
+        // 3. Apply discounts
+        for (var item in customerData.items) {
+          if (item.product == null) continue;
+          
+          double originalRate = item.product!.defaultPrice;
+          double itemDiscount = 0.0;
+          
+          // Single-variety >= 100 QTL discount (Rs 100)
+          double myVarietyQtl = varietyQtl[item.product!.id] ?? 0.0;
+          if (myVarietyQtl >= 100.0) {
+            itemDiscount = math.max(itemDiscount, 100.0);
+          }
+          
+          // Global Galaxy discount (Rs 50 or Rs 75)
+          if (item.product!.name.toUpperCase().contains('GALAXY')) {
+            itemDiscount = math.max(itemDiscount, galaxyDiscount);
+          }
+          
+          if (itemDiscount > 0) {
+            double newRate = math.max(0.0, originalRate - itemDiscount);
+            if (item.rate != newRate) {
+              item.rate = newRate;
+              _bumpInputRevision('${item.hashCode}_rate');
+              discountAppliedCount++;
+            }
+          }
+        }
+      }
+    });
+    
+    if (discountAppliedCount > 0) {
+      SafeSnackBar.show(context, 'Applied $discountAppliedCount bulk discounts successfully!');
+    } else {
+      SafeSnackBar.show(context, 'No eligible bulk discounts found or already applied.', isError: true);
+    }
   }
 
   Future<void> _saveLorryOrder() async {
@@ -534,13 +596,18 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               _currentStep == 1 ? 'build_lorry'.tr(ref) : 'review_send'.tr(ref),
               style: const TextStyle(fontSize: 18)),
           actions: [
-            if (_currentStep == 1)
+            if (_currentStep == 1) ...[
+              IconButton(
+                onPressed: _applyBulkDiscounts,
+                icon: const Icon(Icons.discount_outlined),
+                tooltip: 'Apply Bulk Discounts',
+              ),
               TextButton.icon(
                 onPressed: _validateAndReview,
                 icon: const Icon(Icons.arrow_forward),
                 label: Text('review'.tr(ref)),
               )
-            else if (_isSaving)
+            ] else if (_isSaving)
               const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
