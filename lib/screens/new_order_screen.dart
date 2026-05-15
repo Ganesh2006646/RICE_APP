@@ -1,31 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import '../main.dart';
-import '../theme.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_radius.dart';
 import '../db/database.dart';
 import '../services/excel_service.dart';
 import '../services/settings_service.dart';
-import '../services/translation_service.dart';
-import '../services/whatsapp_service.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/safe_widgets.dart';
+import '../widgets/capacity_progress_card.dart';
+import '../widgets/confirm_dialog.dart';
+
+// ── Data Classes (unchanged) ──────────────────────────────────────────────────
 
 class OrderItemFormData {
   Product? product;
   int bags26;
   int bags10;
   int bags5;
-  double rate; // Defined ONLY for 100 KG (1 Quintal)
+  double rate;
 
-  // Packing costs remain configurable from settings.
   double packingPrice10;
   double packingPrice5;
-  double amcRate; // Kept for backward compatibility; effective AMC is fixed.
-  double gstRate; // Kept for backward compatibility; effective GST comes from product.
+  double amcRate;
+  double gstRate;
 
   OrderItemFormData({
     this.product,
@@ -49,19 +51,16 @@ class OrderItemFormData {
 
   double get effectiveGstRate => (product?.gstRateDefault ?? 0) / 100.0;
 
-  // WEIGHTS
   double get kg26 => bags26 * 26.0;
   double get kg10 => applicableBags10 * 10.0;
   double get kg5 => applicableBags5 * 5.0;
   double get kgTotal => kg26 + kg10 + kg5;
   double get qtlTotal => kgTotal / 100.0;
 
-  // 26 KG LOGIC: No Packing, No GST, configurable AMC
   double get value26 => (rate / 100.0) * 26.0 * bags26;
   double get amc26 => value26 * _fixedAmcRate;
   double get total26 => value26 + amc26;
 
-  // 10 KG LOGIC: Configurable Packing, AMC, GST
   double get baseValue10 => (rate / 100.0) * 10.0 * applicableBags10;
   double get packing10 => packingPrice10 * (applicableBags10 * 10.0 / 100.0);
   double get subtotal10 => baseValue10 + packing10;
@@ -69,7 +68,6 @@ class OrderItemFormData {
   double get gst10 => (subtotal10 + amc10) * effectiveGstRate;
   double get total10 => subtotal10 + amc10 + gst10;
 
-  // 5 KG LOGIC: Configurable Packing, AMC, GST
   double get baseValue5 => (rate / 100.0) * 5.0 * applicableBags5;
   double get packing5 => packingPrice5 * (applicableBags5 * 5.0 / 100.0);
   double get subtotal5 => baseValue5 + packing5;
@@ -77,12 +75,10 @@ class OrderItemFormData {
   double get gst5 => (subtotal5 + amc5) * effectiveGstRate;
   double get total5 => subtotal5 + amc5 + gst5;
 
-  // TOTALS for Line Item
   double get netAmount => total26 + total10 + total5;
   double get amcAmount => amc26 + amc10 + amc5;
   double get gstAmount => gst10 + gst5;
 
-  // Percentage Helpers for DB/Legacy UI
   double get amcPercent => _fixedAmcRate * 100.0;
   double get gstPercent {
     double taxableSubtotal = (subtotal10 + amc10) + (subtotal5 + amc5);
@@ -90,7 +86,6 @@ class OrderItemFormData {
     return (gstAmount / taxableSubtotal) * 100.0;
   }
 
-  // Display fields for UI/Excel
   double get baseAmount => value26 + baseValue10 + baseValue5;
 
   bool get isValid =>
@@ -103,23 +98,41 @@ class OrderItemFormData {
 
   static bool _supportsPackFromUnit(String? unit, int packKg) {
     if (unit == null || unit.isEmpty) return true;
-
-    final match = RegExp('p$packKg:(0|1)', caseSensitive: false)
-        .firstMatch(unit);
+    final match = RegExp('p$packKg:(0|1)', caseSensitive: false).firstMatch(unit);
     if (match == null) return true;
-
     return match.group(1) == '1';
   }
 }
 
-/// Lorry Based Order Screen - Refactored for Stability
-/// ZERO OVERFLOW ERRORS - AGING USER FRIENDLY
+class CustomerLoadFormData {
+  Customer? customer;
+  final List<OrderItemFormData> items;
+  bool isExpanded;
+  String paymentStatus;
+  DateTime? dueDate;
+
+  CustomerLoadFormData({
+    this.customer,
+    required this.items,
+    this.isExpanded = true,
+    this.paymentStatus = 'UNPAID',
+    this.dueDate,
+  });
+
+  double get totalQtl =>
+      items.fold(0, (sum, item) => sum + (item.isValid ? item.qtlTotal : 0));
+  double get totalAmount =>
+      items.fold(0, (sum, item) => sum + (item.isValid ? item.netAmount : 0));
+  bool get isValid => customer != null && items.any((item) => item.isValid);
+}
+
+// ── Screen ──────────────────────────────────────────────────────────────────
+
 class NewOrderScreen extends ConsumerStatefulWidget {
   final Customer? preselectedCustomer;
   final String? duplicateOrderId;
 
-  const NewOrderScreen(
-      {super.key, this.preselectedCustomer, this.duplicateOrderId});
+  const NewOrderScreen({super.key, this.preselectedCustomer, this.duplicateOrderId});
 
   @override
   ConsumerState<NewOrderScreen> createState() => _NewOrderScreenState();
@@ -127,9 +140,9 @@ class NewOrderScreen extends ConsumerStatefulWidget {
 
 class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   int _currentStep = 1;
+  static const int _totalSteps = 4;
   DateTime _loadingDate = DateTime.now().add(const Duration(days: 1));
-  final TextEditingController _capacityController =
-      TextEditingController(text: '120');
+  final TextEditingController _capacityController = TextEditingController(text: '120');
   final TextEditingController _orderNumberController = TextEditingController();
   final Map<String, int> _inputFieldRevisions = {};
   final List<CustomerLoadFormData> _customers = [];
@@ -149,8 +162,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     super.dispose();
   }
 
-  /// Reset all state for clean Cancel/Discard behavior
-  /// Prevents black screen when re-entering after cancel
   void _resetState() {
     _currentStep = 1;
     _isSaving = false;
@@ -160,18 +171,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     _orderNumber = null;
   }
 
-  /// Fallback widget when step state is invalid
-  /// Prevents black screen from null body rendering
   Widget _buildLoadingFallback() {
-    final theme = Theme.of(context);
-    return Center(
+    return const Center(
       child: SafeColumn(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: theme.primaryColor),
-          const SizedBox(height: 16),
-          SafeText('Loading...', style: TextStyle(color: theme.primaryColor)),
+          CircularProgressIndicator(color: AppColors.primary),
+          SizedBox(height: 16),
+          SafeText('Loading...', style: TextStyle(color: AppColors.primary)),
         ],
       ),
     );
@@ -180,14 +188,12 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   Future<void> _initLorry() async {
     final db = ref.read(databaseProvider);
     final orderCount = await db.select(db.orders).get();
-    final nextNum =
-        await SettingsService.generateOrderNumber(orderCount.length);
+    final nextNum = await SettingsService.generateOrderNumber(orderCount.length);
     if (!mounted) return;
     setState(() {
       _orderNumber = nextNum;
       _orderNumberController.text = nextNum;
     });
-
     if (widget.duplicateOrderId != null) {
       await _loadDuplicateData(widget.duplicateOrderId!, db);
     } else {
@@ -201,30 +207,22 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ..where((tbl) => tbl.id.equals(orderId)))
           .getSingle();
       _capacityController.text = originalOrder.lorryCapacity.toString();
-
       final shipmentRows = await (db.select(db.lorryShipments).join([
-        drift.innerJoin(db.customers,
-            db.customers.id.equalsExp(db.lorryShipments.customerId)),
+        drift.innerJoin(db.customers, db.customers.id.equalsExp(db.lorryShipments.customerId)),
       ])
             ..where(db.lorryShipments.orderId.equals(orderId)))
           .get();
-
       if (!mounted) return;
-
       final allItems = await (db.select(db.orderItems)
             ..where((tbl) => tbl.orderId.equals(orderId)))
           .get();
       final products = await db.select(db.products).get();
-
       final loadedCustomers = <CustomerLoadFormData>[];
       for (var row in shipmentRows) {
         final customer = row.readTable(db.customers);
-        final myItems =
-            allItems.where((i) => i.customerId == customer.id).toList();
-
+        final myItems = allItems.where((i) => i.customerId == customer.id).toList();
         final formItems = myItems.map((i) {
-          final product = products.firstWhere((p) => p.id == i.productId,
-              orElse: () => _fallbackProduct());
+          final product = products.firstWhere((p) => p.id == i.productId, orElse: () => _fallbackProduct());
           return OrderItemFormData(
             product: product,
             bags26: i.bags26,
@@ -237,79 +235,44 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             gstRate: ref.read(settingsProvider).gstPercent / 100.0,
           );
         }).toList();
-
         if (formItems.isEmpty) formItems.add(_createFormItem());
-        loadedCustomers
-            .add(CustomerLoadFormData(customer: customer, items: formItems));
+        loadedCustomers.add(CustomerLoadFormData(customer: customer, items: formItems));
       }
-
       if (loadedCustomers.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _customers.clear();
-            _customers.addAll(loadedCustomers);
-          });
-        }
-      } else {
-        _addCustomer();
-      }
-    } catch (e) {
-      _addCustomer();
-    }
+        if (mounted) setState(() { _customers.clear(); _customers.addAll(loadedCustomers); });
+      } else { _addCustomer(); }
+    } catch (e) { _addCustomer(); }
   }
 
   Product _fallbackProduct() => Product(
-      id: '?',
-      name: 'Unknown',
-      defaultPrice: 0,
-      gstRateDefault: 0,
-      unit: '',
-      isGalaxy: false,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now());
+      id: '?', name: 'Unknown', defaultPrice: 0, gstRateDefault: 0, unit: '', isGalaxy: false,
+      createdAt: DateTime.now(), updatedAt: DateTime.now());
 
-  /// Creates an OrderItemFormData with current settings values
-  OrderItemFormData _createFormItem(
-      {Product? product,
-      int bags26 = 0,
-      int bags10 = 0,
-      int bags5 = 0,
-      double rate = 0}) {
+  OrderItemFormData _createFormItem({Product? product, int bags26 = 0, int bags10 = 0, int bags5 = 0, double rate = 0}) {
     final settings = ref.read(settingsProvider);
     return OrderItemFormData(
       product: product,
-      bags26: bags26,
-      bags10: bags10,
-      bags5: bags5,
-      rate: rate,
-      packingPrice10: settings.packing10Price,
-      packingPrice5: settings.packing5Price,
-      amcRate: 0.01,
-      gstRate: settings.gstPercent / 100.0,
+      bags26: bags26, bags10: bags10, bags5: bags5, rate: rate,
+      packingPrice10: settings.packing10Price, packingPrice5: settings.packing5Price,
+      amcRate: 0.01, gstRate: settings.gstPercent / 100.0,
     );
   }
 
   void _addCustomer({Customer? initial}) {
-    setState(() {
-      _customers.add(
-          CustomerLoadFormData(customer: initial, items: [_createFormItem()]));
-    });
+    setState(() { _customers.add(CustomerLoadFormData(customer: initial, items: [_createFormItem()])); });
   }
 
   void _removeCustomer(int index) {
     if (_customers.length > 1) {
       setState(() {
         final removed = _customers.removeAt(index);
-        for (final item in removed.items) {
-          _clearItemInputRevisions(item);
-        }
+        for (final item in removed.items) { _clearItemInputRevisions(item); }
       });
     }
   }
 
   double get _totalQtl => _customers.fold(0.0, (sum, c) => sum + c.totalQtl);
-  double get _totalAmount =>
-      _customers.fold(0.0, (sum, c) => sum + (c.isValid ? c.totalAmount : 0.0));
+  double get _totalAmount => _customers.fold(0.0, (sum, c) => sum + (c.isValid ? c.totalAmount : 0.0));
   double get _capacity => double.tryParse(_capacityController.text) ?? 120.0;
 
   void _bumpInputRevision(String fieldKey) {
@@ -324,16 +287,11 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   }
 
   void _applyBulkDiscounts() {
-    int discountAppliedCount = 0;
     final List<String> discountLog = [];
-
     setState(() {
       for (var customerData in _customers) {
         if (!customerData.isValid) continue;
-
         double customerTotalQtl = customerData.totalQtl;
-
-        // 1. Group Qtl by variety (including 5kg & 10kg packs — already in qtlTotal)
         Map<String, double> varietyQtl = {};
         Map<String, Product> varietyProduct = {};
         for (var item in customerData.items) {
@@ -343,113 +301,51 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             varietyProduct[pid] = item.product!;
           }
         }
-
-        // 2. Determine discount-eligible varieties (all except excluded ones)
         final eligibleVarieties = <String, double>{};
         final excludedNames = <String>[];
         for (var entry in varietyQtl.entries) {
           final prod = varietyProduct[entry.key];
           if (prod != null) {
-            if (prod.isGalaxy) {
-              eligibleVarieties[entry.key] = entry.value;
-            } else {
-              excludedNames.add(prod.name);
-            }
+            if (prod.isGalaxy) { eligibleVarieties[entry.key] = entry.value; }
+            else { excludedNames.add(prod.name); }
           }
         }
-
-        // 3. Determine applicable discount rate
         double discountRate = 0.0;
-        if (customerTotalQtl >= 100.0) {
-          discountRate = 75.0;
-        } else if (customerTotalQtl >= 50.0) {
-          discountRate = 50.0;
-        }
-
-        // 4. Apply discounts per item
+        if (customerTotalQtl >= 100.0) { discountRate = 75.0; }
+        else if (customerTotalQtl >= 50.0) { discountRate = 50.0; }
         for (var item in customerData.items) {
           if (item.product == null) continue;
-
           double originalRate = item.product!.defaultPrice;
           double itemDiscount = 0.0;
           final pid = item.product!.id;
           double itemVarietyQtl = varietyQtl[pid] ?? 0.0;
-
-          // Rule C: Single variety >= 100 QTL → ₹100/qtl on that variety (highest priority)
-          if (itemVarietyQtl >= 100.0) {
-            itemDiscount = math.max(itemDiscount, 100.0);
-          }
-
-          // Rule B: Total >= 100 QTL → ₹75/qtl on eligible varieties
-          // Rule A: Total >= 50 QTL → ₹50/qtl on eligible varieties
+          if (itemVarietyQtl >= 100.0) { itemDiscount = math.max(itemDiscount, 100.0); }
           if (discountRate > 0 && eligibleVarieties.containsKey(pid)) {
             itemDiscount = math.max(itemDiscount, discountRate);
           }
-
           if (itemDiscount > 0) {
             double newRate = math.max(0.0, originalRate - itemDiscount);
             if ((item.rate - newRate).abs() > 0.01) {
               item.rate = newRate;
               _bumpInputRevision('${item.hashCode}_rate');
-              discountAppliedCount++;
               discountLog.add('${item.product!.name}: ${item.qtlTotal.toStringAsFixed(1)}QTL → ₹$itemDiscount off (${originalRate.toStringAsFixed(0)} → ${newRate.toStringAsFixed(0)})');
             }
           }
         }
       }
     });
-
-    // Build summary message
-    final excludedLog = <String>[];
-    for (var customerData in _customers) {
-      for (var item in customerData.items) {
-        if (item.product != null && !item.product!.isGalaxy) {
-          if (!excludedLog.contains(item.product!.name)) {
-            excludedLog.add(item.product!.name);
-          }
-        }
-      }
-    }
-
-    final buffer = StringBuffer();
-    buffer.writeln('Bulk Discounts Applied: $discountAppliedCount items');
-    if (excludedLog.isNotEmpty) {
-      buffer.writeln('');
-      buffer.writeln('Excluded from discount:');
-      for (var name in excludedLog) {
-        buffer.writeln('  ⊘ $name');
-      }
-    }
-    if (discountLog.isNotEmpty) {
-      buffer.writeln('');
-      buffer.writeln('Discounts:');
-      for (var log in discountLog.take(5)) {
-        buffer.writeln('  ✓ $log');
-      }
-      if (discountLog.length > 5) {
-        buffer.writeln('  ... and ${discountLog.length - 5} more');
-      }
-    }
-
     if (mounted) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           scrollable: true,
-          title: Row(
-            children: [
-              Icon(Icons.discount, color: Colors.green.shade700),
-              const SizedBox(width: 10),
-              const Expanded(child: Text('Bulk Discount Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-            ],
-          ),
-          content: Text(buffer.toString(), style: const TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace')),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
+          title: Row(children: [
+            Icon(Icons.discount, color: Colors.green.shade700),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Bulk Discount Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+          ]),
+          content: Text(discountLog.join('\n'), style: const TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace')),
+          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
         ),
       );
     }
@@ -457,1046 +353,876 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Future<void> _saveLorryOrder() async {
     if (_customers.every((c) => !c.isValid)) {
-      _showError('valid_items_required'.tr(ref));
+      _showError('Please add at least one customer with valid items');
       return;
     }
-
-    final confirmed = await showDialog<bool>(
+    final confirmed = await ConfirmDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        scrollable: true,
-        title: Text('confirm_save'.tr(ref)),
-        content: Text('confirm_save_desc'.tr(ref)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('cancel'.tr(ref)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('save'.tr(ref)),
-          ),
-        ],
-      ),
+      icon: Icons.save_outlined,
+      title: 'Confirm Save',
+      message: 'Are you sure you want to save this lorry order?',
+      confirmLabel: 'Save',
     );
-
     if (confirmed != true) return;
-
     setState(() => _isSaving = true);
-
     try {
       final db = ref.read(databaseProvider);
       final lorryId = generateId();
-
       await db.transaction(() async {
         await db.into(db.orders).insert(OrdersCompanion(
-              id: drift.Value(lorryId),
-              loadingDate: drift.Value(_loadingDate),
-              totalAmount: drift.Value(_totalAmount),
-              lorryCapacity: drift.Value(_capacity),
-              notes: drift.Value(_orderNumber),
-              createdAt: drift.Value(DateTime.now()),
-              updatedAt: drift.Value(DateTime.now()),
-              paymentStatus: const drift.Value('UNPAID'),
+              id: drift.Value(lorryId), loadingDate: drift.Value(_loadingDate),
+              totalAmount: drift.Value(_totalAmount), lorryCapacity: drift.Value(_capacity),
+              notes: drift.Value(_orderNumber), createdAt: drift.Value(DateTime.now()),
+              updatedAt: drift.Value(DateTime.now()), paymentStatus: const drift.Value('UNPAID'),
             ));
-
         for (var customerLoad in _customers) {
           if (!customerLoad.isValid) continue;
           final cId = customerLoad.customer?.id ?? 'unknown';
-
           final shipmentId = generateId();
-
           await db.into(db.lorryShipments).insert(LorryShipmentsCompanion(
-                id: drift.Value(shipmentId),
-                orderId: drift.Value(lorryId),
-                customerId: drift.Value(cId),
-                totalAmount: drift.Value(customerLoad.totalAmount),
+                id: drift.Value(shipmentId), orderId: drift.Value(lorryId),
+                customerId: drift.Value(cId), totalAmount: drift.Value(customerLoad.totalAmount),
               ));
-
           for (var item in customerLoad.items) {
             if (!item.isValid) continue;
             final pId = item.product?.id ?? 'unknown';
-
             final orderItemId = generateId();
-
             await db.into(db.orderItems).insert(OrderItemsCompanion(
-                  id: drift.Value(orderItemId),
-                  orderId: drift.Value(lorryId),
-                  customerId: drift.Value(cId),
-                  productId: drift.Value(pId),
-                  bags26: drift.Value(item.bags26),
-                  bags10: drift.Value(item.bags10),
-                  bags5: drift.Value(item.bags5),
-                  qtyKg: drift.Value(item.kgTotal),
-                  qtyQtl: drift.Value(item.qtlTotal),
-                  ratePerQtl: drift.Value(item.rate),
-                  amcPercent: drift.Value(item.amcPercent),
-                  amcAmount: drift.Value(item.amcAmount),
-                  gstPercent: drift.Value(item.gstPercent),
-                  gstAmount: drift.Value(item.gstAmount),
-                  lineAmount: drift.Value(item.baseAmount),
-                  netAmount: drift.Value(item.netAmount),
+                  id: drift.Value(orderItemId), orderId: drift.Value(lorryId),
+                  customerId: drift.Value(cId), productId: drift.Value(pId),
+                  bags26: drift.Value(item.bags26), bags10: drift.Value(item.bags10),
+                  bags5: drift.Value(item.bags5), qtyKg: drift.Value(item.kgTotal),
+                  qtyQtl: drift.Value(item.qtlTotal), ratePerQtl: drift.Value(item.rate),
+                  amcPercent: drift.Value(item.amcPercent), amcAmount: drift.Value(item.amcAmount),
+                  gstPercent: drift.Value(item.gstPercent), gstAmount: drift.Value(item.gstAmount),
+                  lineAmount: drift.Value(item.baseAmount), netAmount: drift.Value(item.netAmount),
                 ));
           }
         }
       });
-
-      final validCustomers =
-          _customers.where((c) => c.isValid).map((c) => c.customer!).toList();
-      final allItems = await (db.select(db.orderItems)
-            ..where((t) => t.orderId.equals(lorryId)))
-          .get();
+      final validCustomers = _customers.where((c) => c.isValid).map((c) => c.customer!).toList();
+      final allItems = await (db.select(db.orderItems)..where((t) => t.orderId.equals(lorryId))).get();
       final products = await db.select(db.products).get();
-      final lorryOrder = await (db.select(db.orders)
-            ..where((t) => t.id.equals(lorryId)))
-          .getSingle();
-
-      // Excel generation & Custom Path storage
+      final lorryOrder = await (db.select(db.orders)..where((t) => t.id.equals(lorryId))).getSingle();
       try {
-        final orderNum = _orderNumberController.text.trim().isEmpty
-            ? lorryId
-            : _orderNumberController.text.trim();
-
+        final orderNum = _orderNumberController.text.trim().isEmpty ? lorryId : _orderNumberController.text.trim();
         final path = await ExcelService.generateLorryExcel(
-          order: lorryOrder,
-          items: allItems,
-          customers: validCustomers,
-          products: products,
-          orderNumber: orderNum,
-          settings: ref.read(settingsProvider),
+          order: lorryOrder, items: allItems, customers: validCustomers,
+          products: products, orderNumber: orderNum, settings: ref.read(settingsProvider),
         );
-
-        final finalPath = await ExcelService.copyToDownloads(path,
-            customPath: ref.read(settingsProvider).excelSavePath);
-
+        await ExcelService.copyToDownloads(path, customPath: ref.read(settingsProvider).excelSavePath);
+      } catch (e) { debugPrint('Excel Save Error: $e'); }
+      if (mounted) {
+        await ConfirmDialog.showSuccess(
+          context: context, title: 'Order Saved!',
+          message: 'Lorry order saved successfully with Excel export.',
+        );
         if (mounted) {
-          SafeSnackBar.show(
-              context, '${'saved_successfully'.tr(ref)}: $finalPath');
-        }
-      } catch (e) {
-        debugPrint('Excel Save Error: $e');
-        if (mounted) {
-          SafeSnackBar.show(context, 'saved_successfully'.tr(ref));
+          Navigator.pop(context);
         }
       }
-
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      _showError('${'failed_to_save_order'.tr(ref)}: $e');
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
+    } catch (e) { _showError('Failed to save order: $e'); }
+    finally { if (mounted) setState(() => _isSaving = false); }
   }
 
   void _showError(String message) {
     SafeSnackBar.show(context, message, isError: true);
   }
 
-  void _validateAndReview() {
-    // 1. Check for at least one customer
-    if (_customers.isEmpty) {
-      _showError('valid_items_required'.tr(ref));
-      return;
+  void _goToStep(int step) {
+    if (step < 1 || step > _totalSteps) return;
+    if (step > _currentStep) {
+      if (!_validateStep()) return;
     }
-
-    for (var c in _customers) {
-      // 2. Check each customer has items
-      if (c.items.isEmpty) {
-        _showError('${c.customer?.shopName}: Add at least one item');
-        return;
-      }
-
-      for (var item in c.items) {
-        // 3. Check for valid Product
-        if (item.product == null) {
-          _showError('Select a product for all items');
-          return;
-        }
-
-        // 4. Check for Rate > 0
-        if (item.rate <= 0) {
-          _showError('Rate must be greater than 0');
-          return;
-        }
-
-        // 5. Check for Bags > 0 (at least one type)
-        if ((item.bags26 + item.bags10 + item.bags5) <= 0) {
-          _showError('Enter quantity for at least one bag type');
-          return;
-        }
-      }
-    }
-
-    setState(() => _currentStep = 2);
+    setState(() => _currentStep = step);
   }
+
+  bool _validateStep() {
+    switch (_currentStep) {
+      case 1:
+        if (_capacity <= 0) {
+          _showError('Enter a valid lorry capacity');
+          return false;
+        }
+        return true;
+      case 2:
+        if (_customers.isEmpty || _customers.every((c) => c.customer == null)) {
+          _showError('Select at least one customer');
+          return false;
+        }
+        return true;
+      case 3:
+        for (var c in _customers) {
+          for (var item in c.items) {
+            if (item.product == null) { _showError('Select a product for all items'); return false; }
+            if (item.rate <= 0) { _showError('Rate must be greater than 0'); return false; }
+            if ((item.bags26 + item.bags10 + item.bags5) <= 0) { _showError('Enter quantity for at least one bag type'); return false; }
+          }
+        }
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  // ── BUILD ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            scrollable: true,
-            title: Text('discard_changes'.tr(ref)),
-            content: Text('discard_changes_desc'.tr(ref)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text('cancel'.tr(ref)),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text('discard'.tr(ref)),
-              ),
-            ],
-          ),
+        final confirmed = await ConfirmDialog.show(
+          context: context, icon: Icons.exit_to_app,
+          title: 'Discard Changes?', message: 'You have unsaved changes. Discard them?',
+          confirmLabel: 'Discard', isDanger: true,
         );
-        if (confirmed == true && context.mounted) {
-          _resetState(); // Clean state before navigation
-          Navigator.pop(context);
-        }
+        if (confirmed == true && context.mounted) { _resetState(); Navigator.pop(context); }
       },
       child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: SafeText(
-              _currentStep == 1 ? 'build_lorry'.tr(ref) : 'review_send'.tr(ref),
-              style: const TextStyle(fontSize: 18)),
-          actions: [
-            if (_currentStep == 1) ...[
-              IconButton(
-                onPressed: _applyBulkDiscounts,
-                icon: const Icon(Icons.discount_outlined),
-                tooltip: 'Apply Bulk Discounts',
-              ),
-              TextButton.icon(
-                onPressed: _validateAndReview,
-                icon: const Icon(Icons.arrow_forward),
-                label: Text('review'.tr(ref)),
-              )
-            ] else if (_isSaving)
-              const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                      child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))))
-            else
-              FilledButton.icon(
-                onPressed: _saveLorryOrder,
-                icon: const Icon(Icons.send),
-                label: Text('save_send'.tr(ref)),
-              ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: _currentStep == 1
-            ? _buildLorryBuilder()
-            : (_currentStep == 2 || _currentStep == 3
-                ? _buildReviewPage()
-                : _buildLoadingFallback()), // Never null - prevents black screen
-        bottomNavigationBar:
-            _currentStep == 1 ? _buildLorryProgressFooter() : null,
+        backgroundColor: AppColors.background,
+        appBar: _buildAppBar(),
+        body: _buildBody(),
+        bottomNavigationBar: _buildBottomBar(),
       ),
     );
   }
 
-  Widget _buildLorryBuilder() {
-    final theme = Theme.of(context);
-    return SafePage(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      child: SafeColumn(
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Lorry Info Card
-          SafeCard(
-            color: theme.cardColor,
-            child: SafeColumn(
-              children: [
-                SafeRow(
-                  leading: TextFormField(
-                    controller: _orderNumberController,
-                    decoration: InputDecoration(
-                      labelText: 'order_no'.tr(ref),
-                      prefixIcon: const Icon(Icons.tag),
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (v) => _orderNumber = v,
-                  ),
-                  trailing: InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                          context: context,
-                          initialDate: _loadingDate,
-                          firstDate: DateTime(2024),
-                          lastDate: DateTime(2030));
-                      if (date != null) setState(() => _loadingDate = date);
-                    },
-                    child: _buildInfoItem(
-                        'loading_date'.tr(ref),
-                        DateFormat('dd MMM yyyy').format(_loadingDate),
-                        Icons.calendar_today),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _capacityController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'lorry_capacity'.tr(ref),
-                    prefixIcon: const Icon(Icons.balance),
-                    helperText: 'lorry_capacity_helper'.tr(ref),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ],
-            ),
-          ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.05, curve: Curves.easeOut),
-          const SizedBox(height: 8),
-
-          // Customers Header
-          SafeRow(
-            leading: SafeText('step_2_add_customers'.tr(ref),
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            trailing: TextButton.icon(
-              onPressed: () => _addCustomer(),
-              icon: const Icon(Icons.person_add, size: 20),
-              label: Text('add_party'.tr(ref)),
-            ),
-          ).animate().fadeIn(delay: 150.ms).slideX(begin: -0.05, curve: Curves.easeOut),
-          const SizedBox(height: 12),
-
-          // Customer Cards
-          ..._customers
-              .asMap()
-              .entries
-              .map((entry) => _buildCustomerCard(entry.key, entry.value)),
-
-          const SizedBox(height: 80),
+          const Text('New Lorry Order', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text('Step $_currentStep of $_totalSteps',
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
         ],
       ),
-    );
-  }
-
-  Widget _buildCustomerCard(int index, CustomerLoadFormData data) {
-    final db = ref.watch(databaseProvider);
-    final theme = Theme.of(context);
-
-    return SafeCard(
-      padding: EdgeInsets.zero,
-      color: theme.cardColor,
-      child: SafeColumn(
-        children: [
-          SafeListTile(
-            onTap: () => setState(() => data.isExpanded = !data.isExpanded),
-            leading: CircleAvatar(
-              backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
-              radius: 16,
-              child: Text('${index + 1}',
-                  style: TextStyle(
-                      color: theme.primaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13)),
-            ),
-            title: data.customer?.shopName ?? 'select_customer'.tr(ref),
-            subtitle: data.customer?.place,
-            trailing:
-                Icon(data.isExpanded ? Icons.expand_less : Icons.expand_more),
+      actions: [
+        if (_currentStep == 3)
+          IconButton(
+            onPressed: _applyBulkDiscounts,
+            icon: const Icon(Icons.discount_outlined),
+            tooltip: 'Apply Bulk Discounts',
           ),
-          if (data.isExpanded) ...[
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SafeColumn(
-                children: [
-                  if (data.customer == null)
-                    StreamBuilder<List<Customer>>(
-                      stream: db.select(db.customers).watch(),
-                      builder: (context, snapshot) {
-                        final allCustomers = snapshot.data ?? [];
-                        return SearchAnchor(
-                          builder: (context, controller) => SearchBar(
-                            controller: controller,
-                            padding: const WidgetStatePropertyAll<EdgeInsets>(
-                                EdgeInsets.symmetric(horizontal: 16.0)),
-                            onTap: () => controller.openView(),
-                            onChanged: (_) => controller.openView(),
-                            leading: const Icon(Icons.search),
-                            hintText: 'search_hint'.tr(ref),
-                          ),
-                          suggestionsBuilder: (context, controller) {
-                            final keyword = controller.text.toLowerCase();
-                            final selectedIds = _customers
-                                .where((cx) => cx.customer != null && cx != data)
-                                .map((cx) => cx.customer!.id)
-                                .toSet();
-                            final filtered = allCustomers.where((c) {
-                              if (selectedIds.contains(c.id)) return false;
-                              return c.shopName
-                                      .toLowerCase()
-                                      .contains(keyword) ||
-                                  (c.phone ?? '')
-                                      .toLowerCase()
-                                      .contains(keyword);
-                            }).toList();
-                            return filtered.map((c) => ListTile(
-                                  title: Text(c.shopName),
-                                  subtitle: Text(c.place ?? ''),
-                                  onTap: () => setState(() {
-                                    data.customer = c;
-                                    controller.closeView(null);
-                                  }),
-                                ));
-                          },
-                        );
-                      },
-                    ),
-                  if (data.customer != null) ...[
-                    SafeRow(
-                      leading: SafeText('rice_varieties'.tr(ref),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 14)),
-                      trailing: TextButton.icon(
-                        onPressed: () =>
-                            setState(() => data.items.add(_createFormItem())),
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
-                        label: Text('add_rice'.tr(ref)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Scrollable varieties list
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SafeColumn(
-                        children: [
-                          _buildTableHeader(),
-                          ...data.items.asMap().entries.map((itemEntry) =>
-                              _buildItemRow(
-                                  data, itemEntry.key, itemEntry.value)),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: theme.primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8)),
-                      child: SafeRow(
-                        leading: SafeText('sub_total'.tr(ref).toUpperCase(),
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: theme.primaryColor)),
-                        trailing: SafeWrap(
-                          children: [
-                            SafeText(
-                                '${data.totalQtl.toStringAsFixed(2)} ${'qtl_short'.tr(ref)}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
-                            SafeText(
-                                '${ref.watch(settingsProvider).currencySymbol}${data.totalAmount.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.primaryColor)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      style:
-                          TextButton.styleFrom(foregroundColor: AppTheme.error),
-                      onPressed: () => _removeCustomer(index),
-                      icon: const Icon(Icons.delete_outline, size: 20),
-                      label: Text('remove_party'.tr(ref)),
-                    ),
-                  ),
-                ],
-              ),
+        if (_currentStep < _totalSteps)
+          TextButton.icon(
+            onPressed: () => _goToStep(_currentStep + 1),
+            icon: const Icon(Icons.arrow_forward, size: 18),
+            label: const Text('Next'),
+          )
+        else if (_isSaving)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else
+          FilledButton.icon(
+            onPressed: _saveLorryOrder,
+            icon: const Icon(Icons.send, size: 18),
+            label: const Text('Save & Send'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
-          ],
-        ],
-      ),
-    ).animate().fadeIn().slideY(begin: 0.1);
+          ),
+        const SizedBox(width: 8),
+      ],
+    );
   }
 
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(4)),
-      child: Row(
+  Widget _buildBody() {
+    return SafePage(
+      padding: const EdgeInsets.all(16),
+      backgroundColor: AppColors.background,
+      child: Column(
         children: [
-          _columnHeader('rice_variety'.tr(ref), 140, align: TextAlign.left),
-          _columnHeader('26kg'.tr(ref), 60),
-          _columnHeader('10kg'.tr(ref), 60),
-          _columnHeader('5kg'.tr(ref), 60),
-          _columnHeader('rate_100kg'.tr(ref), 80),
-          _columnHeader('qtl'.tr(ref), 60),
-          _columnHeader('amount'.tr(ref), 100, align: TextAlign.right),
-          const SizedBox(width: 40),
+          _buildStepIndicator(),
+          const SizedBox(height: AppSpacing.xl),
+          Expanded(
+            child: _buildStepContent(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _columnHeader(String label, double width,
-      {TextAlign align = TextAlign.center}) {
-    return SizedBox(
-        width: width,
-        child: Text(label,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-            textAlign: align));
-  }
-
-  Widget _buildItemRow(
-      CustomerLoadFormData data, int index, OrderItemFormData item) {
-    final theme = Theme.of(context);
-      final productsStream = ref
-          .read(databaseProvider)
-          .select(ref.read(databaseProvider).products)
-          .get();
-
-      return FutureBuilder<List<Product>>(
-          future: productsStream,
-          builder: (context, snapshot) {
-            final list = (snapshot.data ?? [])
-                .where((p) => p.defaultPrice > 0)
-                .toList();
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 140,
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButtonFormField<Product>(
-                        initialValue: item.product,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                            contentPadding: EdgeInsets.zero,
-                            border: InputBorder.none),
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: theme.textTheme.bodyLarge?.color),
-                        items: list
-                            .map((p) => DropdownMenuItem(
-                                value: p,
-                                child: Text(p.name,
-                                    overflow: TextOverflow.ellipsis)))
-                            .toList(),
-                      onChanged: (val) => setState(() {
-                        item.product = val;
-                        item.rate = val?.defaultPrice ?? 0;
-
-                        if (!item.supports10Kg && item.bags10 > 0) {
-                          item.bags10 = 0;
-                          _bumpInputRevision('${item.hashCode}_bags10');
-                        }
-
-                        if (!item.supports5Kg && item.bags5 > 0) {
-                          item.bags5 = 0;
-                          _bumpInputRevision('${item.hashCode}_bags5');
-                        }
-
-                        _bumpInputRevision('${item.hashCode}_rate');
-                      }),
-                    ),
-                  ),
-                ),
-                _itemInput(
-                  60,
-                  item.bags26,
-                  (v) => setState(() => item.bags26 = _parseNonNegativeInt(v)),
-                  fieldKey: '${item.hashCode}_bags26',
-                ),
-                _itemInput(
-                  60,
-                  item.supports10Kg ? item.bags10 : 0,
-                  (v) => setState(() => item.bags10 = _parseNonNegativeInt(v)),
-                  fieldKey: '${item.hashCode}_bags10',
-                  enabled: item.supports10Kg,
-                ),
-                _itemInput(
-                  60,
-                  item.supports5Kg ? item.bags5 : 0,
-                  (v) => setState(() => item.bags5 = _parseNonNegativeInt(v)),
-                  fieldKey: '${item.hashCode}_bags5',
-                  enabled: item.supports5Kg,
-                ),
-                _itemInput(
-                  80,
-                  item.rate,
-                  (v) => setState(() => item.rate = _parseNonNegativeDouble(v)),
-                  fieldKey: '${item.hashCode}_rate',
-                  isDouble: true,
-                ),
-                SizedBox(
-                    width: 60,
-                    child: Text(item.qtlTotal.toStringAsFixed(2),
-                        style: const TextStyle(fontSize: 12),
-                        textAlign: TextAlign.center)),
-                SizedBox(
-                    width: 100,
-                    child: Text(
-                        '${ref.watch(settingsProvider).currencySymbol}${item.netAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.right)),
-                SizedBox(
-                    width: 40,
-                    child: IconButton(
-                        icon: const Icon(Icons.close,
-                            size: 18, color: Colors.red),
-                        onPressed: () => setState(() {
-                              _clearItemInputRevisions(item);
-                              data.items.removeAt(index);
-                            }))),
-              ],
+  Widget _buildStepIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: List.generate(_totalSteps * 2 - 1, (index) {
+          if (index.isOdd) {
+            return Expanded(
+              child: Container(
+                height: 2,
+                color: index ~/ 2 < _currentStep - 1 ? AppColors.primary : AppColors.border,
+              ),
+            );
+          }
+          final step = index ~/ 2 + 1;
+          final isActive = step <= _currentStep;
+          final isCurrent = step == _currentStep;
+          return Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive ? AppColors.primary : Colors.white,
+              border: Border.all(
+                color: isActive ? AppColors.primary : AppColors.border,
+                width: isCurrent ? 2.5 : 1.5,
+              ),
+            ),
+            child: Center(
+              child: isActive
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : Text('$step', style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    )),
             ),
           );
-        });
-  }
-
-  int _parseNonNegativeInt(String input) {
-    return math.max(0, int.tryParse(input) ?? 0);
-  }
-
-  double _parseNonNegativeDouble(String input) {
-    return math.max(0.0, double.tryParse(input) ?? 0.0);
-  }
-
-  Widget _itemInput(double width, num value, Function(String) onChanged,
-      {bool isDouble = false,
-      required String fieldKey,
-      bool enabled = true}) {
-    final theme = Theme.of(context);
-    final initial = !enabled 
-        ? '-' 
-        : (value == 0
-            ? ''
-            : (isDouble ? value.toStringAsFixed(0) : value.toString()));
-    final revision = _inputFieldRevisions[fieldKey] ?? 0;
-    return Container(
-      width: width,
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      child: TextFormField(
-        key: ValueKey('$fieldKey:$revision'),
-        initialValue: initial,
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        style: TextStyle(
-          fontSize: 13,
-          color: enabled ? null : AppTheme.grey,
-        ),
-        enabled: enabled,
-        readOnly: !enabled,
-        decoration: InputDecoration(
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-          isDense: true,
-          filled: true,
-          fillColor: enabled
-              ? (theme.inputDecorationTheme.fillColor ?? Colors.white)
-              : AppTheme.lightGrey.withValues(alpha: 0.5),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: AppTheme.lightGrey)),
-        ),
-        onChanged: onChanged,
+        }),
       ),
     );
   }
 
-  Widget _buildLorryProgressFooter() {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        border: const Border(top: BorderSide(color: AppTheme.lightGrey)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5))
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SafeProgress(
-            label: 'lorry_fill'.tr(ref),
-            value: _totalQtl,
-            max: _capacity,
-            suffix: 'QTL',
-            color: _totalQtl / _capacity > 0.9
-                ? Colors.orange
-                : theme.primaryColor,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReviewPage() {
-    final theme = Theme.of(context);
-    final validCustomers = _customers.where((c) => c.isValid).toList();
-
-    return SafePage(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      child: SafeColumn(
-        children: [
-          // Detailed Party-wise Summary
-          SafeCard(
-            color: theme.cardColor,
-            child: SafeColumn(
-              children: [
-                SafeText('party_wise_summary'.tr(ref),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 16),
-                ...validCustomers.map((c) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: SafeColumn(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Customer Header
-                          SafeCard(
-                            color: theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.3),
-                            padding: const EdgeInsets.all(8),
-                            child: SafeRow(
-                              leading: SafeText(
-                                  c.customer?.shopName ?? 'Unknown',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14)),
-                              trailing: SafeText(
-                                  '${c.totalQtl.toStringAsFixed(2)} QTL',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13)),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Detailed Items Table
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: AppTheme.lightGrey
-                                      .withValues(alpha: 0.3)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Column(
-                              children: [
-                                // Table Header
-                                const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                          flex: 3,
-                                          child: Text('Item',
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.grey,
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      Expanded(
-                                          flex: 2,
-                                          child: Text('Bags',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.grey,
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      Expanded(
-                                          flex: 2,
-                                          child: Text('Rate',
-                                              textAlign: TextAlign.right,
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.grey,
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                      Expanded(
-                                          flex: 2,
-                                          child: Text('Total',
-                                              textAlign: TextAlign.right,
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.grey,
-                                                  fontWeight:
-                                                      FontWeight.bold))),
-                                    ],
-                                  ),
-                                ),
-                                const Divider(height: 1),
-                                // Items
-                                ...c.items.where((i) => i.isValid).map((i) {
-                                  String bagsText = '';
-                                  if (i.bags26 > 0) {
-                                    bagsText += '${i.bags26}x26k ';
-                                  }
-                                  if (i.bags10 > 0) {
-                                    bagsText += '${i.bags10}x10k ';
-                                  }
-                                  if (i.bags5 > 0) {
-                                    bagsText += '${i.bags5}x5k';
-                                  }
-
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 6),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                            flex: 3,
-                                            child: Text(i.product?.name ?? '-',
-                                                style: const TextStyle(
-                                                    fontSize: 12))),
-                                        Expanded(
-                                            flex: 2,
-                                            child: Text(bagsText,
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                    fontSize: 11))),
-                                        Expanded(
-                                            flex: 2,
-                                            child: Text(
-                                                i.rate.toStringAsFixed(0),
-                                                textAlign: TextAlign.right,
-                                                style: const TextStyle(
-                                                    fontSize: 12))),
-                                        Expanded(
-                                            flex: 2,
-                                            child: Text(
-                                                i.baseAmount.toStringAsFixed(0),
-                                                textAlign: TextAlign.right,
-                                                style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.w500))),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                          if (validCustomers.indexOf(c) <
-                              validCustomers.length - 1)
-                            const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                child: Divider(thickness: 1, height: 1)),
-                        ],
-                      ),
-                    )),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          SafeCard(
-            color: theme.cardColor,
-            child: SafeColumn(
-              children: [
-                _summaryRow(
-                    'total_customers'.tr(ref), '${validCustomers.length}'),
-                _summaryRow('total_weight'.tr(ref),
-                    '${_totalQtl.toStringAsFixed(2)} QTL'),
-                _summaryRow('total_value'.tr(ref),
-                    '${ref.watch(settingsProvider).currencySymbol}${_totalAmount.toStringAsFixed(0)}',
-                    isTotal: true),
-                const Divider(height: 32),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // WhatsApp Summary Action
-          SafeCard(
-            color: theme.primaryColor.withValues(alpha: 0.1),
-            child: SafeColumn(
-              children: [
-                FilledButton.icon(
-                  onPressed: _sendWhatsAppSummary,
-                  icon: const Icon(Icons.chat),
-                  label: Text('whatsapp_summary'.tr(ref)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SafeText('whatsapp_summary_helper'.tr(ref),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12, color: AppTheme.grey)),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          TextButton.icon(
-            onPressed: () => setState(() => _currentStep = 1),
-            icon: const Icon(Icons.edit),
-            label: Text('back_to_editing'.tr(ref)),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  void _sendWhatsAppSummary() {
-    try {
-      final settings = ref.read(settingsProvider);
-      final validCustomers = _customers
-          .where((c) => c.customer != null)
-          .map((c) => c.customer!)
-          .toList();
-
-      final List<OrderItem> allItems = [];
-      for (var cLoad in _customers) {
-        if (cLoad.customer == null) continue;
-        for (var item in cLoad.items) {
-          if (item.isValid) {
-            allItems.add(OrderItem(
-              id: '',
-              orderId: '',
-              productId: item.product!.id,
-              customerId: cLoad.customer!.id,
-              bags26: item.bags26,
-              bags10: item.bags10,
-              bags5: item.bags5,
-              qtyKg: item.kgTotal,
-              qtyQtl: item.qtlTotal,
-              ratePerQtl: item.rate,
-              amcAmount: item.amcAmount,
-              amcPercent: item.amcPercent,
-              gstPercent: item.gstPercent,
-              gstAmount: item.gstAmount,
-              lineAmount: item.baseAmount,
-              netAmount: item.netAmount,
-            ));
-          }
-        }
-      }
-
-      final products = <Product>[];
-      for (var cLoad in _customers) {
-        for (var item in cLoad.items) {
-          if (item.product != null &&
-              !products.any((p) => p.id == item.product!.id)) {
-            products.add(item.product!);
-          }
-        }
-      }
-
-      final orderStub = Order(
-        id: '',
-        loadingDate: _loadingDate,
-        totalAmount: _totalAmount,
-        notes: _orderNumber,
-        lorryCapacity: _capacity,
-        amountPaid: 0,
-        paymentStatus: 'UNPAID',
-        isSynced: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        customerId: null,
-      );
-
-      WhatsAppService.sendLorrySummaryMessage(
-        customers: validCustomers,
-        order: orderStub,
-        allItems: allItems,
-        allProducts: products,
-        millContactPhone: settings.millContactPhone,
-        currencySymbol: settings.currencySymbol,
-        agentName: settings.agentName,
-        millName: settings.millName,
-      );
-    } catch (e) {
-      _showError('Error: $e');
+  Widget _buildStepContent() {
+    switch (_currentStep) {
+      case 1: return _buildStep1Details();
+      case 2: return _buildStep2Customers();
+      case 3: return _buildStep3Items();
+      case 4: return _buildStep4Review();
+      default: return _buildLoadingFallback();
     }
   }
 
-  Widget _summaryRow(String label, String value, {bool isTotal = false}) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: SafeRow(
-        leading: SafeText(label,
-            style: TextStyle(
-                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                fontSize: isTotal ? 16 : 14)),
-        trailing: SafeText(value,
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: isTotal ? 16 : 14,
-                color: isTotal ? theme.primaryColor : null)),
-      ),
-    );
-  }
+  // ── STEP 1: Date & Lorry Details ──────────────────────────────────────────
 
-  Widget _buildInfoItem(String label, String value, IconData icon) {
-    final theme = Theme.of(context);
-    return Row(
+  Widget _buildStep1Details() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: theme.primaryColor),
-        const SizedBox(width: 8),
-        Flexible(
-          child: SafeColumn(
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 12, offset: const Offset(0, 4))],
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              SafeText(label,
-                  style: const TextStyle(fontSize: 10, color: AppTheme.grey)),
-              SafeText(value,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySurface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.info_outline, size: 20, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  const Text('Lorry Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextFormField(
+                controller: _orderNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'Order Number',
+                  prefixIcon: Icon(Icons.tag),
+                ),
+                onChanged: (v) => _orderNumber = v,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              InkWell(
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context, initialDate: _loadingDate,
+                    firstDate: DateTime(2024), lastDate: DateTime(2030),
+                  );
+                  if (date != null) setState(() => _loadingDate = date);
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Loading Date',
+                    prefixIcon: Icon(Icons.calendar_today),
+                  ),
+                  child: Text(DateFormat('dd MMM yyyy').format(_loadingDate),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _capacityController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Lorry Capacity (QTL)',
+                  prefixIcon: Icon(Icons.balance),
+                  helperText: 'Standard lorry capacity is 120 QTL',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
             ],
           ),
         ),
       ],
     );
   }
-}
 
-class CustomerLoadFormData {
-  Customer? customer;
-  final List<OrderItemFormData> items;
-  bool isExpanded;
-  String paymentStatus;
-  DateTime? dueDate;
+  // ── STEP 2: Select Customers ─────────────────────────────────────────────
 
-  CustomerLoadFormData(
-      {this.customer,
-      required this.items,
-      this.isExpanded = true,
-      this.paymentStatus = 'UNPAID',
-      this.dueDate});
+  Widget _buildStep2Customers() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            const Text('Select Customers', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => _addCustomer(),
+              icon: const Icon(Icons.person_add, size: 20),
+              label: const Text('Add Customer'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        ..._customers.asMap().entries.map((entry) => _buildCustomerSelector(entry.key, entry.value)),
+        if (_totalQtl > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.md),
+            child: CapacityProgressCard(
+              currentQtl: _totalQtl,
+              maxCapacity: _capacity,
+            ),
+          ),
+      ],
+    );
+  }
 
-  double get totalQtl =>
-      items.fold(0, (sum, item) => sum + (item.isValid ? item.qtlTotal : 0));
-  double get totalAmount =>
-      items.fold(0, (sum, item) => sum + (item.isValid ? item.netAmount : 0));
-  bool get isValid => customer != null && items.any((item) => item.isValid);
+  Widget _buildCustomerSelector(int index, CustomerLoadFormData data) {
+    final db = ref.watch(databaseProvider);
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: data.customer != null
+                  ? AppColors.primarySurface
+                  : AppColors.warningLight,
+              radius: 18,
+              child: Text(
+                data.customer != null ? data.customer!.shopName[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: data.customer != null ? AppColors.primary : AppColors.warning,
+                  fontWeight: FontWeight.bold, fontSize: 16,
+                ),
+              ),
+            ),
+            title: Text(
+              data.customer?.shopName ?? 'Select Customer',
+              style: TextStyle(
+                fontWeight: data.customer != null ? FontWeight.w600 : FontWeight.w400,
+                color: data.customer != null ? AppColors.textPrimary : AppColors.textHint,
+              ),
+            ),
+            subtitle: data.customer?.place != null
+                ? Text(data.customer!.place!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))
+                : null,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (data.customer != null && _customers.length > 1)
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.error),
+                    onPressed: () => _removeCustomer(index),
+                  ),
+                Icon(data.isExpanded ? Icons.expand_less : Icons.expand_more, color: AppColors.textSecondary),
+              ],
+            ),
+            onTap: () => setState(() => data.isExpanded = !data.isExpanded),
+          ),
+          if (data.isExpanded && data.customer == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: StreamBuilder<List<Customer>>(
+                stream: db.select(db.customers).watch(),
+                builder: (context, snapshot) {
+                  final allCustomers = snapshot.data ?? [];
+                  return SearchAnchor(
+                    builder: (context, controller) => SearchBar(
+                      controller: controller,
+                      padding: const WidgetStatePropertyAll<EdgeInsets>(EdgeInsets.symmetric(horizontal: 16)),
+                      onTap: () => controller.openView(),
+                      onChanged: (_) => controller.openView(),
+                      leading: const Icon(Icons.search),
+                      hintText: 'Search customer...',
+                    ),
+                    suggestionsBuilder: (context, controller) {
+                      final keyword = controller.text.toLowerCase();
+                      final selectedIds = _customers
+                          .where((cx) => cx.customer != null && cx != data)
+                          .map((cx) => cx.customer!.id).toSet();
+                      final filtered = allCustomers.where((c) {
+                        if (selectedIds.contains(c.id)) return false;
+                        return c.shopName.toLowerCase().contains(keyword) ||
+                            (c.phone ?? '').toLowerCase().contains(keyword);
+                      }).toList();
+                      return filtered.map((c) => ListTile(
+                        title: Text(c.shopName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(c.place ?? ''),
+                        trailing: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.primary),
+                        onTap: () {
+                          setState(() { data.customer = c; });
+                          controller.closeView(null);
+                        },
+                      ));
+                    },
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── STEP 3: Add Items ────────────────────────────────────────────────────
+
+  Widget _buildStep3Items() {
+    if (_customers.every((c) => c.customer == null)) {
+      return const Center(child: Text('Please select customers first.', style: TextStyle(color: AppColors.textSecondary)));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CapacityProgressCard(
+          currentQtl: _totalQtl,
+          maxCapacity: _capacity,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        ..._customers.asMap().entries.map((entry) => _buildCustomerItemsCard(entry.key, entry.value)),
+      ],
+    );
+  }
+
+  Widget _buildCustomerItemsCard(int index, CustomerLoadFormData data) {
+    if (data.customer == null) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.md)),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.white,
+                  child: Text('${index + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(data.customer!.shopName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      if (data.customer!.place != null)
+                        Text(data.customer!.place!, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                Text('${data.totalQtl.toStringAsFixed(1)} QTL',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
+              ],
+            ),
+          ),
+          ...data.items.asMap().entries.map((itemEntry) => _buildItemCard(data, itemEntry.key, itemEntry.value)),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => setState(() => data.items.add(_createFormItem())),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Variety', style: TextStyle(fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+                const Spacer(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemCard(CustomerLoadFormData data, int index, OrderItemFormData item) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _buildProductDropdown(item),
+                ),
+                const SizedBox(width: 8),
+                if (item.product != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: item.effectiveGstRate > 0 ? AppColors.warningLight : AppColors.infoLight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      item.effectiveGstRate > 0 ? 'GST ${(item.effectiveGstRate * 100).toInt()}%' : 'GST 0%',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                          color: item.effectiveGstRate > 0 ? AppColors.warning : AppColors.textSecondary),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18, color: AppColors.error),
+                  onPressed: () {
+                    _clearItemInputRevisions(item);
+                    setState(() => data.items.removeAt(index));
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                _bagInput('26kg', item.bags26, (v) => setState(() => item.bags26 = _parseNonNegativeInt(v)),
+                    fieldKey: '${item.hashCode}_bags26'),
+                const SizedBox(width: 6),
+                if (item.supports10Kg)
+                  _bagInput('10kg', item.bags10, (v) => setState(() => item.bags10 = _parseNonNegativeInt(v)),
+                      fieldKey: '${item.hashCode}_bags10')
+                else
+                  _disabledBagInput('10kg'),
+                const SizedBox(width: 6),
+                if (item.supports5Kg)
+                  _bagInput('5kg', item.bags5, (v) => setState(() => item.bags5 = _parseNonNegativeInt(v)),
+                      fieldKey: '${item.hashCode}_bags5')
+                else
+                  _disabledBagInput('5kg'),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('${item.hashCode}_rate:${_inputFieldRevisions['${item.hashCode}_rate'] ?? 0}'),
+                    initialValue: item.rate == 0 ? '' : item.rate.toStringAsFixed(0),
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Rate',
+                      hintStyle: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                    ),
+                    onChanged: (v) => setState(() => item.rate = _parseNonNegativeDouble(v)),
+                  ),
+                ),
+              ],
+            ),
+            if (item.isValid)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    Text('${item.qtlTotal.toStringAsFixed(2)} QTL', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    const Spacer(),
+                    Text('${ref.watch(settingsProvider).currencySymbol}${item.netAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductDropdown(OrderItemFormData item) {
+    final productsStream = ref.read(databaseProvider).select(ref.read(databaseProvider).products).get();
+    return FutureBuilder<List<Product>>(
+      future: productsStream,
+      builder: (context, snapshot) {
+        final list = (snapshot.data ?? []).where((p) => p.defaultPrice > 0).toList();
+          return DropdownButtonHideUnderline(
+          child: DropdownButtonFormField<Product>(
+            initialValue: item.product,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              border: InputBorder.none,
+              filled: false,
+            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            hint: const Text('Select variety', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+            items: list.map((p) => DropdownMenuItem(
+              value: p,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(child: Text(p.name, overflow: TextOverflow.ellipsis)),
+                  if (p.isGalaxy)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.star, size: 12, color: AppColors.secondary),
+                    ),
+                ],
+              ),
+            )).toList(),
+            onChanged: (val) => setState(() {
+              item.product = val;
+              item.rate = val?.defaultPrice ?? 0;
+              if (!item.supports10Kg && item.bags10 > 0) { item.bags10 = 0; _bumpInputRevision('${item.hashCode}_bags10'); }
+              if (!item.supports5Kg && item.bags5 > 0) { item.bags5 = 0; _bumpInputRevision('${item.hashCode}_bags5'); }
+              _bumpInputRevision('${item.hashCode}_rate');
+            }),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _bagInput(String label, int value, ValueChanged<String> onChanged, {required String fieldKey}) {
+    return Expanded(
+      child: TextFormField(
+        key: ValueKey('$fieldKey:${_inputFieldRevisions[fieldKey] ?? 0}'),
+        initialValue: value == 0 ? '' : value.toString(),
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          hintText: label,
+          hintStyle: const TextStyle(fontSize: 10, color: AppColors.textHint),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _disabledBagInput(String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.border.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(label, textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+      ),
+    );
+  }
+
+  int _parseNonNegativeInt(String input) => math.max(0, int.tryParse(input) ?? 0);
+  double _parseNonNegativeDouble(String input) => math.max(0.0, double.tryParse(input) ?? 0.0);
+
+  // ── STEP 4: Review ──────────────────────────────────────────────────────
+
+  Widget _buildStep4Review() {
+    final validCustomers = _customers.where((c) => c.isValid).toList();
+    final settings = ref.watch(settingsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CapacityProgressCard(currentQtl: _totalQtl, maxCapacity: _capacity),
+        const SizedBox(height: AppSpacing.lg),
+        ...validCustomers.map((c) => _buildReviewCustomerCard(c, settings)),
+        const SizedBox(height: AppSpacing.lg),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: const Offset(0, 2))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _summaryRow('Order Date', DateFormat('dd MMM yyyy').format(_loadingDate)),
+              const Divider(height: 16),
+              _summaryRow('Total Customers', '${validCustomers.length}'),
+              const Divider(height: 16),
+              _summaryRow('Total Weight', '${_totalQtl.toStringAsFixed(2)} QTL'),
+              const Divider(height: 16),
+              _summaryRow('Total Amount', '${settings.currencySymbol}${_totalAmount.toStringAsFixed(0)}', isTotal: true),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewCustomerCard(CustomerLoadFormData data, AppSettings settings) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.md)),
+            ),
+            child: Row(
+              children: [
+                Text(data.customer?.shopName ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: AppColors.primary)),
+                const Spacer(),
+                Text('${data.totalQtl.toStringAsFixed(2)} QTL', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
+              ],
+            ),
+          ),
+          ...data.items.where((i) => i.isValid).map((i) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(flex: 3, child: Text(i.product?.name ?? '-', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                Expanded(flex: 2, child: Text('${i.bags26 > 0 ? '${i.bags26}x26 ' : ''}${i.bags10 > 0 ? '${i.bags10}x10 ' : ''}${i.bags5 > 0 ? '${i.bags5}x5' : ''}',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary), textAlign: TextAlign.center)),
+                Expanded(flex: 2, child: Text('${settings.currencySymbol}${i.rate.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 12), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text('${settings.currencySymbol}${i.netAmount.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {bool isTotal = false}) {
+    return Row(
+      children: [
+        Text(label, style: TextStyle(fontSize: isTotal ? 16 : 14, fontWeight: isTotal ? FontWeight.bold : FontWeight.w400, color: AppColors.textSecondary)),
+        const Spacer(),
+        Text(value, style: TextStyle(fontSize: isTotal ? 16 : 14, fontWeight: FontWeight.bold, color: isTotal ? AppColors.primary : AppColors.textPrimary)),
+      ],
+    );
+  }
+
+  // ── BOTTOM BAR ──────────────────────────────────────────────────────────
+
+  Widget? _buildBottomBar() {
+    if (_currentStep == 4) return null;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 10, offset: const Offset(0, -5))],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CapacityProgressCard(currentQtl: _totalQtl, maxCapacity: _capacity, label: 'Lorry Fill Progress'),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  if (_currentStep > 1)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _goToStep(_currentStep - 1),
+                        icon: const Icon(Icons.arrow_back, size: 18),
+                        label: const Text('Back'),
+                      ),
+                    ),
+                  if (_currentStep > 1) const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: () => _goToStep(_currentStep + 1),
+                      icon: Icon(_currentStep == _totalSteps - 1 ? Icons.check : Icons.arrow_forward, size: 18),
+                      label: Text(_currentStep == _totalSteps - 1 ? 'Review & Save' : 'Next'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -550,8 +550,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
                     // Variety-wise QTL summary
                     const Divider(height: 32),
-                    SafeText('RICE VARIETY SUMMARY',
-                        style: const TextStyle(
+                    const SafeText('RICE VARIETY SUMMARY',
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             letterSpacing: 0.5)),

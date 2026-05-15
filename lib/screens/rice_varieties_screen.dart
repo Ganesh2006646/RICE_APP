@@ -492,10 +492,10 @@ class RiceVarietiesScreen extends ConsumerWidget {
                   ],
                   if (!product.isGalaxy) ...[
                     const SizedBox(height: 4),
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.block, size: 14, color: AppTheme.error),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 4),
                         Text(
                           'Discount Excluded',
                           style: TextStyle(

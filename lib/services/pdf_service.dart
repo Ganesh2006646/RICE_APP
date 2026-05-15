@@ -185,7 +185,7 @@ class PdfService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
-                      pw.Text('Thanks & Regards', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey800)),
+                      pw.Text('Thanks & Regards', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey800)),
                       pw.SizedBox(height: 4),
                       pw.Text('by $agentName', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
                     ],
