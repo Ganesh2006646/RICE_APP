@@ -41,7 +41,23 @@ class ProductSeedingService {
 
   static bool _isExcludedFromDiscount(String name) {
     final upper = name.toUpperCase();
-    return upper == 'KARTHIKA BLUE' || upper == 'KARTHIKA BROWN' || upper == 'RGL';
+    return upper.contains('KARTHIKA') || upper.contains('RGL');
+  }
+
+  /// Run this to forcibly apply the Galaxy flag rules to all existing varieties
+  static Future<void> applyGalaxyFlagToExisting(AppDatabase db) async {
+    final allProducts = await db.select(db.products).get();
+    await db.batch((batch) {
+      for (final p in allProducts) {
+        final isGalaxy = !_isExcludedFromDiscount(p.name);
+        if (p.isGalaxy != isGalaxy) {
+          batch.replace(
+            db.products,
+            p.copyWith(isGalaxy: isGalaxy),
+          );
+        }
+      }
+    });
   }
 
   static ProductsCompanion _p(

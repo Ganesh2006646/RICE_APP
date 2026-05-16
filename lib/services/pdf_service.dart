@@ -29,17 +29,54 @@ class PdfService {
       // Logo not found — continue without it
     }
 
+    pw.Font? teluguFont;
+    try {
+      final fontData = await rootBundle.load('assets/fonts/NotoSansTelugu-Regular.ttf');
+      teluguFont = pw.Font.ttf(fontData);
+    } catch (_) {}
+
     final dateStr = DateFormat('dd-MMM-yyyy').format(order.loadingDate);
     final nf = NumberFormat('#,##0', 'en_US');
 
     double totalQtl = 0;
-    double totalAmt = 0;
+    double totalGross = 0;
+    double totalDiscount = 0;
+    double totalPacking = 0;
+    double totalAMC = 0;
+    double totalGST = 0;
+    double totalNet = 0;
 
     // Pre-compute totals (must be outside the pw.Page builder)
     for (final item in items.where(
         (i) => i.bags26 > 0 || i.bags10 > 0 || i.bags5 > 0)) {
       totalQtl += item.qtyQtl;
-      totalAmt += item.netAmount;
+      totalNet += item.netAmount;
+      totalAMC += item.amcAmount;
+      totalGST += item.gstAmount;
+
+      final product = products.firstWhere(
+        (p) => p.id == item.productId,
+        orElse: () => Product(
+          id: '',
+          name: 'Rice',
+          defaultPrice: 0,
+          gstRateDefault: 0,
+          unit: 'qtl',
+          isGalaxy: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      
+      final packingForThisItem = item.lineAmount - (item.qtyQtl * item.ratePerQtl);
+      totalPacking += packingForThisItem;
+
+      if (product.defaultPrice > item.ratePerQtl) {
+        totalDiscount += (product.defaultPrice - item.ratePerQtl) * item.qtyQtl;
+        totalGross += product.defaultPrice * item.qtyQtl;
+      } else {
+        totalGross += item.ratePerQtl * item.qtyQtl;
+      }
     }
 
     pdf.addPage(
@@ -47,6 +84,24 @@ class PdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(28),
         build: (pw.Context ctx) {
+          pw.Widget buildTotalRow(String label, String value, {bool isBold = false, PdfColor? color}) {
+            return pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(label, style: pw.TextStyle(fontSize: 10, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal, color: PdfColors.grey700)),
+                  pw.SizedBox(width: 16),
+                  pw.Container(
+                    width: 80,
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Text(value, style: pw.TextStyle(fontSize: 10, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color ?? PdfColors.black)),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
@@ -67,6 +122,17 @@ class PdfService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
+                        if (teluguFont != null) ...[
+                          pw.Text(
+                            '|| ఒకసారి రుచి చూస్తే జీవితకాలం మరవలేరు ||',
+                            style: pw.TextStyle(
+                              font: teluguFont,
+                              color: PdfColors.green900,
+                              fontSize: 12,
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                        ],
                         pw.Text(
                           millName,
                           style: pw.TextStyle(
@@ -113,7 +179,6 @@ class PdfService {
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // Bill To
                   pw.Expanded(
                     flex: 3,
                     child: pw.Column(
@@ -294,38 +359,39 @@ class PdfService {
                   borderRadius: pw.BorderRadius.circular(6),
                   border: pw.Border.all(color: PdfColors.green200),
                 ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Expanded(
-                      flex: 3,
-                      child: pw.Text('Total Quantity:',
-                          textAlign: pw.TextAlign.right,
-                          style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold,
-                              fontSize: 11,
-                              color: PdfColors.grey700)),
-                    ),
-                    pw.SizedBox(width: 8),
-                    pw.Text('${totalQtl.toStringAsFixed(2)} QTL',
-                        style: pw.TextStyle(
-                            fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.SizedBox(width: 24),
-                    pw.Expanded(
-                      flex: 2,
-                      child: pw.Text('Grand Total:',
-                          textAlign: pw.TextAlign.right,
-                          style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold,
-                              fontSize: 11,
-                              color: PdfColors.grey700)),
-                    ),
-                    pw.SizedBox(width: 8),
-                    pw.Text(nf.format(totalAmt),
-                        style: pw.TextStyle(
-                            fontWeight: pw.FontWeight.bold,
-                            fontSize: 14,
-                            color: PdfColors.green900)),
+                    buildTotalRow('Subtotal (Base):', nf.format(totalGross), isBold: false),
+                    if (totalDiscount > 0)
+                      buildTotalRow('Bulk Discount:', '-${nf.format(totalDiscount)}', isBold: false, color: PdfColors.red700),
+                    if (totalPacking > 0)
+                      buildTotalRow('Packing Surcharge:', '+${nf.format(totalPacking)}', isBold: false),
+                    if (totalAMC > 0)
+                      buildTotalRow('AMC (1%):', '+${nf.format(totalAMC)}', isBold: false),
+                    if (totalGST > 0)
+                      buildTotalRow('GST (5%):', '+${nf.format(totalGST)}', isBold: false),
+                    pw.Divider(color: PdfColors.green200),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text('Total Quantity: ${totalQtl.toStringAsFixed(2)} QTL', 
+                              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                        ),
+                        pw.SizedBox(width: 8),
+                        pw.Flexible(
+                          child: pw.Row(
+                            mainAxisSize: pw.MainAxisSize.min,
+                            children: [
+                              pw.Text('Grand Total:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.grey700)),
+                              pw.SizedBox(width: 8),
+                              pw.Text(nf.format(totalNet), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: PdfColors.green900)),
+                            ]
+                          )
+                        )
+                      ]
+                    )
                   ],
                 ),
               ),
@@ -339,12 +405,36 @@ class PdfService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text(
-                    'Auto generated document. Data may be subject to rounding.',
-                    style: pw.TextStyle(
-                        fontSize: 8,
-                        color: PdfColors.grey500,
-                        fontStyle: pw.FontStyle.italic),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        '"Quality You Can Trust. Taste You Will Love!"',
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green800, fontStyle: pw.FontStyle.italic),
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'Thank you for your business. Prompt payments are highly appreciated!',
+                        style: pw.TextStyle(fontSize: 8, color: PdfColors.green900, fontWeight: pw.FontWeight.bold),
+                      ),
+                      pw.SizedBox(height: 8),
+                      pw.Text(
+                        'CASH DISCOUNT:',
+                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800),
+                      ),
+                      pw.Text(
+                        'PAYMENT WITHIN 07 DAYS: 2% CD\nPAYMENT WITHIN 15 DAYS: 1.5% CD\nPAYMENT WITHIN 20 DAYS: 1% CD\nABOVE 20 DAYS: NO CASH DISCOUNT\nAFTER 30 DAYS: 18% INTEREST WILL BE CALCULATED',
+                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.orange900),
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        'Auto generated document. Data may be subject to rounding.',
+                        style: pw.TextStyle(
+                            fontSize: 8,
+                            color: PdfColors.grey500,
+                            fontStyle: pw.FontStyle.italic),
+                      ),
+                    ]
                   ),
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.center,

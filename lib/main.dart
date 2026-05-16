@@ -35,6 +35,8 @@ void main() async {
 
         // Seed initial products if empty
         await ProductSeedingService.seedInitialProducts(db);
+        // Ensure all existing varieties are properly flagged (Galaxy except Karthika/RGL)
+        await ProductSeedingService.applyGalaxyFlagToExisting(db);
 
         runApp(ProviderScope(
           overrides: [
@@ -60,6 +62,8 @@ void main() async {
   );
 }
 
+final _navigatorKey = GlobalKey<NavigatorState>();
+
 /// Root application widget - now responds to settings changes
 class RiceAgentApp extends ConsumerWidget {
   const RiceAgentApp({super.key});
@@ -79,6 +83,7 @@ class RiceAgentApp extends ConsumerWidget {
     );
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Galaxy E-Orders',
       debugShowCheckedModeBanner: false,
       theme: scaledTheme,

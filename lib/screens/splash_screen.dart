@@ -22,11 +22,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1300),
+      duration: const Duration(milliseconds: 600), // Faster animation
     );
     _fadeIn = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0, 0.75, curve: Curves.easeOut),
+      curve: const Interval(0, 1.0, curve: Curves.easeOut),
     );
     _slideUp = Tween<Offset>(
       begin: const Offset(0, 0.06),
@@ -34,7 +34,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.15, 0.9, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -49,14 +49,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _navigateToHome() async {
-    await Future.delayed(const Duration(milliseconds: 2200));
+    // Shorter delay before transitioning
+    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
 
     await Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
             const HomeScreen(),
-        transitionDuration: const Duration(milliseconds: 520),
+        transitionDuration: const Duration(milliseconds: 300),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),

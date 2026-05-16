@@ -1720,19 +1720,28 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ),
             child: Row(
               children: [
-                const Text('Customer Total',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Text('${data.totalQtl.toStringAsFixed(2)} QTL',
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary)),
+                Expanded(
+                  child: Text('Customer Total',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+                Flexible(
+                  child: Text('${data.totalQtl.toStringAsFixed(2)} QTL',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
+                      textAlign: TextAlign.right,
+                      overflow: TextOverflow.ellipsis),
+                ),
                 const SizedBox(width: 12),
-                Text('$cc${data.totalAmount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary)),
+                Flexible(
+                  child: Text('$cc${data.totalAmount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary),
+                      textAlign: TextAlign.right,
+                      overflow: TextOverflow.ellipsis),
+                ),
               ],
             ),
           ),
