@@ -42,19 +42,15 @@ class CustomersScreen extends ConsumerStatefulWidget {
   ConsumerState<CustomersScreen> createState() => _CustomersScreenState();
 }
 
-enum _CustomerFilter { all, name, place, phone }
-
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   final _searchController = TextEditingController();
-  final _scrollController = ScrollController();
   String _searchQuery = '';
-  _CustomerFilter _filter = _CustomerFilter.all;
-  final Map<String, double> _letterOffsets = {};
+
+  Stream<List<Customer>>? _customersStream;
 
   @override
   void dispose() {
     _searchController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -62,6 +58,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
     final theme = Theme.of(context);
+    _customersStream ??= db.select(db.customers).watch();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -93,32 +90,17 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   _searchController.clear();
                   setState(() => _searchQuery = '');
                 },
-                onChanged: (value) =>
-                    setState(() => _searchQuery = value.toLowerCase()),
+                onChanged: (value) {
+                  // Trim + collapse whitespace to handle " AKKAYYAPALEM " vs "AKKAYYAPALEM"
+                  setState(() => _searchQuery =
+                      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '));
+                },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _filterChip(
-                        'All', _CustomerFilter.all, Icons.all_inclusive),
-                    const SizedBox(width: 8),
-                    _filterChip('Name', _CustomerFilter.name, Icons.store),
-                    const SizedBox(width: 8),
-                    _filterChip(
-                        'Place', _CustomerFilter.place, Icons.location_on),
-                    const SizedBox(width: 8),
-                    _filterChip('Phone', _CustomerFilter.phone, Icons.phone),
-                  ],
-                ),
-              ),
-            ),
+
             Expanded(
               child: StreamBuilder<List<Customer>>(
-                stream: db.select(db.customers).watch(),
+                stream: _customersStream,
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
@@ -139,37 +121,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   });
 
                   if (_searchQuery.isNotEmpty) {
+                    final q = _searchQuery; // already trimmed+lowercased
                     customers = customers.where((c) {
-                      switch (_filter) {
-                        case _CustomerFilter.name:
-                          return c.shopName
-                                  .toLowerCase()
-                                  .contains(_searchQuery) ||
-                              (c.ownerName ?? '')
-                                  .toLowerCase()
-                                  .contains(_searchQuery);
-                        case _CustomerFilter.place:
-                          return (c.place ?? '')
-                              .toLowerCase()
-                              .contains(_searchQuery);
-                        case _CustomerFilter.phone:
-                          return (c.phone ?? '')
-                              .toLowerCase()
-                              .contains(_searchQuery);
-                        case _CustomerFilter.all:
-                          return c.shopName
-                                  .toLowerCase()
-                                  .contains(_searchQuery) ||
-                              (c.phone ?? '')
-                                  .toLowerCase()
-                                  .contains(_searchQuery) ||
-                              (c.ownerName ?? '')
-                                  .toLowerCase()
-                                  .contains(_searchQuery) ||
-                              (c.place ?? '')
-                                  .toLowerCase()
-                                  .contains(_searchQuery);
-                      }
+                      // Normalise each field the same way the query was normalised
+                      String norm(String? s) =>
+                          (s ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+                      return norm(c.shopName).contains(q) ||
+                          norm(c.phone).contains(q) ||
+                          norm(c.ownerName).contains(q) ||
+                          norm(c.place).contains(q) ||
+                          norm(c.tinGst).contains(q);
                     }).toList();
                   }
 
@@ -177,85 +138,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     return _buildEmptyState();
                   }
 
-                  final groupedCustomers = <String, List<Customer>>{};
-                  for (var c in customers) {
-                    final place = c.place?.trim().toUpperCase() ?? '';
-                    final letter = place.isNotEmpty ? place[0] : '#';
-                    final key =
-                        RegExp(r'[A-Z]').hasMatch(letter) ? letter : '#';
-                    groupedCustomers.putIfAbsent(key, () => []).add(c);
-                  }
-                  final sortedKeys = groupedCustomers.keys.toList()..sort();
-
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    _rebuildLetterOffsets();
-                  });
-
-                  return Stack(
-                    children: [
-                      ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 40, 80),
-                        itemCount: sortedKeys.length,
-                        itemBuilder: (context, index) {
-                          final letter = sortedKeys[index];
-                          final group = groupedCustomers[letter]!;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                    top: 16.0, bottom: 8.0, left: 4.0),
-                                child: Text(letter,
-                                    style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.grey)),
-                              ),
-                              ...group.map((customer) =>
-                                  _buildCustomerCard(customer, db)),
-                            ],
-                          );
-                        },
-                      ),
-                      if (_searchQuery.isEmpty && sortedKeys.length > 2)
-                        Positioned(
-                          right: 4,
-                          top: 0,
-                          bottom: 0,
-                          child: Center(
-                            child: SingleChildScrollView(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 4),
-                                decoration: BoxDecoration(
-                                  color: theme.cardColor.withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: sortedKeys.map((letter) {
-                                    return InkWell(
-                                      onTap: () =>
-                                          _scrollToLetter(letter, sortedKeys),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 4.0, horizontal: 4.0),
-                                        child: Text(letter,
-                                            style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: theme.primaryColor)),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                    itemCount: customers.length,
+                    itemBuilder: (context, index) {
+                      return _buildCustomerCard(customers[index], db);
+                    },
                   );
                 },
               ),
@@ -266,49 +154,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     );
   }
 
-  Widget _filterChip(String label, _CustomerFilter filter, IconData icon) {
-    final theme = Theme.of(context);
-    final isSelected = _filter == filter;
-    return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              size: 14, color: isSelected ? Colors.white : theme.primaryColor),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, color: isSelected ? Colors.white : null)),
-        ],
-      ),
-      selected: isSelected,
-      onSelected: (_) => setState(() => _filter = filter),
-      selectedColor: theme.primaryColor,
-      checkmarkColor: Colors.white,
-      showCheckmark: false,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
 
-  void _rebuildLetterOffsets() {
-    if (!_scrollController.hasClients) return;
-    final offset = _scrollController.offset;
-    _letterOffsets.clear();
-    _letterOffsets['_last'] = offset;
-  }
-
-  void _scrollToLetter(String letter, List<String> sortedKeys) {
-    final index = sortedKeys.indexOf(letter);
-    if (index < 0 || !_scrollController.hasClients) return;
-    final estimatedOffset = index * 120.0;
-    _scrollController.animateTo(
-      estimatedOffset,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-  }
 
   Widget _buildEmptyState() {
     return EmptyStateWidget(
@@ -366,66 +212,72 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     );
 
     if (confirmed == true) {
-      // Auto-backup before destructive operation
-      await BackupService.backupDatabase();
+      try {
+        // Auto-backup before destructive operation
+        await BackupService.backupDatabase();
 
-      // Background consolidated backup
-      await ExcelService.appendDeletedCustomer(customer,
-          customPath: ref.read(settingsProvider).excelSavePath);
+        // Background consolidated backup
+        await ExcelService.appendDeletedCustomer(customer,
+            customPath: ref.read(settingsProvider).excelSavePath);
 
-      await db.transaction(() async {
-        // 1. Find all orders this customer is part of
-        final affectedShipments = await (db.select(db.lorryShipments)
-              ..where((tbl) => tbl.customerId.equals(customer.id)))
-            .get();
-        final affectedOrderIds =
-            affectedShipments.map((s) => s.orderId).toSet();
-
-        // 2. Delete customer's order items and shipments
-        await (db.delete(db.orderItems)
-              ..where((tbl) => tbl.customerId.equals(customer.id)))
-            .go();
-        await (db.delete(db.lorryShipments)
-              ..where((tbl) => tbl.customerId.equals(customer.id)))
-            .go();
-
-        // 3. Recalculate totals for each affected order
-        for (final orderId in affectedOrderIds) {
-          final remainingItems = await (db.select(db.orderItems)
-                ..where((tbl) => tbl.orderId.equals(orderId)))
+        await db.transaction(() async {
+          // 1. Find all orders this customer is part of
+          final affectedShipments = await (db.select(db.lorryShipments)
+                ..where((tbl) => tbl.customerId.equals(customer.id)))
               .get();
+          final affectedOrderIds =
+              affectedShipments.map((s) => s.orderId).toSet();
 
-          if (remainingItems.isEmpty) {
-            // Order is now empty — delete it and its payments
-            await (db.delete(db.payments)
+          // 2. Delete customer's order items and shipments
+          await (db.delete(db.orderItems)
+                ..where((tbl) => tbl.customerId.equals(customer.id)))
+              .go();
+          await (db.delete(db.lorryShipments)
+                ..where((tbl) => tbl.customerId.equals(customer.id)))
+              .go();
+
+          // 3. Recalculate totals for each affected order
+          for (final orderId in affectedOrderIds) {
+            final remainingItems = await (db.select(db.orderItems)
                   ..where((tbl) => tbl.orderId.equals(orderId)))
-                .go();
-            await (db.delete(db.orders)..where((tbl) => tbl.id.equals(orderId)))
-                .go();
-          } else {
-            // Recalculate total from remaining items
-            final newTotal =
-                remainingItems.fold(0.0, (sum, item) => sum + item.netAmount);
-            await (db.update(db.orders)..where((tbl) => tbl.id.equals(orderId)))
-                .write(OrdersCompanion(
-              totalAmount: drift.Value(newTotal),
-              updatedAt: drift.Value(DateTime.now()),
-            ));
+                .get();
+
+            if (remainingItems.isEmpty) {
+              // Order is now empty — delete it and its payments
+              await (db.delete(db.payments)
+                    ..where((tbl) => tbl.orderId.equals(orderId)))
+                  .go();
+              await (db.delete(db.orders)..where((tbl) => tbl.id.equals(orderId)))
+                  .go();
+            } else {
+              // Recalculate total from remaining items
+              final newTotal =
+                  remainingItems.fold(0.0, (sum, item) => sum + item.netAmount);
+              await (db.update(db.orders)..where((tbl) => tbl.id.equals(orderId)))
+                  .write(OrdersCompanion(
+                totalAmount: drift.Value(newTotal),
+                updatedAt: drift.Value(DateTime.now()),
+              ));
+            }
           }
+
+          // 4. Delete customer prices and the customer itself
+          await (db.delete(db.customerPrices)
+                ..where((tbl) => tbl.customerId.equals(customer.id)))
+              .go();
+          await (db.delete(db.customers)
+                ..where((tbl) => tbl.id.equals(customer.id)))
+              .go();
+        });
+
+        if (mounted) {
+          SafeSnackBar.show(context, 'deleted'.tr(ref));
         }
-
-        // 4. Delete customer prices and the customer itself
-        await (db.delete(db.customerPrices)
-              ..where((tbl) => tbl.customerId.equals(customer.id)))
-            .go();
-        await (db.delete(db.customers)
-              ..where((tbl) => tbl.id.equals(customer.id)))
-            .go();
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('deleted'.tr(ref))));
+      } catch (e) {
+        if (mounted) {
+          SafeSnackBar.show(context, '${'failed_to_delete'.tr(ref)}: $e',
+              isError: true);
+        }
       }
     }
   }

@@ -54,7 +54,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
               itemCount: products.length,
               itemBuilder: (context, index) {
                 final product = products[index];

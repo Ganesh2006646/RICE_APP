@@ -147,13 +147,13 @@ class _Dashboard extends ConsumerWidget {
                           currencySymbol: settings.currencySymbol,
                         ),
                         const SizedBox(height: AppSpacing.xl),
-                        const SectionHeader(title: 'Gallery'),
-                        const SizedBox(height: AppSpacing.md),
-                        _GalleryButton(),
-                        const SizedBox(height: AppSpacing.xl),
                         const SectionHeader(title: 'Business Pulse'),
                         const SizedBox(height: AppSpacing.md),
                         _BusinessPulse(stats: stats),
+                        const SizedBox(height: AppSpacing.xl),
+                        const SectionHeader(title: 'Gallery'),
+                        const SizedBox(height: AppSpacing.md),
+                        _GalleryButton(),
                       ],
                     );
                   },
@@ -309,62 +309,29 @@ class _AnalyticsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = [
-      MetricCard(
-        icon: Icons.local_shipping_outlined,
-        label: "Today's Orders",
-        value: '${stats.todayOrders}',
-        subtitle: '${stats.todayQtl.toStringAsFixed(1)} QTL',
-        color: AppColors.primary,
-        backgroundColor: AppColors.cardGreen,
-      ),
-      MetricCard(
-        icon: Icons.event_available_outlined,
-        label: "Tomorrow's Orders",
-        value: '${stats.tomorrowOrders}',
-        subtitle: '${stats.tomorrowQtl.toStringAsFixed(1)} QTL',
-        color: AppColors.warning,
-        backgroundColor: AppColors.cardGold,
-      ),
-      MetricCard(
-        icon: Icons.people_outline,
-        label: 'Customers',
-        value: '${stats.customers}',
-        color: AppColors.info,
-        backgroundColor: AppColors.cardBlue,
-      ),
-      MetricCard(
-        icon: Icons.grass_outlined,
-        label: 'Varieties',
-        value: '${stats.varieties}',
-        color: const Color(0xFF6F5FA8),
-        backgroundColor: AppColors.cardPurple,
-      ),
-      MetricCard(
-        icon: Icons.scale_outlined,
-        label: 'Total QTL',
-        value: stats.totalQtl.toStringAsFixed(1),
-        color: AppColors.primaryLight,
-        backgroundColor: AppColors.cardTeal,
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 560;
-        return GridView.builder(
-          itemCount: metrics.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: isWide ? 3 : 2,
-            crossAxisSpacing: AppSpacing.md,
-            mainAxisSpacing: AppSpacing.md,
-            childAspectRatio: isWide ? 1.35 : 1.15,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: MetricCard(
+            icon: Icons.people_outline,
+            label: 'Customers',
+            value: '${stats.customers}',
+            color: AppColors.info,
+            backgroundColor: AppColors.cardBlue,
           ),
-          itemBuilder: (context, index) => metrics[index],
-        );
-      },
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: MetricCard(
+            icon: Icons.grass_outlined,
+            label: 'Varieties',
+            value: '${stats.varieties}',
+            color: const Color(0xFF6F5FA8),
+            backgroundColor: AppColors.cardPurple,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -508,28 +475,35 @@ class _DashboardSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        GridView.builder(
-          itemCount: 6,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: AppSpacing.md,
-            mainAxisSpacing: AppSpacing.md,
-            childAspectRatio: 1.05,
-          ),
-          itemBuilder: (context, index) => const DashboardCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LoadingSkeleton(width: 44, height: 44),
-                SizedBox(height: AppSpacing.lg),
-                LoadingSkeleton(width: 88, height: 24),
-                SizedBox(height: AppSpacing.sm),
-                LoadingSkeleton(width: 120, height: 14),
-              ],
-            ),
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const crossAxisSpacing = AppSpacing.md;
+            const mainAxisSpacing = AppSpacing.md;
+            // 2 items per row
+            final cellWidth = (constraints.maxWidth - crossAxisSpacing) / 2;
+            return Wrap(
+              spacing: crossAxisSpacing,
+              runSpacing: mainAxisSpacing,
+              children: List.generate(6, (index) {
+                return SizedBox(
+                  width: cellWidth,
+                  child: const DashboardCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        LoadingSkeleton(width: 44, height: 44),
+                        SizedBox(height: AppSpacing.lg),
+                        LoadingSkeleton(width: 88, height: 24),
+                        SizedBox(height: AppSpacing.sm),
+                        LoadingSkeleton(width: 120, height: 14),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
         ),
       ],
     );
@@ -543,7 +517,6 @@ class _DashboardStats {
   final int varieties;
   final double todayQtl;
   final double tomorrowQtl;
-  final double totalQtl;
   final double revenue;
   final String? topCustomer;
   final String? topVariety;
@@ -557,7 +530,6 @@ class _DashboardStats {
     required this.varieties,
     required this.todayQtl,
     required this.tomorrowQtl,
-    required this.totalQtl,
     required this.revenue,
     required this.topCustomer,
     required this.topVariety,
@@ -602,7 +574,6 @@ class _DashboardStats {
     final tomorrowQtl = allItems
         .where((item) => tomorrowIds.contains(item.orderId))
         .fold<double>(0, (sum, item) => sum + item.qtyQtl);
-    final totalQtl = allItems.fold<double>(0, (sum, item) => sum + item.qtyQtl);
     final revenue =
         todayOrders.fold<double>(0, (sum, order) => sum + order.totalAmount);
 
@@ -658,7 +629,6 @@ class _DashboardStats {
       varieties: products.length,
       todayQtl: todayQtl,
       tomorrowQtl: tomorrowQtl,
-      totalQtl: totalQtl,
       revenue: revenue,
       topCustomer: topCustomer,
       topVariety: topVariety,

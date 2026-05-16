@@ -57,36 +57,57 @@ class OrderItemFormData {
   double get kgTotal => kg26 + kg10 + kg5;
   double get qtlTotal => kgTotal / 100.0;
 
-  double get value26 => (rate / 100.0) * 26.0 * bags26;
-  double get amc26 => value26 * _fixedAmcRate;
-  double get total26 => value26 + amc26;
+  // ── Effective rates: packing surcharge baked into per-QTL rate ────────────
+  // Bulk discount (which reduces `rate`) therefore also cuts into packing cost.
+  double get effectiveRate26 => rate;                   // 26 kg: no packing
+  double get effectiveRate10 => rate + packingPrice10;  // 10 kg: rate + surcharge
+  double get effectiveRate5  => rate + packingPrice5;   //  5 kg: rate + surcharge
 
-  double get baseValue10 => (rate / 100.0) * 10.0 * applicableBags10;
-  double get packing10 => packingPrice10 * (applicableBags10 * 10.0 / 100.0);
-  double get subtotal10 => baseValue10 + packing10;
-  double get amc10 => subtotal10 * _fixedAmcRate;
-  double get gst10 => (subtotal10 + amc10) * effectiveGstRate;
-  double get total10 => subtotal10 + amc10 + gst10;
+  // ── Base values (effective rate × QTL) ────────────────────────────────────
+  double get value26     => (effectiveRate26 / 100.0) * 26.0 * bags26;
+  double get baseValue10 => (effectiveRate10 / 100.0) * 10.0 * applicableBags10;
+  double get baseValue5  => (effectiveRate5  / 100.0) *  5.0 * applicableBags5;
 
-  double get baseValue5 => (rate / 100.0) * 5.0 * applicableBags5;
-  double get packing5 => packingPrice5 * (applicableBags5 * 5.0 / 100.0);
-  double get subtotal5 => baseValue5 + packing5;
-  double get amc5 => subtotal5 * _fixedAmcRate;
-  double get gst5 => (subtotal5 + amc5) * effectiveGstRate;
-  double get total5 => subtotal5 + amc5 + gst5;
+  /// Finalized base price shown in Review & Excel (packing already included).
+  double get baseAmount => value26 + baseValue10 + baseValue5;
+
+  /// Weighted effective rate per QTL across all bag types (for display chips).
+  double get weightedEffectiveRate =>
+      qtlTotal > 0 ? baseAmount / qtlTotal : rate;
+
+  // ── AMC: 1% on effective base value ──────────────────────────────────────
+  double get amc26 => value26     * _fixedAmcRate;
+  double get amc10 => baseValue10 * _fixedAmcRate;
+  double get amc5  => baseValue5  * _fixedAmcRate;
+
+  // ── GST: on (base + AMC), 10 kg & 5 kg only ─────────────────────────────
+  double get gst10 => (baseValue10 + amc10) * effectiveGstRate;
+  double get gst5  => (baseValue5  + amc5)  * effectiveGstRate;
+
+  // ── Line totals ───────────────────────────────────────────────────────────
+  double get total26 => value26     + amc26;
+  double get total10 => baseValue10 + amc10 + gst10;
+  double get total5  => baseValue5  + amc5  + gst5;
 
   double get netAmount => total26 + total10 + total5;
   double get amcAmount => amc26 + amc10 + amc5;
   double get gstAmount => gst10 + gst5;
-  double get taxableSubtotal => (subtotal10 + amc10) + (subtotal5 + amc5);
+
+  // ── GST taxable base (for DB storage / percentage display) ───────────────
+  double get taxableSubtotal => (baseValue10 + amc10) + (baseValue5 + amc5);
+
+  // ── Packing / subtotal aliases (kept for test compatibility) ─────────────
+  // packing = (effectiveRate - baseRate) × qtl
+  double get packing10 => packingPrice10 * (applicableBags10 * 10.0 / 100.0);
+  double get packing5  => packingPrice5  * (applicableBags5  *  5.0 / 100.0);
+  double get subtotal10 => baseValue10; // base already includes packing
+  double get subtotal5  => baseValue5;  // base already includes packing
 
   double get amcPercent => _fixedAmcRate * 100.0;
   double get gstPercent {
     if (taxableSubtotal == 0) return 0.0;
     return (gstAmount / taxableSubtotal) * 100.0;
   }
-
-  double get baseAmount => value26 + baseValue10 + baseValue5;
 
   bool get isValid =>
       product != null &&
@@ -306,6 +327,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   }
 
   void _addCustomer({Customer? initial}) {
+    // ── Duplicate guard ────────────────────────────────────────────────────
+    if (initial != null) {
+      final alreadyAdded = _customers.any((c) => c.customer?.id == initial.id);
+      if (alreadyAdded) {
+        _showError('${initial.shopName} is already in this order');
+        return;
+      }
+    }
     setState(() {
       _customers.add(
           CustomerLoadFormData(customer: initial, items: [_createFormItem()]));
@@ -681,14 +710,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Widget _buildBody() {
     return SafePage(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       backgroundColor: AppColors.background,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           _buildStepIndicator(),
           const SizedBox(height: AppSpacing.xl),
           _buildStepContent(),
-          const SizedBox(height: AppSpacing.xxl),
         ],
       ),
     );
@@ -977,15 +1007,21 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                       hintText: 'Search customer...',
                     ),
                     suggestionsBuilder: (context, controller) {
-                      final keyword = controller.text.toLowerCase();
+                      // Normalise: trim + lowercase + collapse spaces
+                      String norm(String? s) => (s ?? '')
+                          .trim()
+                          .toLowerCase()
+                          .replaceAll(RegExp(r'\s+'), ' ');
+                      final keyword = norm(controller.text);
                       final selectedIds = _customers
                           .where((cx) => cx.customer != null && cx != data)
                           .map((cx) => cx.customer!.id)
                           .toSet();
                       final filtered = allCustomers.where((c) {
                         if (selectedIds.contains(c.id)) return false;
-                        return c.shopName.toLowerCase().contains(keyword) ||
-                            (c.phone ?? '').toLowerCase().contains(keyword);
+                        return norm(c.shopName).contains(keyword) ||
+                            norm(c.phone).contains(keyword) ||
+                            norm(c.place).contains(keyword);
                       }).toList();
                       return filtered.map((c) => ListTile(
                             title: Text(c.shopName,
@@ -995,6 +1031,16 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                             trailing: const Icon(Icons.add_circle_outline,
                                 size: 20, color: AppColors.primary),
                             onTap: () {
+                              // Duplicate guard
+                              final isDuplicate = _customers
+                                  .where((cx) => cx != data)
+                                  .any((cx) => cx.customer?.id == c.id);
+                              if (isDuplicate) {
+                                controller.closeView(null);
+                                _showError(
+                                    '${c.shopName} is already in this order');
+                                return;
+                              }
                               setState(() {
                                 data.customer = c;
                               });
@@ -1218,14 +1264,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                 padding: const EdgeInsets.only(top: 6),
                 child: Row(
                   children: [
-                    Text('${item.qtlTotal.toStringAsFixed(2)} QTL',
+                    Text('${_safeQtl(item.qtlTotal)} QTL',
                         style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppColors.primary)),
                     const Spacer(),
                     Text(
-                        '${ref.watch(settingsProvider).currencySymbol}${item.netAmount.toStringAsFixed(0)}',
+                        '${ref.watch(settingsProvider).currencySymbol}${_safeAmt(item.netAmount)}',
                         style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1491,6 +1537,18 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   double _parseNonNegativeDouble(String input) =>
       math.max(0.0, double.tryParse(input) ?? 0.0);
 
+  // ── Float safety helpers (prevent 119.999999 display issues) ─────────────
+  static String _safeQtl(double v) {
+    // Round to 3 dp then format to 2 dp to eliminate floating-point noise
+    final rounded = (v * 1000).roundToDouble() / 1000;
+    return rounded.toStringAsFixed(2);
+  }
+
+  static String _safeAmt(double v) {
+    // Round to nearest rupee for display
+    return v.roundToDouble().toStringAsFixed(0);
+  }
+
   // ── STEP 4: Review ──────────────────────────────────────────────────────
 
   Widget _buildStep4Review() {
@@ -1526,11 +1584,16 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               _summaryRow(
                   'Total Weight', '${_totalQtl.toStringAsFixed(2)} QTL'),
               const Divider(height: 16),
-              _summaryRow('Base Amount', '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.taxableSubtotal)).toStringAsFixed(2)}'),
+              // Effective Base = rate + packing surcharge (after bulk discount)
+              _summaryRow('Effective Base',
+                  '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.baseAmount)).toStringAsFixed(2)}'),
               const Divider(height: 8),
-              _summaryRow('Total AMC', '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + (i.amc10 + i.amc5))).toStringAsFixed(2)}'),
+              // AMC on all bag types (26kg + 10kg + 5kg)
+              _summaryRow('Total AMC (1%)',
+                  '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.amcAmount)).toStringAsFixed(2)}'),
               const Divider(height: 8),
-              _summaryRow('Total GST', '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.gstAmount)).toStringAsFixed(2)}'),
+              _summaryRow('Total GST',
+                  '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.gstAmount)).toStringAsFixed(2)}'),
               const Divider(height: 16),
               _summaryRow('Grand Total',
                   '${settings.currencySymbol}${_totalAmount.toStringAsFixed(2)}',
@@ -1570,12 +1633,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ),
             child: Row(
               children: [
-                Text(data.customer?.shopName ?? 'Unknown',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: AppColors.primary)),
-                const Spacer(),
+                Expanded(
+                  child: Text(data.customer?.shopName ?? 'Unknown',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: AppColors.primary),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1)),
+                const SizedBox(width: 8),
                 Text('${data.totalQtl.toStringAsFixed(2)} QTL',
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
@@ -1588,10 +1654,11 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               (entry) {
             final i = entry.value;
             final itemTotal = i.netAmount;
-            final itemBase = i.baseAmount;
-            final itemPacking = (i.packing10 + i.packing5);
-            final itemAmc = i.amcAmount;
-            final itemGst = i.gstAmount;
+            final itemBase = i.baseAmount; // effective base (packing included)
+            final itemAmc  = i.amcAmount;
+            final itemGst  = i.gstAmount;
+            // Show effective rate per-QTL for each bag type
+            final has10or5 = i.applicableBags10 > 0 || i.applicableBags5 > 0;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Container(
@@ -1610,22 +1677,37 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                             child: Text(i.product?.name ?? '-',
                                 style: const TextStyle(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w600))),
+                                    fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis)),
                         Text('$cc${itemTotal.toStringAsFixed(0)}',
                             style: const TextStyle(
                                 fontSize: 12, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                        '${i.bags26 > 0 ? '${i.bags26}x26kg ' : ''}${i.bags10 > 0 ? '${i.bags10}x10kg ' : ''}${i.bags5 > 0 ? '${i.bags5}x5kg' : ''} | ${i.qtlTotal.toStringAsFixed(2)} QTL @ $cc${i.rate.toStringAsFixed(0)}/QTL',
-                        style: const TextStyle(
-                            fontSize: 10, color: AppColors.textSecondary)),
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        if (i.bags26 > 0) _reviewChip('${i.bags26}×26kg'),
+                        if (i.applicableBags10 > 0) _reviewChip('${i.applicableBags10}×10kg'),
+                        if (i.applicableBags5 > 0) _reviewChip('${i.applicableBags5}×5kg'),
+                        _reviewChip('${_safeQtl(i.qtlTotal)} QTL'),
+                        // Show effective rate (base + packing baked in)
+                        if (has10or5)
+                          _reviewChip('$cc${i.weightedEffectiveRate.toStringAsFixed(0)}/QTL (eff.)')
+                        else
+                          _reviewChip('$cc${i.rate.toStringAsFixed(0)}/QTL'),
+                      ],
+                    ),
                     const SizedBox(height: 2),
+                    // Breakdown: Eff.Base already includes packing
                     Text(
-                        'Base: $cc${itemBase.toStringAsFixed(0)} + Pack: $cc${itemPacking.toStringAsFixed(0)} + AMC: $cc${itemAmc.toStringAsFixed(0)} + GST: $cc${itemGst.toStringAsFixed(0)}',
+                        'Eff. Base: $cc${itemBase.toStringAsFixed(0)}'
+                        ' · AMC(1%): $cc${itemAmc.toStringAsFixed(0)}'
+                        '${itemGst > 0 ? ' · GST: $cc${itemGst.toStringAsFixed(0)}' : ''}',
                         style: const TextStyle(
-                            fontSize: 10, color: AppColors.textSecondary)),
+                            fontSize: 10, color: AppColors.textSecondary),
+                        softWrap: true),
                   ],
                 ),
               ),
@@ -1659,26 +1741,42 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     );
   }
 
+  Widget _reviewChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primarySurface,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label,
+          style: const TextStyle(fontSize: 10, color: AppColors.primary)),
+    );
+  }
+
   Widget _summaryRow(String label, String value, {bool isTotal = false}) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Flexible(
+        Expanded(
+          flex: 2,
           child: Text(label,
               style: TextStyle(
-                  fontSize: isTotal ? 16 : 14,
+                  fontSize: isTotal ? 15 : 13,
                   fontWeight: isTotal ? FontWeight.bold : FontWeight.w400,
-                  color: AppColors.textSecondary),
-              overflow: TextOverflow.ellipsis),
+                  color: AppColors.textSecondary)),
         ),
         const SizedBox(width: 8),
-        Flexible(
+        Expanded(
+          flex: 3,
           child: Text(value,
               style: TextStyle(
-                  fontSize: isTotal ? 16 : 14,
+                  fontSize: isTotal ? 15 : 13,
                   fontWeight: FontWeight.bold,
                   color: isTotal ? AppColors.primary : AppColors.textPrimary),
               textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2),
         ),
       ],
     );

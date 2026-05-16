@@ -135,11 +135,12 @@ void main() {
         rate: 5000,
         packingPrice10: 200.0,
       );
-      // base = (5000/100)*10*10 = 5000
-      expect(item.baseValue10, 5000.0);
-      // packing = 200 * (10*10/100) = 200 * 1.0 = 200
+      // New model: effectiveRate10 = 5000 + 200 = 5200/qtl
+      // baseValue10 = (5200/100) * 10 * 10 = 5200
+      expect(item.baseValue10, 5200.0);
+      // packing alias = 200 * (10*10/100) = 200.0
       expect(item.packing10, 200.0);
-      // subtotal = 5000+200 = 5200
+      // subtotal alias == baseValue10
       expect(item.subtotal10, 5200.0);
       // AMC 1%: 5200*0.01 = 52
       expect(item.amc10, 52.0);
@@ -200,11 +201,12 @@ void main() {
         rate: 5000,
         packingPrice5: 250.0,
       );
-      // base = (5000/100)*5*20 = 5000
-      expect(item.baseValue5, 5000.0);
-      // packing = 250 * (20*5/100) = 250 * 1.0 = 250
+      // New model: effectiveRate5 = 5000 + 250 = 5250/qtl
+      // baseValue5 = (5250/100) * 5 * 20 = 5250
+      expect(item.baseValue5, 5250.0);
+      // packing alias = 250 * (20*5/100) = 250.0
       expect(item.packing5, 250.0);
-      // subtotal = 5000+250 = 5250
+      // subtotal alias == baseValue5
       expect(item.subtotal5, 5250.0);
       // AMC 1%: 5250*0.01 = 52.5
       expect(item.amc5, 52.5);
@@ -429,16 +431,18 @@ void main() {
   // GROUP 9 – Edge Cases
   // =========================================================================
   group('OrderItemFormData - Edge Cases', () {
-    test('rate = 0 → all amounts are 0', () {
+    test('rate = 0 → value26 is 0, netAmount is finite, isValid is false', () {
       final item = OrderItemFormData(
           product: productGst5, bags26: 10, bags10: 10, bags5: 10, rate: 0);
+      // 26kg has no packing baked in → value26 = 0
       expect(item.value26, 0.0);
-      expect(item.baseValue10, 0.0);
-      expect(item.baseValue5, 0.0);
-      // packing is based on qty not rate, so it is non-zero
+      // 10kg & 5kg: effectiveRate = packingPrice only, so baseValue > 0
+      expect(item.baseValue10, greaterThan(0));
+      expect(item.baseValue5, greaterThan(0));
+      // packing alias is qty-based — also non-zero
       expect(item.packing10, greaterThan(0));
       expect(item.netAmount.isFinite, true);
-      expect(item.isValid, false);
+      expect(item.isValid, false); // rate=0 → isValid false
     });
 
     test('very large quantity does not overflow', () {

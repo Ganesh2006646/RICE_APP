@@ -5,14 +5,6 @@ import '../services/crash_reporting_service.dart';
 ///
 /// Wraps the app to catch any uncaught errors and show a friendly
 /// error screen instead of crashing.
-///
-/// USAGE:
-/// In main.dart, wrap your app:
-/// ```dart
-/// ErrorBoundary(
-///   child: const RiceAgentApp(),
-/// )
-/// ```
 class ErrorBoundary extends StatefulWidget {
   final Widget child;
   final Widget Function(FlutterErrorDetails)? errorBuilder;
@@ -54,9 +46,7 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   }
 
   void _resetError() {
-    if (_retryCount >= _maxRetries) {
-      return;
-    }
+    if (_retryCount >= _maxRetries) return;
     setState(() {
       _retryCount++;
       _errorDetails = null;
@@ -74,81 +64,136 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   }
 
   Widget _buildDefaultErrorScreen() {
+    final canRetry = _retryCount < _maxRetries;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorSchemeSeed: const Color(0xFF2E7D32),
+        useMaterial3: true,
+      ),
       home: Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
+        backgroundColor: const Color(0xFFF4F6F0),
         body: SafeArea(
           child: Center(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Error Icon
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red.shade400,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // ── Icon ──────────────────────────────────────────────
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF2E7D32).withValues(alpha: 0.25),
+                        width: 2,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 40,
+                      color: Color(0xFF2E7D32),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
-                    // Error Title
-                    const Text(
-                      'Oops! Something went wrong',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
-                      ),
-                      textAlign: TextAlign.center,
+                  // ── Title ─────────────────────────────────────────────
+                  const Text(
+                    'Something went wrong',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1B2E1B),
                     ),
-                    const SizedBox(height: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'The app hit an unexpected error.\nYour data is safe.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7B6B),
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
 
-                    // Error Message
-                    Text(
-                      'The app encountered an unexpected error.\nTap the button below to try again.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
+                  // ── Error detail card ─────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFDDE5DD)),
                     ),
-                    const SizedBox(height: 32),
-
-                    // Retry Button
-                    FilledButton.icon(
-                      onPressed: _resetError,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Try Again'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'If this keeps happening, restart the app and check Settings > Backup before making more changes.',
-                      style: TextStyle(
+                    child: Text(
+                      _errorDetails?.exceptionAsString() ??
+                          'Unknown error occurred.',
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade500,
+                        color: Color(0xFF5C3317),
+                        fontFamily: 'monospace',
                         height: 1.4,
                       ),
-                      textAlign: TextAlign.center,
+                      maxLines: 6,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ── Action ────────────────────────────────────────────
+                  if (canRetry)
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _resetError,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(
+                            'Try Again (${_maxRetries - _retryCount} left)'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFFCC02)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              color: Color(0xFFF57C00), size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Please restart the app. If the error persists, go to Settings → Backup to recover your data.',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFFF57C00)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'RiceAgent · ${_retryCount > 0 ? 'Retry #$_retryCount' : 'First occurrence'}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF9E9E9E)),
+                  ),
+                ],
               ),
             ),
           ),
@@ -159,25 +204,19 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
 }
 
 /// GlobalErrorHandler - Static utility for setting up global error handling
-///
-/// Call this in main() before runApp() to catch all errors
 class GlobalErrorHandler {
   static bool _initialized = false;
-  static bool _handling = false; // re-entrancy guard
+  static bool _handling = false;
 
-  /// Initialize global error handling
-  /// Must be called before runApp()
   static void init() {
     if (_initialized) return;
     _initialized = true;
 
     FlutterError.onError = (FlutterErrorDetails details) {
-      // Guard against recursive calls (e.g., presentError re-firing onError)
       if (_handling) return;
       _handling = true;
       try {
         debugPrint('[GlobalErrorHandler] Flutter Error: ${details.exception}');
-        // Use dumpErrorToConsole instead of presentError to avoid re-entrancy
         FlutterError.dumpErrorToConsole(details);
       } finally {
         _handling = false;
@@ -185,7 +224,6 @@ class GlobalErrorHandler {
     };
   }
 
-  /// Log an error manually
   static void logError(dynamic error, StackTrace? stackTrace) {
     debugPrint('[GlobalErrorHandler] Error: $error');
     if (stackTrace != null) {

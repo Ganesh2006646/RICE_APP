@@ -31,10 +31,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   final _searchController = TextEditingController();
   bool _isProcessing = false;
   String? _processingOrderId;
+  Stream<List<OrderWithDetails>>? _ordersStream;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchQuery = ''; // reset on dispose to avoid stale state
     super.dispose();
   }
 
@@ -54,13 +56,32 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         child: Column(
           children: [
             StreamBuilder<List<OrderWithDetails>>(
-              stream: _buildOrdersQuery(db),
+              stream: _ordersStream ??= _buildOrdersQuery(db),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final orders = snapshot.data!;
-                if (orders.isEmpty) return _buildEmptyState();
+                var orders = snapshot.data!;
+                
+                // ── Client-side filtering ──
+                if (_searchQuery.isNotEmpty) {
+                  final q = _searchQuery; // already normalised
+                  orders = orders.where((item) {
+                    String norm(String? s) => (s ?? '')
+                        .trim()
+                        .toLowerCase()
+                        .replaceAll(RegExp(r'\s+'), ' ');
+                    final orderNo = norm(item.order.notes);
+                    final customers = item.customers
+                        .map((c) => norm(c.shopName))
+                        .join(' ');
+                    return orderNo.contains(q) || customers.contains(q);
+                  }).toList();
+                }
+
+                if (orders.isEmpty && _searchQuery.isEmpty) {
+                  return _buildEmptyState();
+                }
 
                 return Column(
                   children: [
@@ -90,13 +111,19 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                           contentPadding:
                               const EdgeInsets.symmetric(horizontal: 16),
                         ),
-                        onChanged: (val) => setState(() => _searchQuery = val),
+                        onChanged: (val) {
+                          // Normalise: trim + lowercase + collapse spaces
+                          setState(() => _searchQuery = val
+                              .trim()
+                              .toLowerCase()
+                              .replaceAll(RegExp(r'\s+'), ' '));
+                        },
                       ),
                     ),
                     ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 120), // Prevent FAB overlap
                       itemCount: orders.length,
                       itemBuilder: (context, index) =>
                           _buildOrderCard(orders[index], db),
@@ -151,17 +178,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               customers: orderCustomers[order.id] ?? [],
               items: orderItems[order.id] ?? []))
           .toList();
-      var filtered = results;
-      if (_searchQuery.isNotEmpty) {
-        filtered = filtered.where((item) {
-          final q = _searchQuery.toLowerCase();
-          final orderNo = (item.order.notes ?? '').toLowerCase();
-          final customers =
-              item.customers.map((c) => c.shopName.toLowerCase()).join(' ');
-          return orderNo.contains(q) || customers.contains(q);
-        }).toList();
-      }
-      return filtered;
+      return results;
     });
   }
 
