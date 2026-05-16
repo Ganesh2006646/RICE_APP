@@ -52,7 +52,7 @@ class StatusBadge extends StatelessWidget {
       );
 
   factory StatusBadge.gst(double rate) => StatusBadge(
-        label: rate > 0 ? 'GST ${rate.toInt()}%' : 'GST 0%',
+        label: rate > 0 ? 'GST ${rate.toInt()}%' : '',
         color: rate > 0 ? AppColors.warning : AppColors.textHint,
         backgroundColor:
             rate > 0 ? AppColors.warningLight : AppColors.infoLight,

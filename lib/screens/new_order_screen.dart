@@ -78,10 +78,10 @@ class OrderItemFormData {
   double get netAmount => total26 + total10 + total5;
   double get amcAmount => amc26 + amc10 + amc5;
   double get gstAmount => gst10 + gst5;
+  double get taxableSubtotal => (subtotal10 + amc10) + (subtotal5 + amc5);
 
   double get amcPercent => _fixedAmcRate * 100.0;
   double get gstPercent {
-    double taxableSubtotal = (subtotal10 + amc10) + (subtotal5 + amc5);
     if (taxableSubtotal == 0) return 0.0;
     return (gstAmount / taxableSubtotal) * 100.0;
   }
@@ -688,6 +688,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
           _buildStepIndicator(),
           const SizedBox(height: AppSpacing.xl),
           _buildStepContent(),
+          const SizedBox(height: AppSpacing.xxl),
         ],
       ),
     );
@@ -1082,11 +1083,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                     ],
                   ),
                 ),
-                Text('${data.totalQtl.toStringAsFixed(1)} QTL',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppColors.primary)),
+                Flexible(
+                  child: Text('${data.totalQtl.toStringAsFixed(1)} QTL',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppColors.primary),
+                      overflow: TextOverflow.ellipsis),
+                ),
               ],
             ),
           ),
@@ -1235,6 +1239,134 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     );
   }
 
+  Widget _buildScrollableProductDropdown(
+      OrderItemFormData item, List<Product> productList) {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () => _showProductPicker(item, productList),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.product?.name ?? 'Select variety',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: item.product != null
+                        ? AppColors.textPrimary
+                        : AppColors.textHint,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (item.product?.isGalaxy == true)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(Icons.star,
+                      size: 12, color: AppColors.secondary),
+                ),
+              const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showProductPicker(
+      OrderItemFormData item, List<Product> productList) async {
+    final selected = await showModalBottomSheet<Product>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text('Select Variety',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                const Divider(),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    itemCount: productList.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final p = productList[i];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: p.isGalaxy
+                              ? AppColors.secondarySurface
+                              : AppColors.primarySurface,
+                          child: Icon(
+                            p.isGalaxy ? Icons.star : Icons.grass_outlined,
+                            size: 16,
+                            color:
+                                p.isGalaxy ? AppColors.secondary : AppColors.primary,
+                          ),
+                        ),
+                        title: Text(p.name,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        trailing: p.isGalaxy
+                            ? const Icon(Icons.star,
+                                size: 16, color: AppColors.secondary)
+                            : null,
+                        onTap: () => Navigator.pop(ctx, p),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        item.product = selected;
+        item.rate = selected.defaultPrice;
+        if (!item.supports10Kg && item.bags10 > 0) {
+          item.bags10 = 0;
+          _bumpInputRevision('${item.hashCode}_bags10');
+        }
+        if (!item.supports5Kg && item.bags5 > 0) {
+          item.bags5 = 0;
+          _bumpInputRevision('${item.hashCode}_bags5');
+        }
+        _bumpInputRevision('${item.hashCode}_rate');
+      });
+    }
+  }
+
   Widget _buildProductDropdown(OrderItemFormData item) {
     if (!_productsLoaded) {
       return const SizedBox(
@@ -1242,12 +1374,30 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
-    final list = _cachedProducts.where((p) => p.defaultPrice > 0).toList();
+    // Show ALL products - do not filter by price so varieties like Karthika Blue/Green are always visible
+    final list = List<Product>.from(_cachedProducts);
+    if (list.isEmpty) {
+      return Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Center(
+          child: Text('No varieties — add from Varieties tab',
+              style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+        ),
+      );
+    }
+    if (list.length > 8) {
+      return _buildScrollableProductDropdown(item, list);
+    }
     return DropdownButtonHideUnderline(
       child: DropdownButtonFormField<Product>(
         initialValue: item.product,
         isExpanded: true,
-        menuMaxHeight: MediaQuery.of(context).size.height * 0.7,
+        menuMaxHeight: MediaQuery.of(context).size.height * 0.8,
         decoration: const InputDecoration(
           contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           border: InputBorder.none,
@@ -1350,8 +1500,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        CapacityProgressCard(currentQtl: _totalQtl, maxCapacity: _capacity),
-        const SizedBox(height: AppSpacing.lg),
         ...validCustomers.map((c) => _buildReviewCustomerCard(c, settings)),
         const SizedBox(height: AppSpacing.lg),
         Container(
@@ -1396,6 +1544,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
 
   Widget _buildReviewCustomerCard(
       CustomerLoadFormData data, AppSettings settings) {
+    final cc = settings.currencySymbol;
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
@@ -1435,39 +1584,76 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               ],
             ),
           ),
-          ...data.items.where((i) => i.isValid).map((i) => Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
+          ...data.items.where((i) => i.isValid).toList().asMap().entries.map(
+              (entry) {
+            final i = entry.value;
+            final itemTotal = i.netAmount;
+            final itemBase = i.baseAmount;
+            final itemPacking = (i.packing10 + i.packing5);
+            final itemAmc = i.amcAmount;
+            final itemGst = i.gstAmount;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                        flex: 3,
-                        child: Text(i.product?.name ?? '-',
+                    Row(
+                      children: [
+                        Expanded(
+                            child: Text(i.product?.name ?? '-',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600))),
+                        Text('$cc${itemTotal.toStringAsFixed(0)}',
                             style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w500))),
-                    Expanded(
-                        flex: 2,
-                        child: Text(
-                            '${i.bags26 > 0 ? '${i.bags26}x26 ' : ''}${i.bags10 > 0 ? '${i.bags10}x10 ' : ''}${i.bags5 > 0 ? '${i.bags5}x5' : ''}',
-                            style: const TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary),
-                            textAlign: TextAlign.center)),
-                    Expanded(
-                        flex: 2,
-                        child: Text(
-                            '${settings.currencySymbol}${i.rate.toStringAsFixed(0)}',
-                            style: const TextStyle(fontSize: 12),
-                            textAlign: TextAlign.right)),
-                    Expanded(
-                        flex: 2,
-                        child: Text(
-                            '${settings.currencySymbol}${i.netAmount.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.right)),
+                                fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                        '${i.bags26 > 0 ? '${i.bags26}x26kg ' : ''}${i.bags10 > 0 ? '${i.bags10}x10kg ' : ''}${i.bags5 > 0 ? '${i.bags5}x5kg' : ''} | ${i.qtlTotal.toStringAsFixed(2)} QTL @ $cc${i.rate.toStringAsFixed(0)}/QTL',
+                        style: const TextStyle(
+                            fontSize: 10, color: AppColors.textSecondary)),
+                    const SizedBox(height: 2),
+                    Text(
+                        'Base: $cc${itemBase.toStringAsFixed(0)} + Pack: $cc${itemPacking.toStringAsFixed(0)} + AMC: $cc${itemAmc.toStringAsFixed(0)} + GST: $cc${itemGst.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontSize: 10, color: AppColors.textSecondary)),
                   ],
                 ),
-              )),
+              ),
+            );
+          }),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.borderLight)),
+            ),
+            child: Row(
+              children: [
+                const Text('Customer Total',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text('${data.totalQtl.toStringAsFixed(2)} QTL',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
+                const SizedBox(width: 12),
+                Text('$cc${data.totalAmount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1476,17 +1662,24 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   Widget _summaryRow(String label, String value, {bool isTotal = false}) {
     return Row(
       children: [
-        Text(label,
-            style: TextStyle(
-                fontSize: isTotal ? 16 : 14,
-                fontWeight: isTotal ? FontWeight.bold : FontWeight.w400,
-                color: AppColors.textSecondary)),
-        const Spacer(),
-        Text(value,
-            style: TextStyle(
-                fontSize: isTotal ? 16 : 14,
-                fontWeight: FontWeight.bold,
-                color: isTotal ? AppColors.primary : AppColors.textPrimary)),
+        Flexible(
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: isTotal ? 16 : 14,
+                  fontWeight: isTotal ? FontWeight.bold : FontWeight.w400,
+                  color: AppColors.textSecondary),
+              overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(value,
+              style: TextStyle(
+                  fontSize: isTotal ? 16 : 14,
+                  fontWeight: FontWeight.bold,
+                  color: isTotal ? AppColors.primary : AppColors.textPrimary),
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
   }
@@ -1542,6 +1735,39 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               _summaryRow('Order number', orderNumber),
             ],
           ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _goToStep(_currentStep - 1),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: const Text('Back'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              flex: 2,
+              child: _isSaving
+                  ? const Center(
+                      child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2)))
+                  : FilledButton.icon(
+                      onPressed: _saveLorryOrder,
+                      icon: const Icon(Icons.send, size: 18),
+                      label: const Text('Save & Send'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        textStyle: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ],
     );

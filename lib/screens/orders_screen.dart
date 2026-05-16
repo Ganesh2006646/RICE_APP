@@ -26,19 +26,11 @@ class OrdersScreen extends ConsumerStatefulWidget {
 }
 
 class _OrdersScreenState extends ConsumerState<OrdersScreen> {
-  DateTime? _filterDate;
   String _searchQuery = '';
   final _dateFormat = DateFormat('dd MMM yyyy');
   final _searchController = TextEditingController();
   bool _isProcessing = false;
   String? _processingOrderId;
-
-  @override
-  void initState() {
-    super.initState();
-    // Default filter removed per request
-    _filterDate = null;
-  }
 
   @override
   void dispose() {
@@ -160,14 +152,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               items: orderItems[order.id] ?? []))
           .toList();
       var filtered = results;
-      if (_filterDate != null) {
-        filtered = filtered
-            .where((item) =>
-                item.order.loadingDate.day == _filterDate!.day &&
-                item.order.loadingDate.month == _filterDate!.month &&
-                item.order.loadingDate.year == _filterDate!.year)
-            .toList();
-      }
       if (_searchQuery.isNotEmpty) {
         filtered = filtered.where((item) {
           final q = _searchQuery.toLowerCase();
@@ -564,15 +548,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now());
 
-  Future<void> _selectDate(BuildContext context) async {
-    final picked = await showDatePicker(
-        context: context,
-        initialDate: _filterDate ?? DateTime.now(),
-        firstDate: DateTime(2020),
-        lastDate: DateTime(2030));
-    if (picked != null) setState(() => _filterDate = picked);
-  }
-
   Future<void> _downloadExcel(OrderWithDetails item, AppDatabase db) async {
     setState(() {
       _isProcessing = true;
@@ -661,7 +636,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
         final allProducts = await db.select(db.products).get();
 
-        // 1. Share PDF via system sheet (WhatsApp, email, etc.)
+        // Share PDF invoice via system share sheet (WhatsApp, email, etc.)
         await PdfService.generateAndShareInvoice(
           customer: customer,
           items: customerItems,
@@ -671,45 +646,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           agentName: localization.agentName,
           millName: localization.millName,
         );
-
-        // 2. Also offer to send a text message via WhatsApp
-        if (mounted && customer.phone != null && customer.phone!.isNotEmpty) {
-          final sendText = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              scrollable: true,
-              title: const Text('WhatsApp'),
-              content: const Text('Also send a text message via WhatsApp?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('No'),
-                ),
-                FilledButton.icon(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  icon: const Icon(Icons.chat, size: 18),
-                  label: const Text('Send Text'),
-                  style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366)),
-                ),
-              ],
-            ),
-          );
-
-          if (sendText == true && mounted) {
-            await WhatsAppService.sendOrderMessage(
-              customer: customer,
-              order: item.order,
-              items: customerItems,
-              products: allProducts,
-              currencySymbol: currency,
-              agentName: localization.agentName,
-              millName: localization.millName,
-            );
-          }
-        }
       } catch (e) {
-        _showError('WhatsApp failed: $e');
+        _showError('Share failed: $e');
       }
     }
 

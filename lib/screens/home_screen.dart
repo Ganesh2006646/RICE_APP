@@ -5,16 +5,12 @@ import 'package:intl/intl.dart';
 import '../db/database.dart';
 import '../main.dart';
 import '../providers/settings_provider.dart';
-import '../services/backup_service.dart';
 import '../theme.dart';
 import '../widgets/analytics_tile.dart';
 import '../widgets/dashboard_card.dart';
-import '../widgets/empty_state_widget.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/metric_card.dart';
-import '../widgets/quick_action_card.dart';
 import '../widgets/section_header.dart';
-import '../widgets/status_chip.dart';
 import 'customers_screen.dart';
 import 'new_order_screen.dart';
 import 'orders_screen.dart';
@@ -31,7 +27,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const _pages = [
+  final List<Widget> _pages = const [
     _Dashboard(),
     OrdersScreen(),
     CustomersScreen(),
@@ -151,17 +147,13 @@ class _Dashboard extends ConsumerWidget {
                           currencySymbol: settings.currencySymbol,
                         ),
                         const SizedBox(height: AppSpacing.xl),
-                        const SectionHeader(title: 'Quick Actions'),
+                        const SectionHeader(title: 'Gallery'),
                         const SizedBox(height: AppSpacing.md),
-                        _QuickActions(currency: settings.currencySymbol),
+                        _GalleryButton(),
                         const SizedBox(height: AppSpacing.xl),
                         const SectionHeader(title: 'Business Pulse'),
                         const SizedBox(height: AppSpacing.md),
                         _BusinessPulse(stats: stats),
-                        const SizedBox(height: AppSpacing.xl),
-                        const SectionHeader(title: 'Activity Timeline'),
-                        const SizedBox(height: AppSpacing.md),
-                        _ActivityTimeline(stats: stats),
                       ],
                     );
                   },
@@ -264,20 +256,6 @@ class _DashboardHeader extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             children: [
               _HeaderPill(icon: Icons.calendar_today_outlined, label: dateStr),
-              FutureBuilder<DateTime?>(
-                future: BackupService.getLastAutoBackupTime(),
-                builder: (context, snapshot) {
-                  final lastBackup = snapshot.data;
-                  final label = lastBackup == null
-                      ? 'Backup ready'
-                      : 'Backup ${DateFormat('dd MMM').format(lastBackup)}';
-                  return _HeaderPill(
-                    icon: Icons.cloud_done_outlined,
-                    label: label,
-                    color: AppColors.secondaryLight,
-                  );
-                },
-              ),
             ],
           ),
         ],
@@ -289,12 +267,10 @@ class _DashboardHeader extends StatelessWidget {
 class _HeaderPill extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
 
   const _HeaderPill({
     required this.icon,
     required this.label,
-    this.color = Colors.white,
   });
 
   @override
@@ -308,12 +284,12 @@ class _HeaderPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Icon(icon, size: 14, color: Colors.white),
           const SizedBox(width: 6),
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
+                  color: Colors.white,
                 ),
           ),
         ],
@@ -371,13 +347,6 @@ class _AnalyticsGrid extends StatelessWidget {
         color: AppColors.primaryLight,
         backgroundColor: AppColors.cardTeal,
       ),
-      MetricCard(
-        icon: Icons.currency_rupee_outlined,
-        label: 'Est. Revenue',
-        value: '$currencySymbol${stats.revenue.toStringAsFixed(0)}',
-        color: AppColors.secondary,
-        backgroundColor: AppColors.cardOrange,
-      ),
     ];
 
     return LayoutBuilder(
@@ -391,7 +360,7 @@ class _AnalyticsGrid extends StatelessWidget {
             crossAxisCount: isWide ? 3 : 2,
             crossAxisSpacing: AppSpacing.md,
             mainAxisSpacing: AppSpacing.md,
-            childAspectRatio: isWide ? 1.35 : 1.05,
+            childAspectRatio: isWide ? 1.35 : 1.15,
           ),
           itemBuilder: (context, index) => metrics[index],
         );
@@ -400,81 +369,95 @@ class _AnalyticsGrid extends StatelessWidget {
   }
 }
 
-class _QuickActions extends ConsumerWidget {
-  final String currency;
-
-  const _QuickActions({required this.currency});
-
+class _GalleryButton extends StatelessWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final actions = [
-      QuickActionCard(
-        icon: Icons.add_circle_outline,
-        label: 'New Order',
-        color: AppColors.primary,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const NewOrderScreen()),
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, _) => const _GalleryPlaceholder(),
+          transitionsBuilder: (context, animation, _, child) {
+            return FadeTransition(
+              opacity:
+                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 350),
         ),
       ),
-      QuickActionCard(
-        icon: Icons.people_outline,
-        label: 'Customers',
-        color: AppColors.info,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CustomersScreen()),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withValues(alpha: 0.9),
+              AppColors.primaryDark,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: const Icon(Icons.photo_library_outlined,
+                  size: 28, color: Colors.white),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Product Gallery',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                Text(
+                  'Browse all rice varieties',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                      ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
+          ],
         ),
       ),
-      QuickActionCard(
-        icon: Icons.grass_outlined,
-        label: 'Varieties',
-        color: AppColors.primaryLight,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RiceVarietiesScreen()),
-        ),
-      ),
-      QuickActionCard(
-        icon: Icons.receipt_long_outlined,
-        label: 'History',
-        color: AppColors.warning,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const OrdersScreen()),
-        ),
-      ),
-      QuickActionCard(
-        icon: Icons.file_upload_outlined,
-        label: 'Import',
-        color: AppColors.secondary,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CustomersScreen()),
-        ),
-      ),
-      QuickActionCard(
-        icon: Icons.settings_outlined,
-        label: 'Settings',
-        color: AppColors.info,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SettingsScreen()),
-        ),
-      ),
-    ];
+    );
+  }
+}
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: actions.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: AppSpacing.md,
-        crossAxisSpacing: AppSpacing.md,
-        childAspectRatio: 0.98,
+class _GalleryPlaceholder extends StatelessWidget {
+  const _GalleryPlaceholder();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Product Gallery')),
+      body: const Center(
+        child: Text('Gallery coming soon!',
+            style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
       ),
-      itemBuilder: (context, index) => actions[index],
     );
   }
 }
@@ -512,78 +495,7 @@ class _BusinessPulse extends StatelessWidget {
             value: stats.recentOrder ?? 'No recent order',
             color: AppColors.info,
           ),
-          const Divider(height: 24),
-          const AnalyticsTile(
-            icon: Icons.cloud_done_outlined,
-            label: 'Backup Health',
-            value: 'Ready',
-            subtitle: 'Automatic local backup enabled',
-            color: AppColors.success,
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActivityTimeline extends StatelessWidget {
-  final _DashboardStats stats;
-
-  const _ActivityTimeline({required this.stats});
-
-  @override
-  Widget build(BuildContext context) {
-    if (stats.recentActivities.isEmpty) {
-      return const EmptyStateWidget(
-        icon: Icons.timeline_outlined,
-        title: 'No recent activity',
-        description: 'Orders, exports, and customer updates will appear here.',
-      );
-    }
-
-    return DashboardCard(
-      child: Column(
-        children: stats.recentActivities
-            .map(
-              (activity) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySurface,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: const Icon(
-                        Icons.check_circle_outline,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            activity.title,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          Text(
-                            activity.subtitle,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    StatusChip.info(label: activity.status),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
       ),
     );
   }

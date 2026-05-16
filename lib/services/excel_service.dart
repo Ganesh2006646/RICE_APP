@@ -769,12 +769,42 @@ class ExcelService {
             ?? _fuzzyMatchProduct(row.normalizedName, productsByNormalizedName);
 
         if (matchedProduct == null) {
-          // Not found in DB — report for the user to add manually
+          // Not found in DB: auto-create new product from price sheet
+          final newId = generateId();
+          final autoGst =
+              gstEligibleNames.contains(row.normalizedName) ? 5.0 : 0.0;
+          final autoSupports10Kg = has10KgNames.contains(row.normalizedName);
+          final autoSupports5Kg = has5KgNames.contains(row.normalizedName);
+          final autoUnitMeta = _buildUnitWithPackSupport(
+            supports10Kg: autoSupports10Kg,
+            supports5Kg: autoSupports5Kg,
+          );
+          final autoIsGalaxy = row.name.toUpperCase().contains('GALAXY');
+
           updateResults.add(_PriceUpdateResult(
             excelName: row.name,
-            status: _UpdateStatus.notFound,
+            dbName: row.name,
+            oldPrice: null,
+            newPrice: row.ratePerQtl,
+            newGst: autoGst,
+            newUnit: autoUnitMeta,
+            newSku: sku,
+            dbProductId: newId,
+            status: _UpdateStatus.pending,
+            isNewInsert: true,
           ));
-          skippedCount++;
+          updatedCount++;
+
+          productsByNormalizedName[row.normalizedName] = Product(
+            id: newId,
+            name: row.name,
+            defaultPrice: row.ratePerQtl,
+            gstRateDefault: autoGst,
+            unit: autoUnitMeta,
+            isGalaxy: autoIsGalaxy,
+            createdAt: now,
+            updatedAt: now,
+          );
           continue;
         }
 
@@ -825,6 +855,7 @@ class ExcelService {
           newPrice: r.newPrice,
           newGst: r.newGst,
           isMatched: r.status == _UpdateStatus.pending,
+          isNewInsert: r.isNewInsert,
         )).toList();
 
         return {
@@ -848,16 +879,29 @@ class ExcelService {
           final dbId = r.dbProductId;
           if (dbId == null) continue;
           try {
-            await (db.update(db.products)
-                  ..where((tbl) => tbl.id.equals(dbId)))
-                .write(ProductsCompanion(
-              sku: drift.Value(r.newSku),
-              defaultPrice: drift.Value(r.newPrice!),
-              gstRateDefault: drift.Value(r.newGst ?? 0.0),
-              unit: drift.Value(r.newUnit ?? 'qtl'),
-              isGalaxy: drift.Value(r.excelName.toUpperCase().contains('GALAXY')),
-              updatedAt: drift.Value(now),
-            ));
+            if (r.isNewInsert) {
+              await db.into(db.products).insert(ProductsCompanion(
+                id: drift.Value(dbId),
+                name: drift.Value(r.dbName ?? r.excelName),
+                sku: drift.Value(r.newSku),
+                defaultPrice: drift.Value(r.newPrice ?? 0.0),
+                gstRateDefault: drift.Value(r.newGst ?? 0.0),
+                unit: drift.Value(r.newUnit ?? 'qtl'),
+                isGalaxy: drift.Value(r.excelName.toUpperCase().contains('GALAXY')),
+                updatedAt: drift.Value(now),
+              ));
+            } else {
+              await (db.update(db.products)
+                    ..where((tbl) => tbl.id.equals(dbId)))
+                  .write(ProductsCompanion(
+                sku: drift.Value(r.newSku),
+                defaultPrice: drift.Value(r.newPrice!),
+                gstRateDefault: drift.Value(r.newGst ?? 0.0),
+                unit: drift.Value(r.newUnit ?? 'qtl'),
+                isGalaxy: drift.Value(r.excelName.toUpperCase().contains('GALAXY')),
+                updatedAt: drift.Value(now),
+              ));
+            }
             r.markCommitted();
           } on Exception catch (e) {
             r.markError(e.toString());
@@ -1718,6 +1762,8 @@ class PriceChangePreview {
   final double? newGst;
   final bool isMatched;      // false → not found in DB
 
+  final bool isNewInsert;
+
   const PriceChangePreview({
     required this.excelName,
     this.dbName,
@@ -1725,6 +1771,7 @@ class PriceChangePreview {
     this.newPrice,
     this.newGst,
     required this.isMatched,
+    this.isNewInsert = false,
   });
 
   /// e.g. "3200 → 3450"
@@ -1796,6 +1843,7 @@ class _PriceUpdateResult {
   final String? newSku;
   _UpdateStatus status;
   String? errorMsg;
+  final bool isNewInsert;
 
   _PriceUpdateResult({
     required this.excelName,
@@ -1807,6 +1855,7 @@ class _PriceUpdateResult {
     this.newUnit,
     this.newSku,
     required this.status,
+    this.isNewInsert = false,
   });
 
   void markCommitted() => status = _UpdateStatus.updated;

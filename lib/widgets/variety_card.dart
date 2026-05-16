@@ -113,15 +113,12 @@ class VarietyCard extends StatelessWidget {
                   icon: Icons.star,
                   color: AppColors.secondary,
                 ),
-              StatusChip(
-                label: product.gstRateDefault > 0
-                    ? 'GST ${product.gstRateDefault.toStringAsFixed(0)}%'
-                    : 'EXEMPTED',
-                icon: Icons.percent,
-                color: product.gstRateDefault > 0
-                    ? AppColors.warning
-                    : AppColors.success,
-              ),
+              if (product.gstRateDefault > 0)
+                StatusChip(
+                  label: 'GST ${product.gstRateDefault.toStringAsFixed(0)}%',
+                  icon: Icons.percent,
+                  color: AppColors.warning,
+                ),
               StatusChip.info(
                 label: [
                   '26kg',

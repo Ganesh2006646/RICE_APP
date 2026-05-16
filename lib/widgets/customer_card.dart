@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../db/database.dart';
 import '../theme.dart';
 import 'dashboard_card.dart';
 import 'status_chip.dart';
 
+void _launchPhone(BuildContext context, String phone) async {
+  final uri = Uri.parse('tel:${phone.replaceAll(RegExp(r'\D'), '')}');
+  // ignore: unnecessary_non_null_assertion
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri);
+  }
+}
+
 class CustomerCard extends StatelessWidget {
   final Customer customer;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
-  final VoidCallback? onCall;
-  final VoidCallback? onWhatsApp;
-  final VoidCallback? onNewOrder;
   final VoidCallback? onDelete;
 
   const CustomerCard({
@@ -19,9 +25,6 @@ class CustomerCard extends StatelessWidget {
     required this.customer,
     this.onTap,
     this.onEdit,
-    this.onCall,
-    this.onWhatsApp,
-    this.onNewOrder,
     this.onDelete,
   });
 
@@ -106,10 +109,13 @@ class CustomerCard extends StatelessWidget {
                   color: AppColors.primary,
                 ),
               if (phone != null && phone.isNotEmpty)
-                StatusChip(
-                  label: phone,
-                  icon: Icons.phone_outlined,
-                  color: AppColors.info,
+                GestureDetector(
+                  onTap: () => _launchPhone(context, phone),
+                  child: StatusChip(
+                    label: phone,
+                    icon: Icons.phone_outlined,
+                    color: AppColors.info,
+                  ),
                 ),
             ],
           ),

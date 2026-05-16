@@ -426,7 +426,9 @@ class RiceVarietiesScreen extends ConsumerWidget {
     final nameController = TextEditingController(text: product?.name ?? '');
     final skuController = TextEditingController(text: product?.sku ?? '');
     final priceController = TextEditingController(
-      text: product != null ? product.defaultPrice.toStringAsFixed(0) : '',
+      text: product != null && product.defaultPrice > 0
+          ? product.defaultPrice.toStringAsFixed(0)
+          : '',
     );
     bool isGst5 = product?.gstRateDefault == 5.0;
     bool isGalaxy = product?.isGalaxy ?? false;
@@ -434,179 +436,244 @@ class RiceVarietiesScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          scrollable: true,
-          title: Text(isEditing
-              ? 'edit_rice_variety'.tr(ref)
-              : 'add_rice_variety'.tr(ref)),
-          content: SingleChildScrollView(
+        builder: (context, setState) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+              maxWidth: 480,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: '${'variety_name'.tr(ref)} *',
-                    prefixIcon: const Icon(Icons.grass),
+                // Title
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 12, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          isEditing
+                              ? 'edit_rice_variety'.tr(ref)
+                              : 'add_rice_variety'.tr(ref),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
                   ),
-                  textCapitalization: TextCapitalization.words,
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: skuController,
-                  decoration: InputDecoration(
-                    labelText: '${'short_code'.tr(ref)} (Optional)',
-                    hintText: 'e.g., SMO-001',
-                    prefixIcon: const Icon(Icons.qr_code),
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: priceController,
-                  decoration: InputDecoration(
-                    labelText:
-                        '${'rate'.tr(ref)}/${'qtl_short'.tr(ref)} (${ref.watch(settingsProvider).currencySymbol}) *',
-                    prefixIcon: const Icon(Icons.currency_rupee),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightGrey,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SwitchListTile(
-                    title: Row(
+                const Divider(height: 1),
+                // Scrollable content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.discount,
-                            size: 18, color: Colors.green.shade700),
-                        const SizedBox(width: 8),
-                        const Text('Eligible for Discount'),
+                        TextField(
+                          controller: nameController,
+                          decoration: InputDecoration(
+                            labelText: '${'variety_name'.tr(ref)} *',
+                            prefixIcon: const Icon(Icons.grass),
+                          ),
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: skuController,
+                          decoration: InputDecoration(
+                            labelText: '${'short_code'.tr(ref)} (Optional)',
+                            hintText: 'e.g., SMO-001',
+                            prefixIcon: const Icon(Icons.qr_code),
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: priceController,
+                          decoration: InputDecoration(
+                            labelText:
+                                '${'rate'.tr(ref)}/${'qtl_short'.tr(ref)} (${ref.watch(settingsProvider).currencySymbol})',
+                            hintText: 'Leave blank if price not set yet',
+                            prefixIcon: const Icon(Icons.currency_rupee),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightGrey,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: SwitchListTile(
+                            title: Row(
+                              children: [
+                                Icon(Icons.discount,
+                                    size: 18, color: Colors.green.shade700),
+                                const SizedBox(width: 8),
+                                const Flexible(
+                                    child: Text('Eligible for Discount',
+                                        overflow: TextOverflow.ellipsis)),
+                              ],
+                            ),
+                            subtitle: Text(
+                              isGalaxy
+                                  ? 'Bulk discount will apply'
+                                  : 'Excluded from bulk discount',
+                              style: TextStyle(
+                                color: isGalaxy
+                                    ? Colors.green.shade700
+                                    : AppTheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                            value: isGalaxy,
+                            activeTrackColor: Colors.green.shade200,
+                            activeThumbColor: Colors.green.shade700,
+                            onChanged: (val) => setState(() => isGalaxy = val),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightGrey,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: SwitchListTile(
+                            title: const Text('GST 5%'),
+                            subtitle: Text(
+                              isGst5
+                                  ? 'branded_rice'.tr(ref)
+                                  : 'loose_rice'.tr(ref),
+                              style: TextStyle(
+                                color: isGst5
+                                    ? Colors.orange.shade700
+                                    : AppTheme.grey,
+                                fontSize: 12,
+                              ),
+                            ),
+                            value: isGst5,
+                            activeThumbColor: Theme.of(context).primaryColor,
+                            onChanged: (val) => setState(() => isGst5 = val),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'gst_note'.tr(ref),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.grey,
+                                fontStyle: FontStyle.italic,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.orange.shade800,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
                       ],
                     ),
-                    subtitle: Text(
-                      isGalaxy
-                          ? 'Bulk discount will apply'
-                          : 'Excluded from bulk discount',
-                      style: TextStyle(
-                        color:
-                            isGalaxy ? Colors.green.shade700 : AppTheme.error,
-                        fontSize: 12,
-                      ),
-                    ),
-                    value: isGalaxy,
-                    activeTrackColor: Colors.green.shade200,
-                    activeThumbColor: Colors.green.shade700,
-                    onChanged: (val) => setState(() => isGalaxy = val),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightGrey,
-                    borderRadius: BorderRadius.circular(12),
+                const Divider(height: 1),
+                // Action buttons
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('cancel'.tr(ref)),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () async {
+                          if (nameController.text.trim().isEmpty) {
+                            SafeSnackBar.show(
+                                context, 'name_required'.tr(ref),
+                                isError: true);
+                            return;
+                          }
+
+                          // Price can be 0 (will be set via import later)
+                          final priceText = priceController.text.trim();
+                          final price =
+                              priceText.isEmpty ? 0.0 : double.tryParse(priceText);
+                          if (price == null || price < 0) {
+                            SafeSnackBar.show(
+                                context, 'valid_price_required'.tr(ref),
+                                isError: true);
+                            return;
+                          }
+
+                          if (isEditing) {
+                            await (db.update(db.products)
+                                  ..where(
+                                      (tbl) => tbl.id.equals(product.id)))
+                                .write(ProductsCompanion(
+                              name: drift.Value(nameController.text.trim()),
+                              sku: drift.Value(
+                                  skuController.text.trim().isEmpty
+                                      ? null
+                                      : skuController.text.trim()),
+                              defaultPrice: drift.Value(price),
+                              gstRateDefault:
+                                  drift.Value(isGst5 ? 5.0 : 0.0),
+                              isGalaxy: drift.Value(isGalaxy),
+                              updatedAt: drift.Value(DateTime.now()),
+                            ));
+                          } else {
+                            await db.into(db.products).insert(
+                                ProductsCompanion(
+                                  id: drift.Value(generateId()),
+                                  name:
+                                      drift.Value(nameController.text.trim()),
+                                  sku: drift.Value(
+                                      skuController.text.trim().isEmpty
+                                          ? null
+                                          : skuController.text.trim()),
+                                  defaultPrice: drift.Value(price),
+                                  gstRateDefault:
+                                      drift.Value(isGst5 ? 5.0 : 0.0),
+                                  isGalaxy: drift.Value(isGalaxy),
+                                  updatedAt: drift.Value(DateTime.now()),
+                                ));
+                          }
+
+                          if (context.mounted) {
+                            SafeSnackBar.show(
+                                context,
+                                isEditing
+                                    ? 'variety_updated'.tr(ref)
+                                    : 'variety_added'.tr(ref));
+                            Navigator.pop(context);
+                          }
+                        },
+                        child: Text(
+                            isEditing ? 'update'.tr(ref) : 'save'.tr(ref)),
+                      ),
+                    ],
                   ),
-                  child: SwitchListTile(
-                    title: const Text('GST 5%'),
-                    subtitle: Text(
-                      isGst5 ? 'branded_rice'.tr(ref) : 'loose_rice'.tr(ref),
-                      style: TextStyle(
-                        color: isGst5 ? Colors.orange.shade700 : AppTheme.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    value: isGst5,
-                    activeThumbColor: Theme.of(context).primaryColor,
-                    onChanged: (val) => setState(() => isGst5 = val),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'gst_note'.tr(ref),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.grey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.orange.shade800,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('cancel'.tr(ref)),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  SafeSnackBar.show(context, 'name_required'.tr(ref),
-                      isError: true);
-                  return;
-                }
-
-                final price = double.tryParse(priceController.text.trim());
-                if (price == null || price <= 0) {
-                  SafeSnackBar.show(context, 'valid_price_required'.tr(ref),
-                      isError: true);
-                  return;
-                }
-
-                if (isEditing) {
-                  await (db.update(db.products)
-                        ..where((tbl) => tbl.id.equals(product.id)))
-                      .write(ProductsCompanion(
-                    name: drift.Value(nameController.text.trim()),
-                    sku: drift.Value(skuController.text.trim().isEmpty
-                        ? null
-                        : skuController.text.trim()),
-                    defaultPrice: drift.Value(price),
-                    gstRateDefault: drift.Value(isGst5 ? 5.0 : 0.0),
-                    isGalaxy: drift.Value(isGalaxy),
-                    updatedAt: drift.Value(DateTime.now()),
-                  ));
-                } else {
-                  await db.into(db.products).insert(ProductsCompanion(
-                        id: drift.Value(generateId()),
-                        name: drift.Value(nameController.text.trim()),
-                        sku: drift.Value(skuController.text.trim().isEmpty
-                            ? null
-                            : skuController.text.trim()),
-                        defaultPrice: drift.Value(price),
-                        gstRateDefault: drift.Value(isGst5 ? 5.0 : 0.0),
-                        isGalaxy: drift.Value(isGalaxy),
-                        updatedAt: drift.Value(DateTime.now()),
-                      ));
-                }
-
-                if (context.mounted) {
-                  SafeSnackBar.show(
-                      context,
-                      isEditing
-                          ? 'variety_updated'.tr(ref)
-                          : 'variety_added'.tr(ref));
-                  Navigator.pop(context);
-                }
-              },
-              child: Text(isEditing ? 'update'.tr(ref) : 'save'.tr(ref)),
-            ),
-          ],
         ),
       ),
     );
@@ -787,7 +854,7 @@ class _PriceChangeTile extends StatelessWidget {
             ? Icons.arrow_downward
             : Icons.remove;
 
-    final gstLabel = (preview.newGst ?? 0) > 0 ? 'GST 5%' : 'GST 0%';
+    final gstLabel = (preview.newGst ?? 0) > 0 ? 'GST 5%' : '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

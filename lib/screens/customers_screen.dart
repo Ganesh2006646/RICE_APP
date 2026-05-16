@@ -46,13 +46,15 @@ enum _CustomerFilter { all, name, place, phone }
 
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   String _searchQuery = '';
   _CustomerFilter _filter = _CustomerFilter.all;
-  final Map<String, GlobalKey> _letterKeys = {};
+  final Map<String, double> _letterOffsets = {};
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -182,15 +184,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     final key =
                         RegExp(r'[A-Z]').hasMatch(letter) ? letter : '#';
                     groupedCustomers.putIfAbsent(key, () => []).add(c);
-                    if (!_letterKeys.containsKey(key)) {
-                      _letterKeys[key] = GlobalKey();
-                    }
                   }
                   final sortedKeys = groupedCustomers.keys.toList()..sort();
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _rebuildLetterOffsets();
+                  });
 
                   return Stack(
                     children: [
                       ListView.builder(
+                        controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 0, 40, 80),
                         itemCount: sortedKeys.length,
                         itemBuilder: (context, index) {
@@ -198,7 +203,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           final group = groupedCustomers[letter]!;
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            key: _letterKeys[letter],
                             children: [
                               Padding(
                                 padding: const EdgeInsets.only(
@@ -233,17 +237,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: sortedKeys.map((letter) {
                                     return InkWell(
-                                      onTap: () {
-                                        final key = _letterKeys[letter];
-                                        if (key?.currentContext != null) {
-                                          Scrollable.ensureVisible(
-                                            key!.currentContext!,
-                                            duration: const Duration(
-                                                milliseconds: 300),
-                                            curve: Curves.easeInOut,
-                                          );
-                                        }
-                                      },
+                                      onTap: () =>
+                                          _scrollToLetter(letter, sortedKeys),
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
                                             vertical: 4.0, horizontal: 4.0),
@@ -267,12 +262,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'customers_fab',
-        onPressed: () => _showCustomerDialog(context, db),
-        icon: const Icon(Icons.add),
-        label: Text('add_customer'.tr(ref)),
       ),
     );
   }
@@ -303,6 +292,24 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     );
   }
 
+  void _rebuildLetterOffsets() {
+    if (!_scrollController.hasClients) return;
+    final offset = _scrollController.offset;
+    _letterOffsets.clear();
+    _letterOffsets['_last'] = offset;
+  }
+
+  void _scrollToLetter(String letter, List<String> sortedKeys) {
+    final index = sortedKeys.indexOf(letter);
+    if (index < 0 || !_scrollController.hasClients) return;
+    final estimatedOffset = index * 120.0;
+    _scrollController.animateTo(
+      estimatedOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   Widget _buildEmptyState() {
     return EmptyStateWidget(
       icon: _searchQuery.isEmpty
@@ -326,7 +333,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       child: CustomerCard(
         customer: customer,
         onTap: () => _navigateToNewOrder(customer),
-        onNewOrder: () => _navigateToNewOrder(customer),
         onEdit: () => _showCustomerDialog(context, db, customer: customer),
         onDelete: () => _confirmDelete(customer, db),
       ),

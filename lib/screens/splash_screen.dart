@@ -155,6 +155,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       textAlign: TextAlign.center,
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                    child: Text(
+                      'ఒకసారి రుచి చూస్తే జీవితకాలం మరవలేరు',
+                      style: textTheme.titleSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        fontWeight: FontWeight.w700,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: 0.3,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.xxl),
                   SizedBox(
                     width: 132,
