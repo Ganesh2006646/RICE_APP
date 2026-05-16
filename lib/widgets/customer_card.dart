@@ -113,30 +113,6 @@ class CustomerCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onNewOrder,
-                  icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
-                  label: const Text('Order'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              IconButton.filledTonal(
-                tooltip: 'Call',
-                onPressed: onCall,
-                icon: const Icon(Icons.call_outlined),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              IconButton.filledTonal(
-                tooltip: 'WhatsApp',
-                onPressed: onWhatsApp,
-                icon: const Icon(Icons.chat_outlined),
-              ),
-            ],
-          ),
         ],
       ),
     );

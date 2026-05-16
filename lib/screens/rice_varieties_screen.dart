@@ -65,6 +65,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'rice_varieties_fab',
         onPressed: () => _showProductDialog(context, db, ref),
         icon: const Icon(Icons.add),
         label: Text('add_rice'.tr(ref)),

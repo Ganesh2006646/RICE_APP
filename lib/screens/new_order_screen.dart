@@ -950,13 +950,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                         size: 20, color: AppColors.error),
                     onPressed: () => _removeCustomer(index),
                   ),
-                Icon(data.isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: AppColors.textSecondary),
+                if (data.customer != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
+                    onPressed: () => setState(() => data.customer = null),
+                  ),
               ],
             ),
-            onTap: () => setState(() => data.isExpanded = !data.isExpanded),
           ),
-          if (data.isExpanded && data.customer == null)
+          if (data.customer == null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: StreamBuilder<List<Customer>>(
@@ -1020,11 +1022,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        CapacityProgressCard(
-          currentQtl: _totalQtl,
-          maxCapacity: _capacity,
-        ),
-        const SizedBox(height: AppSpacing.lg),
         ..._customers
             .asMap()
             .entries
@@ -1139,29 +1136,6 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                   flex: 3,
                   child: _buildProductDropdown(item),
                 ),
-                const SizedBox(width: 8),
-                if (item.product != null)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: item.effectiveGstRate > 0
-                          ? AppColors.warningLight
-                          : AppColors.infoLight,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      item.effectiveGstRate > 0
-                          ? 'GST ${(item.effectiveGstRate * 100).toInt()}%'
-                          : 'GST 0%',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: item.effectiveGstRate > 0
-                              ? AppColors.warning
-                              : AppColors.textSecondary),
-                    ),
-                  ),
                 const SizedBox(width: 4),
                 IconButton(
                   icon:
@@ -1273,6 +1247,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       child: DropdownButtonFormField<Product>(
         initialValue: item.product,
         isExpanded: true,
+        menuMaxHeight: MediaQuery.of(context).size.height * 0.7,
         decoration: const InputDecoration(
           contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           border: InputBorder.none,
@@ -1403,8 +1378,14 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
               _summaryRow(
                   'Total Weight', '${_totalQtl.toStringAsFixed(2)} QTL'),
               const Divider(height: 16),
-              _summaryRow('Total Amount',
-                  '${settings.currencySymbol}${_totalAmount.toStringAsFixed(0)}',
+              _summaryRow('Base Amount', '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.taxableSubtotal)).toStringAsFixed(2)}'),
+              const Divider(height: 8),
+              _summaryRow('Total AMC', '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + (i.amc10 + i.amc5))).toStringAsFixed(2)}'),
+              const Divider(height: 8),
+              _summaryRow('Total GST', '${settings.currencySymbol}${validCustomers.fold(0.0, (sum, c) => sum + c.items.where((i) => i.isValid).fold(0.0, (s, i) => s + i.gstAmount)).toStringAsFixed(2)}'),
+              const Divider(height: 16),
+              _summaryRow('Grand Total',
+                  '${settings.currencySymbol}${_totalAmount.toStringAsFixed(2)}',
                   isTotal: true),
             ],
           ),

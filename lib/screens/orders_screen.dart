@@ -36,7 +36,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   @override
   void initState() {
     super.initState();
-    _filterDate = DateTime.now().add(const Duration(days: 1));
+    // Default filter removed per request
+    _filterDate = null;
   }
 
   @override
@@ -55,41 +56,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       appBar: AppBar(
         title: SafeText('order_history'.tr(ref),
             style: const TextStyle(fontSize: 18)),
-        actions: [
-          IconButton(
-            icon: Icon(
-                _filterDate != null
-                    ? Icons.event_available
-                    : Icons.calendar_today,
-                color: _filterDate != null ? theme.primaryColor : null),
-            onPressed: () => _selectDate(context),
-          ),
-          if (_filterDate != null)
-            IconButton(
-                icon: const Icon(Icons.clear_all),
-                onPressed: () => setState(() {
-                      _filterDate = null;
-                    })),
-        ],
       ),
       body: SafePage(
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            if (_filterDate != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                color: theme.primaryColor.withValues(alpha: 0.1),
-                child: SafeWrap(
-                  children: [
-                    Icon(Icons.filter_alt, size: 16, color: theme.primaryColor),
-                    if (_filterDate != null)
-                      Chip(
-                          label: Text(_dateFormat.format(_filterDate!)),
-                          onDeleted: () => setState(() => _filterDate = null)),
-                  ],
-                ),
-              ),
             StreamBuilder<List<OrderWithDetails>>(
               stream: _buildOrdersQuery(db),
               builder: (context, snapshot) {

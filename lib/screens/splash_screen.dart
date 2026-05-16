@@ -112,20 +112,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       ],
                     ),
                     child: DecoratedBox(
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        shape: BoxShape.circle,
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(10),
-                        child: Image.asset(
-                          'assets/images/sri_balaji_logo.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                            Icons.agriculture_outlined,
-                            size: 58,
-                            color: AppColors.primary,
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/sri_balaji_logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
+                              Icons.agriculture_outlined,
+                              size: 58,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
                       ),
@@ -133,7 +135,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   Text(
-                    'RiceAgent Pro',
+                    'Sri Balaji Rice Mill',
                     style: textTheme.displaySmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,

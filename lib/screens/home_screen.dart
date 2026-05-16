@@ -54,6 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       floatingActionButton: _selectedIndex == 4
           ? null
           : FloatingActionButton.extended(
+              heroTag: 'home_fab',
               onPressed: _openNewOrder,
               icon: const Icon(Icons.add_shopping_cart_outlined),
               label: const Text('New Order'),

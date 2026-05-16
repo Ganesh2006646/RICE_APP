@@ -79,8 +79,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           ),
         ],
       ),
-      body: SafePage(
-        padding: EdgeInsets.zero,
+      body: SafeArea(
         child: Column(
           children: [
             Padding(
@@ -270,6 +269,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'customers_fab',
         onPressed: () => _showCustomerDialog(context, db),
         icon: const Icon(Icons.add),
         label: Text('add_customer'.tr(ref)),

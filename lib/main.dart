@@ -17,17 +17,17 @@ final databaseProvider = Provider<AppDatabase>((ref) => AppDatabase());
 void main() async {
   // Initialize global error handler first
   GlobalErrorHandler.init();
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize crash reporting (uncomment DSN after setting up Sentry)
-  // To enable: Go to sentry.io, create project, paste DSN below
-  await CrashReportingService.init(
-      // dsn: 'https://your-dsn@sentry.io/your-project', // Uncomment with your DSN
-      );
 
   // Run app in a zone to catch async errors
   runZonedGuarded(
     () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      
+      // Initialize crash reporting (uncomment DSN after setting up Sentry)
+      // To enable: Go to sentry.io, create project, paste DSN below
+      await CrashReportingService.init(
+          // dsn: 'https://your-dsn@sentry.io/your-project', // Uncomment with your DSN
+          );
       try {
         // Apply any staged DB restore before opening Drift connection.
         await BackupService.applyPendingRestoreIfAny();
@@ -36,9 +36,6 @@ void main() async {
 
         // Seed initial products if empty
         await ProductSeedingService.seedInitialProducts(db);
-
-        // Trigger auto-backup before app starts (non-blocking)
-        _triggerAutoBackup();
 
         runApp(ProviderScope(
           overrides: [
@@ -62,17 +59,6 @@ void main() async {
       CrashReportingService.reportError(error, stack, context: 'Async Zone');
     },
   );
-}
-
-/// Trigger auto-backup silently during startup
-Future<void> _triggerAutoBackup() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final autoBackupEnabled = prefs.getBool('auto_backup_enabled') ?? true;
-    await BackupService.performAutoBackupIfNeeded(autoBackupEnabled);
-  } catch (e) {
-    debugPrint('[Main] Auto-backup trigger failed: $e');
-  }
 }
 
 /// Root application widget - now responds to settings changes
