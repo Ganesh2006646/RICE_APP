@@ -466,12 +466,20 @@ class PdfService {
     final fileName =
         'Invoice_${safeOrderNo}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(await pdf.save());
+    final pdfBytes = await pdf.save();
+    await file.writeAsBytes(pdfBytes, flush: true);
 
+    // Verify the file was written successfully
+    if (!await file.exists() || await file.length() == 0) {
+      throw Exception('PDF file was not created successfully');
+    }
+
+    // Use subject (not text) to avoid Android dropping the file attachment
+    // when both text and file are provided in the share intent.
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'application/pdf')],
-      text:
-          'Invoice for ${customer.shopName} — Order #${order.notes ?? "N/A"} from $millName',
+      subject:
+          'Invoice for ${customer.shopName} — Order #${order.notes ?? "N/A"}',
     );
   }
 }

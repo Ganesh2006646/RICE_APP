@@ -121,16 +121,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   });
 
                   if (_searchQuery.isNotEmpty) {
-                    final q = _searchQuery; // already trimmed+lowercased
+                    final queryTokens = _searchQuery.split(' ').where((t) => t.isNotEmpty).toList();
                     customers = customers.where((c) {
                       // Normalise each field the same way the query was normalised
                       String norm(String? s) =>
                           (s ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-                      return norm(c.shopName).contains(q) ||
-                          norm(c.phone).contains(q) ||
-                          norm(c.ownerName).contains(q) ||
-                          norm(c.place).contains(q) ||
-                          norm(c.tinGst).contains(q);
+                      // Combine all searchable fields into one string
+                      final combined = '${norm(c.shopName)} ${norm(c.phone)} ${norm(c.ownerName)} ${norm(c.place)} ${norm(c.tinGst)}';
+                      // Every query token must appear somewhere in the combined text
+                      return queryTokens.every((token) => combined.contains(token));
                     }).toList();
                   }
 

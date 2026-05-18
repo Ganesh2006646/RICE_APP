@@ -53,6 +53,8 @@ class OrderCard extends StatelessWidget {
                     Text(
                       order.notes ?? 'No order number',
                       style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -62,10 +64,15 @@ class OrderCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                '$currencySymbol${order.totalAmount.toStringAsFixed(0)}',
-                style: AppTypography.metricMedium.copyWith(
-                  color: AppColors.primary,
+              Flexible(
+                child: Text(
+                  '$currencySymbol${order.totalAmount.toStringAsFixed(0)}',
+                  style: AppTypography.metricMedium.copyWith(
+                    color: AppColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
                 ),
               ),
             ],

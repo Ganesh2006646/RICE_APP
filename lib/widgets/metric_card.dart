@@ -98,6 +98,8 @@ class MetricCard extends StatelessWidget {
                                   ? AppColors.success
                                   : AppColors.error,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),

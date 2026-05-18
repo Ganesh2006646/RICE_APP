@@ -39,18 +39,24 @@ class SectionHeader extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (actionLabel != null && onAction != null) ...[
-            TextButton.icon(
-              onPressed: onAction,
-              icon: Icon(actionIcon ?? Icons.arrow_forward, size: 16),
-              label: Text(
-                actionLabel!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+            Flexible(
+              child: TextButton.icon(
+                onPressed: onAction,
+                icon: Icon(actionIcon ?? Icons.arrow_forward, size: 16),
+                label: Text(
+                  actionLabel!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),

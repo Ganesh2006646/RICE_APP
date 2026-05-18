@@ -16,6 +16,7 @@ import 'new_order_screen.dart';
 import 'orders_screen.dart';
 import 'rice_varieties_screen.dart';
 import 'settings_screen.dart';
+import 'product_gallery_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -343,7 +344,7 @@ class _GalleryButton extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, _) => const _GalleryPlaceholder(),
+          pageBuilder: (context, animation, _) => const ProductGalleryScreen(),
           transitionsBuilder: (context, animation, _, child) {
             return FadeTransition(
               opacity:
@@ -388,25 +389,32 @@ class _GalleryButton extends StatelessWidget {
                   size: 28, color: Colors.white),
             ),
             const SizedBox(width: AppSpacing.lg),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Product Gallery',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                Text(
-                  'Browse all rice varieties',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.78),
-                      ),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Product Gallery',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Browse all rice varieties',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.78),
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.sm),
             const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
           ],
         ),
@@ -415,19 +423,7 @@ class _GalleryButton extends StatelessWidget {
   }
 }
 
-class _GalleryPlaceholder extends StatelessWidget {
-  const _GalleryPlaceholder();
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Product Gallery')),
-      body: const Center(
-        child: Text('Gallery coming soon!',
-            style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
-      ),
-    );
-  }
-}
+
 
 class _BusinessPulse extends StatelessWidget {
   final _DashboardStats stats;

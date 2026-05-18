@@ -169,6 +169,8 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       TextEditingController(text: '120');
   final TextEditingController _orderNumberController = TextEditingController();
   final Map<String, int> _inputFieldRevisions = {};
+  final Map<int, double> _bulkDiscountBaseRates = {};
+  final Map<int, double> _bulkDiscountLastAppliedRates = {};
   final List<CustomerLoadFormData> _customers = [];
   bool _isSaving = false;
   String? _orderNumber;
@@ -366,9 +368,11 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     _inputFieldRevisions.remove('${item.hashCode}_bags10');
     _inputFieldRevisions.remove('${item.hashCode}_bags5');
     _inputFieldRevisions.remove('${item.hashCode}_rate');
+    _bulkDiscountBaseRates.remove(item.hashCode);
+    _bulkDiscountLastAppliedRates.remove(item.hashCode);
   }
 
-  void _applyBulkDiscounts() {
+  void _applyBulkDiscounts({bool showSummary = true}) {
     final List<String> discountLog = [];
     setState(() {
       for (var customerData in _customers) {
@@ -403,7 +407,17 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         }
         for (var item in customerData.items) {
           if (item.product == null) continue;
-          double currentRate = item.rate;
+          final itemKey = item.hashCode;
+          final lastApplied = _bulkDiscountLastAppliedRates[itemKey];
+          final wasUnchangedSinceLastApply =
+              lastApplied != null && (item.rate - lastApplied).abs() <= 0.01;
+
+          if (!wasUnchangedSinceLastApply ||
+              !_bulkDiscountBaseRates.containsKey(itemKey)) {
+            _bulkDiscountBaseRates[itemKey] = item.rate;
+          }
+
+          final double currentRate = _bulkDiscountBaseRates[itemKey] ?? item.rate;
           double itemDiscount = 0.0;
           final pid = item.product!.id;
           double itemVarietyQtl = varietyQtl[pid] ?? 0.0;
@@ -417,15 +431,18 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             double newRate = math.max(0.0, currentRate - itemDiscount);
             if ((item.rate - newRate).abs() > 0.01) {
               item.rate = newRate;
+              _bulkDiscountLastAppliedRates[itemKey] = newRate;
               _bumpInputRevision('${item.hashCode}_rate');
               discountLog.add(
                   '${item.product!.name}: ${item.qtlTotal.toStringAsFixed(1)}QTL → ₹$itemDiscount off (${currentRate.toStringAsFixed(0)} → ${newRate.toStringAsFixed(0)})');
             }
+          } else {
+            _bulkDiscountLastAppliedRates[itemKey] = currentRate;
           }
         }
       }
     });
-    if (mounted) {
+    if (showSummary && mounted) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -455,6 +472,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       _showError('Please add at least one customer with valid items');
       return;
     }
+
+    // Ensure bulk discounts are always reflected in saved data.
+    _applyBulkDiscounts(showSummary: false);
+
     final confirmed = await ConfirmDialog.show(
       context: context,
       icon: Icons.save_outlined,
@@ -1121,11 +1142,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                     children: [
                       Text(data.customer!.shopName,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
+                              fontWeight: FontWeight.w600, fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                       if (data.customer!.place != null)
                         Text(data.customer!.place!,
                             style: const TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary)),
+                                fontSize: 11, color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -1642,11 +1667,15 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1)),
                 const SizedBox(width: 8),
-                Text('${data.totalQtl.toStringAsFixed(2)} QTL',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppColors.primary)),
+                Flexible(
+                  child: Text('${data.totalQtl.toStringAsFixed(2)} QTL',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppColors.primary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
               ],
             ),
           ),
@@ -1720,7 +1749,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             ),
             child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text('Customer Total',
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.bold)),
