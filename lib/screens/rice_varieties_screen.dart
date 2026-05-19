@@ -430,8 +430,10 @@ class RiceVarietiesScreen extends ConsumerWidget {
           ? product.defaultPrice.toStringAsFixed(0)
           : '',
     );
-    bool isGst5 = product?.gstRateDefault == 5.0;
     bool isGalaxy = product?.isGalaxy ?? false;
+    // Initialize packing support from unit field
+    final unitStr = product?.unit ?? 'qtl';
+    bool hasSmallPacking = unitStr.contains('p10:1') || unitStr.contains('p5:1');
 
     showDialog(
       context: context,
@@ -548,21 +550,33 @@ class RiceVarietiesScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: SwitchListTile(
-                            title: const Text('GST 5%'),
+                            title: Row(
+                              children: [
+                                Icon(Icons.inventory_2,
+                                    size: 18, color: hasSmallPacking ? Colors.blue.shade700 : AppTheme.grey),
+                                const SizedBox(width: 8),
+                                const Flexible(
+                                    child: Text('5kg & 10kg Packing',
+                                        overflow: TextOverflow.ellipsis)),
+                              ],
+                            ),
                             subtitle: Text(
-                              isGst5
-                                  ? 'branded_rice'.tr(ref)
-                                  : 'loose_rice'.tr(ref),
+                              hasSmallPacking
+                                  ? '5kg & 10kg bags available • GST 5% applies'
+                                  : 'Only 26kg bags • No GST',
                               style: TextStyle(
-                                color: isGst5
-                                    ? Colors.orange.shade700
+                                color: hasSmallPacking
+                                    ? Colors.blue.shade700
                                     : AppTheme.grey,
                                 fontSize: 12,
                               ),
                             ),
-                            value: isGst5,
-                            activeThumbColor: Theme.of(context).primaryColor,
-                            onChanged: (val) => setState(() => isGst5 = val),
+                            value: hasSmallPacking,
+                            activeTrackColor: Colors.blue.shade200,
+                            activeThumbColor: Colors.blue.shade700,
+                            onChanged: (val) => setState(() {
+                              hasSmallPacking = val;
+                            }),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -570,15 +584,7 @@ class RiceVarietiesScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'gst_note'.tr(ref),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.grey,
-                                fontStyle: FontStyle.italic,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Note: 5% GST applies only to 5kg & 10kg bags. 26kg bags are always tax-free.',
+                          'Note: 5% GST auto-applies for varieties with 5kg & 10kg packing. 26kg bags are always tax-free.',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.orange.shade800,
                                 fontSize: 11,
@@ -634,8 +640,9 @@ class RiceVarietiesScreen extends ConsumerWidget {
                                       : skuController.text.trim()),
                               defaultPrice: drift.Value(price),
                               gstRateDefault:
-                                  drift.Value(isGst5 ? 5.0 : 0.0),
+                                  drift.Value(hasSmallPacking ? 5.0 : 0.0),
                               isGalaxy: drift.Value(isGalaxy),
+                              unit: drift.Value('qtl|p10:${hasSmallPacking ? 1 : 0}|p5:${hasSmallPacking ? 1 : 0}'),
                               updatedAt: drift.Value(DateTime.now()),
                             ));
                           } else {
@@ -650,8 +657,9 @@ class RiceVarietiesScreen extends ConsumerWidget {
                                           : skuController.text.trim()),
                                   defaultPrice: drift.Value(price),
                                   gstRateDefault:
-                                      drift.Value(isGst5 ? 5.0 : 0.0),
+                                      drift.Value(hasSmallPacking ? 5.0 : 0.0),
                                   isGalaxy: drift.Value(isGalaxy),
+                                  unit: drift.Value('qtl|p10:${hasSmallPacking ? 1 : 0}|p5:${hasSmallPacking ? 1 : 0}'),
                                   updatedAt: drift.Value(DateTime.now()),
                                 ));
                           }

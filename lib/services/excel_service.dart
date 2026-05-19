@@ -270,8 +270,8 @@ class ExcelService {
           effectiveRate > 0
               ? rateNf.format(effectiveRate)
               : '-', // 10: RATE (effective = base + surcharge for small packs)
-          item.amcAmount > 0 ? nf.format(item.amcAmount) : '0', // 11: AMC (amount)
-          item.gstAmount > 0 ? nf.format(item.gstAmount) : '0', // 12: GST (amount)
+          '1%', // 11: AMC (always 1%)
+          product.gstRateDefault > 0 ? '${product.gstRateDefault.toStringAsFixed(0)}%' : '0%', // 12: GST (percentage)
           nf.format(item.netAmount), // 13: EX INFO (Grand Total for line)
         ];
 

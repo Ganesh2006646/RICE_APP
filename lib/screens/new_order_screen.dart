@@ -401,7 +401,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         }
         double discountRate = 0.0;
         if (customerTotalQtl >= 100.0) {
-          discountRate = 75.0;
+          discountRate = 70.0;
         } else if (customerTotalQtl >= 50.0) {
           discountRate = 50.0;
         }
@@ -586,6 +586,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     if (step > _currentStep) {
       if (!_validateStep()) return;
     }
+    // Auto-apply bulk discounts silently when entering Review (step 4+)
+    if (step >= 4 && _currentStep <= 3) {
+      _applyBulkDiscounts(showSummary: false);
+    }
     setState(() => _currentStep = step);
   }
 
@@ -693,12 +697,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         ],
       ),
       actions: [
-        if (_currentStep == 3)
-          IconButton(
-            onPressed: _applyBulkDiscounts,
-            icon: const Icon(Icons.discount_outlined),
-            tooltip: 'Apply Bulk Discounts',
-          ),
+        // Bulk discounts now auto-apply when moving to Review step
         if (_currentStep < _totalSteps)
           TextButton.icon(
             onPressed: () => _goToStep(_currentStep + 1),

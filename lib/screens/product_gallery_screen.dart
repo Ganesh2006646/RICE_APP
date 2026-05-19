@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme.dart';
 import '../services/translation_service.dart';
 import '../widgets/safe_widgets.dart';
@@ -79,6 +80,29 @@ class ProductGalleryScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             _buildProductGrid(context, ref),
+
+            const SizedBox(height: 32),
+
+            // Brand Advertisement Videos
+            SafeText(
+              'Brand Videos',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: theme.textTheme.titleLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const SafeText(
+              'Watch our brand advertisements',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _buildVideoSection(context, ref),
 
             const SizedBox(height: 32),
 
@@ -423,6 +447,231 @@ class ProductGalleryScreen extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoSection(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    // Add your YouTube video links here
+    final videos = <Map<String, String>>[
+      {
+        'title': 'Sri Balaji Rice Mill - Brand Ad',
+        'videoId': '', // Add YouTube video ID here, e.g., 'dQw4w9WgXcQ'
+        'url': '', // Add full YouTube URL here
+      },
+      // Add more videos as needed:
+      // {
+      //   'title': 'Galaxy Sona - Premium Quality',
+      //   'videoId': 'VIDEO_ID_HERE',
+      //   'url': 'https://www.youtube.com/watch?v=VIDEO_ID_HERE',
+      // },
+    ];
+
+    // Filter out entries with empty URLs
+    final activeVideos = videos.where((v) => v['url']!.isNotEmpty).toList();
+
+    if (activeVideos.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.video_library_outlined,
+                size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'Videos coming soon!',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Brand advertisement videos will appear here',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 500.ms);
+    }
+
+    return Column(
+      children: activeVideos.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final video = entry.value;
+        return Padding(
+          padding: EdgeInsets.only(bottom: idx < activeVideos.length - 1 ? 16 : 0),
+          child: _buildVideoCard(context, video, theme)
+              .animate(delay: (idx * 150).ms)
+              .fadeIn(duration: 500.ms)
+              .slideY(begin: 0.05, curve: Curves.easeOutQuad),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildVideoCard(
+      BuildContext context, Map<String, String> video, ThemeData theme) {
+    final videoId = video['videoId'] ?? '';
+    final thumbnailUrl = videoId.isNotEmpty
+        ? 'https://img.youtube.com/vi/$videoId/hqdefault.jpg'
+        : '';
+
+    return GestureDetector(
+      onTap: () async {
+        final url = video['url'] ?? '';
+        if (url.isNotEmpty) {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
+          boxShadow: theme.brightness == Brightness.light
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // YouTube Thumbnail with Play Button overlay
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Thumbnail or placeholder
+                  thumbnailUrl.isNotEmpty
+                      ? Image.network(
+                          thumbnailUrl,
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            height: 200,
+                            color: Colors.red.shade50,
+                            child: Icon(Icons.play_circle_outline,
+                                size: 64, color: Colors.red.shade300),
+                          ),
+                        )
+                      : Container(
+                          height: 200,
+                          width: double.infinity,
+                          color: Colors.red.shade50,
+                          child: Icon(Icons.play_circle_outline,
+                              size: 64, color: Colors.red.shade300),
+                        ),
+                  // Dark overlay
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.4),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Play button
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade600,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.shade900.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.play_arrow,
+                        size: 36, color: Colors.white),
+                  ),
+                  // YouTube branding
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.smart_display,
+                              size: 14, color: Colors.red),
+                          SizedBox(width: 4),
+                          Text(
+                            'YouTube',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Video title
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.play_circle_filled,
+                      color: Colors.red.shade600, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      video['title'] ?? 'Brand Video',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: theme.textTheme.bodyLarge?.color,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(Icons.open_in_new,
+                      size: 18, color: Colors.grey.shade500),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
