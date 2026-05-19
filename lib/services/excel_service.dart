@@ -184,6 +184,10 @@ class ExcelService {
     final nf = NumberFormat('#,##0.00', 'en_US');
     final rateNf = NumberFormat('#,##0', 'en_US');
 
+    // Running totals for the summary row
+    double sumQtl26 = 0, sumQtl10 = 0, sumQtl5 = 0;
+    double sumAmc = 0, sumGst = 0, sumNet = 0;
+
     for (var customerId in groupedItems.keys) {
       final customer = customers.firstWhere(
         (c) => c.id == customerId,
@@ -223,6 +227,14 @@ class ExcelService {
         final qtl10 = item.bags10 > 0 ? (item.bags10 * 10.0) / 100.0 : 0.0;
         final qtl5  = item.bags5  > 0 ? (item.bags5  * 5.0)  / 100.0 : 0.0;
 
+        // Accumulate totals for summary row
+        sumQtl26 += qtl26;
+        sumQtl10 += qtl10;
+        sumQtl5  += qtl5;
+        sumAmc   += item.amcAmount;
+        sumGst   += item.gstAmount;
+        sumNet   += item.netAmount;
+
         // Effective rate shown in RATE column:
         //  - 26 KG bags: base rate (no surcharge)
         //  - 10 KG bags: base rate + surcharge10kgPerQtl
@@ -258,8 +270,8 @@ class ExcelService {
           effectiveRate > 0
               ? rateNf.format(effectiveRate)
               : '-', // 10: RATE (effective = base + surcharge for small packs)
-          item.amcPercent > 0 ? '${item.amcPercent.toInt()}%' : '0%', // 11: AMC
-          item.gstPercent > 0 ? '${item.gstPercent.toInt()}%' : '0%', // 12: GST
+          item.amcAmount > 0 ? nf.format(item.amcAmount) : '0', // 11: AMC (amount)
+          item.gstAmount > 0 ? nf.format(item.gstAmount) : '0', // 12: GST (amount)
           nf.format(item.netAmount), // 13: EX INFO (Grand Total for line)
         ];
 
@@ -274,6 +286,65 @@ class ExcelService {
       }
       slNo++;
     }
+
+    // --- TOTALS ROW ---
+    rowIndex++; // blank separator row
+    final totalStyle = CellStyle(
+      bold: true,
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+      topBorder: Border(borderStyle: BorderStyle.Thin),
+      bottomBorder: Border(borderStyle: BorderStyle.Double),
+      leftBorder: Border(borderStyle: BorderStyle.Thin),
+      rightBorder: Border(borderStyle: BorderStyle.Thin),
+    );
+
+    final totalLabelCell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: rowIndex));
+    totalLabelCell.value = TextCellValue('TOTAL');
+    totalLabelCell.cellStyle = totalStyle;
+
+    // 26 KG QTL total
+    final total26Cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: rowIndex));
+    total26Cell.value = TextCellValue(sumQtl26.toStringAsFixed(2));
+    total26Cell.cellStyle = totalStyle;
+
+    // 10 KG QTL total
+    final total10Cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: rowIndex));
+    total10Cell.value = TextCellValue(sumQtl10 > 0 ? sumQtl10.toStringAsFixed(2) : '-');
+    total10Cell.cellStyle = totalStyle;
+
+    // 5 KG QTL total
+    final total5Cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: rowIndex));
+    total5Cell.value = TextCellValue(sumQtl5 > 0 ? sumQtl5.toStringAsFixed(2) : '-');
+    total5Cell.cellStyle = totalStyle;
+
+    // Total QTL (all bag types)
+    final totalQtlCell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: rowIndex));
+    totalQtlCell.value = TextCellValue('${(sumQtl26 + sumQtl10 + sumQtl5).toStringAsFixed(2)} QTL');
+    totalQtlCell.cellStyle = totalStyle;
+
+    // AMC total
+    final totalAmcCell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: rowIndex));
+    totalAmcCell.value = TextCellValue(sumAmc > 0 ? nf.format(sumAmc) : '0');
+    totalAmcCell.cellStyle = totalStyle;
+
+    // GST total
+    final totalGstCell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: rowIndex));
+    totalGstCell.value = TextCellValue(sumGst > 0 ? nf.format(sumGst) : '0');
+    totalGstCell.cellStyle = totalStyle;
+
+    // Grand Total
+    final totalNetCell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: rowIndex));
+    totalNetCell.value = TextCellValue(nf.format(sumNet));
+    totalNetCell.cellStyle = totalStyle;
 
     // --- SAVE ---
     final directory = await getApplicationDocumentsDirectory();

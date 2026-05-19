@@ -401,40 +401,59 @@ class PdfService {
               // ── Footer ───────────────────────────────────────────────
               pw.Divider(color: PdfColors.grey300),
               pw.SizedBox(height: 6),
+
+              // Telugu quote — bold and simple
+              if (teluguFont != null)
+                pw.Center(
+                  child: pw.Text(
+                    '|| నాణ్యత మా బాధ్యత — రుచి మా గుర్తింపు ||',
+                    style: pw.TextStyle(
+                      font: teluguFont,
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.green900,
+                    ),
+                  ),
+                ),
+              pw.SizedBox(height: 8),
+
+              // Cash Discount — clean box layout
+              pw.Container(
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.orange300, width: 0.8),
+                  borderRadius: pw.BorderRadius.circular(4),
+                  color: PdfColors.orange50,
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'CASH DISCOUNT',
+                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.orange900, letterSpacing: 0.5),
+                    ),
+                    pw.Divider(color: PdfColors.orange200, height: 6),
+                    pw.SizedBox(height: 2),
+                    _cdRow('Within 07 Days', '2% CD'),
+                    _cdRow('Within 15 Days', '1.5% CD'),
+                    _cdRow('Within 20 Days', '1% CD'),
+                    _cdRow('Above 20 Days', 'No Discount'),
+                    _cdRow('After 30 Days', '18% Interest'),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 8),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        '"Quality You Can Trust. Taste You Will Love!"',
-                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green800, fontStyle: pw.FontStyle.italic),
-                      ),
-                      pw.SizedBox(height: 2),
-                      pw.Text(
-                        'Thank you for your business. Prompt payments are highly appreciated!',
-                        style: pw.TextStyle(fontSize: 8, color: PdfColors.green900, fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.SizedBox(height: 8),
-                      pw.Text(
-                        'CASH DISCOUNT:',
-                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800),
-                      ),
-                      pw.Text(
-                        'PAYMENT WITHIN 07 DAYS: 2% CD\nPAYMENT WITHIN 15 DAYS: 1.5% CD\nPAYMENT WITHIN 20 DAYS: 1% CD\nABOVE 20 DAYS: NO CASH DISCOUNT\nAFTER 30 DAYS: 18% INTEREST WILL BE CALCULATED',
-                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.orange900),
-                      ),
-                      pw.SizedBox(height: 6),
-                      pw.Text(
-                        'Auto generated document. Data may be subject to rounding.',
-                        style: pw.TextStyle(
-                            fontSize: 8,
-                            color: PdfColors.grey500,
-                            fontStyle: pw.FontStyle.italic),
-                      ),
-                    ]
+                  pw.Text(
+                    'Auto generated document. Data may be subject to rounding.',
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        color: PdfColors.grey500,
+                        fontStyle: pw.FontStyle.italic),
                   ),
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -480,6 +499,20 @@ class PdfService {
       [XFile(file.path, mimeType: 'application/pdf')],
       subject:
           'Invoice for ${customer.shopName} — Order #${order.notes ?? "N/A"}',
+    );
+  }
+
+  /// Helper: builds one row in the Cash Discount box.
+  static pw.Widget _cdRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+          pw.Text(value, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800)),
+        ],
+      ),
     );
   }
 }
