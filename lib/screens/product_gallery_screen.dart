@@ -268,22 +268,22 @@ class ProductGalleryScreen extends ConsumerWidget {
       {
         'name': 'galaxy_sona_blue'.tr(ref),
         'image': 'assets/images/galaxy_blue_sona.png',
-        'description': 'common_rice_desc'.tr(ref),
+        'description': 'sona_blue_desc'.tr(ref),
       },
       {
         'name': 'galaxy_sona_green'.tr(ref),
         'image': 'assets/images/galaxy_green_sona.png',
-        'description': 'common_rice_desc'.tr(ref),
+        'description': 'sona_green_desc'.tr(ref),
       },
       {
         'name': 'amaravathi'.tr(ref),
         'image': 'assets/images/amaravati.png',
-        'description': 'common_rice_desc'.tr(ref),
+        'description': 'hmt_desc'.tr(ref),
       },
       {
         'name': 'brown_rice'.tr(ref),
         'image': 'assets/images/brown_rice.png',
-        'description': 'common_rice_desc'.tr(ref),
+        'description': 'brown_rice_desc'.tr(ref),
       },
     ];
 
