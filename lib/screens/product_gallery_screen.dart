@@ -454,19 +454,22 @@ class ProductGalleryScreen extends ConsumerWidget {
 
   Widget _buildVideoSection(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    // Add your YouTube video links here
     final videos = <Map<String, String>>[
       {
-        'title': 'Sri Balaji Rice Mill - Brand Ad',
-        'videoId': '', // Add YouTube video ID here, e.g., 'dQw4w9WgXcQ'
-        'url': '', // Add full YouTube URL here
+        'title': 'Sri Balaji Rice Mill - Brand Ad 1',
+        'videoId': '7Lf4R6Xi-KM',
+        'url': 'https://youtu.be/7Lf4R6Xi-KM',
       },
-      // Add more videos as needed:
-      // {
-      //   'title': 'Galaxy Sona - Premium Quality',
-      //   'videoId': 'VIDEO_ID_HERE',
-      //   'url': 'https://www.youtube.com/watch?v=VIDEO_ID_HERE',
-      // },
+      {
+        'title': 'Sri Balaji Rice Mill - Brand Ad 2',
+        'videoId': 'WBmw0Ec_Nlg',
+        'url': 'https://youtu.be/WBmw0Ec_Nlg',
+      },
+      {
+        'title': 'Sri Balaji Rice Mill - Brand Ad 3',
+        'videoId': 'XpIEccDxaAY',
+        'url': 'https://youtu.be/XpIEccDxaAY',
+      },
     ];
 
     // Filter out entries with empty URLs
