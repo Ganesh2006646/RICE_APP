@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import '../main.dart';
 import '../theme.dart';
+
 import '../db/database.dart';
 import '../services/translation_service.dart';
 import '../widgets/safe_widgets.dart';
@@ -48,10 +49,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   Stream<List<Customer>>? _customersStream;
 
+  // Cache: customerId → { totalQtl, records }
+  Map<String, _CustomerPurchaseData> _purchaseCache = {};
+  bool _purchaseCacheLoaded = false;
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+
   }
 
   @override
@@ -59,6 +65,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final db = ref.watch(databaseProvider);
     final theme = Theme.of(context);
     _customersStream ??= db.select(db.customers).watch();
+
+    // Load purchase data lazily (once)
+    if (!_purchaseCacheLoaded) {
+      _purchaseCacheLoaded = true;
+      _loadPurchaseData(db);
+    }
+
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -70,6 +83,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             icon: const Icon(Icons.upload_file),
             tooltip: 'import_excel'.tr(ref),
             onPressed: () => _importExcel(db),
+          ),
+          IconButton(
+            icon: const Icon(Icons.analytics_outlined),
+            tooltip: 'Export All Customers',
+            onPressed: () => _exportAllCustomers(db),
           ),
           IconButton(
             icon: const Icon(Icons.person_add),
@@ -173,10 +191,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   Widget _buildCustomerCard(Customer customer, AppDatabase db) {
+    final data = _purchaseCache[customer.id];
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: CustomerCard(
         customer: customer,
+        totalQtl: data?.totalQtl ?? 0.0,
+        purchaseHistory: data?.records ?? const [],
         onTap: () => _navigateToNewOrder(customer),
         onEdit: () => _showCustomerDialog(context, db, customer: customer),
         onDelete: () => _confirmDelete(customer, db),
@@ -402,4 +423,111 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       }
     }
   }
+
+  Future<void> _exportAllCustomers(AppDatabase db) async {
+    final scaffold = ScaffoldMessenger.of(context);
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final customers = await db.select(db.customers).get();
+      final allItems = await db.select(db.orderItems).get();
+      final allOrders = await db.select(db.orders).get();
+      final allProducts = await db.select(db.products).get();
+
+      final filePath = await ExcelService.exportAllCustomerPurchases(
+        customers: customers,
+        orderItems: allItems,
+        orders: allOrders,
+        products: allProducts,
+        customPath: ref.read(settingsProvider).excelSavePath,
+      );
+
+      if (mounted) Navigator.pop(context); // dismiss loading
+
+      final downloadPath = await ExcelService.copyToDownloads(
+        filePath,
+        customPath: ref.read(settingsProvider).excelSavePath,
+      );
+
+      scaffold.showSnackBar(SnackBar(
+        content: Text('Customer report exported: ${downloadPath.split('/').last}'),
+        backgroundColor: AppTheme.success,
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // dismiss loading
+      scaffold.showSnackBar(SnackBar(
+        content: Text('Export failed: $e'),
+        backgroundColor: AppTheme.error,
+      ));
+    }
+  }
+
+  /// Fetches all order items and builds per-customer purchase summary
+  Future<void> _loadPurchaseData(AppDatabase db) async {
+    try {
+      // Get all order items
+      final allItems = await db.select(db.orderItems).get();
+      if (allItems.isEmpty) return;
+
+      // Get all orders for date + order number
+      final allOrders = await db.select(db.orders).get();
+      final orderMap = {for (final o in allOrders) o.id: o};
+
+      // Get all products for variety name
+      final allProducts = await db.select(db.products).get();
+      final productMap = {for (final p in allProducts) p.id: p};
+
+      // Build the cache
+      final cache = <String, _CustomerPurchaseData>{};
+
+      for (final item in allItems) {
+        final order = orderMap[item.orderId];
+        final product = productMap[item.productId];
+        if (order == null || product == null) continue;
+
+        final record = PurchaseRecord(
+          orderNo: order.notes ?? order.id.substring(0, 6),
+          date: order.loadingDate,
+          variety: product.name,
+          qtyQtl: item.qtyQtl,
+          bags26: item.bags26,
+          bags10: item.bags10,
+          bags5: item.bags5,
+        );
+
+        cache.putIfAbsent(
+          item.customerId,
+          () => _CustomerPurchaseData(totalQtl: 0.0, records: []),
+        );
+        cache[item.customerId]!.totalQtl += item.qtyQtl;
+        cache[item.customerId]!.records.add(record);
+      }
+
+      // Sort each customer's records by date (newest first)
+      for (final entry in cache.values) {
+        entry.records.sort((a, b) => b.date.compareTo(a.date));
+      }
+
+      if (mounted) {
+        setState(() => _purchaseCache = cache);
+      }
+    } catch (_) {
+      // Non-critical — silently fail, badge just won't show
+    }
+  }
+}
+
+/// Internal data holder for per-customer purchase aggregation
+class _CustomerPurchaseData {
+  double totalQtl;
+  final List<PurchaseRecord> records;
+
+  _CustomerPurchaseData({required this.totalQtl, required this.records});
 }

@@ -1821,6 +1821,212 @@ class ExcelService {
 
     return out;
   }
+
+  /// Export all customers with purchase summary as a single-sheet Excel.
+  static Future<String> exportAllCustomerPurchases({
+    required List<Customer> customers,
+    required List<OrderItem> orderItems,
+    required List<Order> orders,
+    required List<Product> products,
+    String? customPath,
+  }) async {
+    final excel = Excel.createExcel();
+    const sheetName = 'Customer Summary';
+    excel.rename('Sheet1', sheetName);
+    final sheet = excel[sheetName];
+
+    final titleStyle = CellStyle(
+      bold: true,
+      fontSize: 13,
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+    );
+    final headerStyle = CellStyle(
+      bold: true,
+      fontSize: 10,
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+      topBorder: Border(borderStyle: BorderStyle.Thin),
+      bottomBorder: Border(borderStyle: BorderStyle.Thin),
+      leftBorder: Border(borderStyle: BorderStyle.Thin),
+      rightBorder: Border(borderStyle: BorderStyle.Thin),
+    );
+    final centerStyle = CellStyle(
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+      topBorder: Border(borderStyle: BorderStyle.Thin),
+      bottomBorder: Border(borderStyle: BorderStyle.Thin),
+      leftBorder: Border(borderStyle: BorderStyle.Thin),
+      rightBorder: Border(borderStyle: BorderStyle.Thin),
+    );
+    final leftStyle = CellStyle(
+      horizontalAlign: HorizontalAlign.Left,
+      verticalAlign: VerticalAlign.Center,
+      topBorder: Border(borderStyle: BorderStyle.Thin),
+      bottomBorder: Border(borderStyle: BorderStyle.Thin),
+      leftBorder: Border(borderStyle: BorderStyle.Thin),
+      rightBorder: Border(borderStyle: BorderStyle.Thin),
+    );
+    final totalStyle = CellStyle(
+      bold: true,
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+      topBorder: Border(borderStyle: BorderStyle.Thin),
+      bottomBorder: Border(borderStyle: BorderStyle.Double),
+      leftBorder: Border(borderStyle: BorderStyle.Thin),
+      rightBorder: Border(borderStyle: BorderStyle.Thin),
+    );
+
+    final orderMap = {for (final o in orders) o.id: o};
+    final productMap = {for (final p in products) p.id: p};
+    final nf = NumberFormat('#,##0.00', 'en_US');
+    final dateFmt = DateFormat('dd-MM-yyyy');
+
+    // Aggregate per customer
+    final custData = <String, _CustExportData>{};
+    for (final item in orderItems) {
+      final order = orderMap[item.orderId];
+      final product = productMap[item.productId];
+      if (order == null || product == null) continue;
+
+      final cid = item.customerId;
+      custData.putIfAbsent(cid, () => _CustExportData());
+      final d = custData[cid]!;
+
+      d.orderIds.add(item.orderId);
+      d.totalQtl += item.qtyQtl;
+      d.totalBags26 += item.bags26;
+      d.totalBags10 += item.bags10;
+      d.totalBags5 += item.bags5;
+      d.totalNetAmount += item.netAmount;
+
+      final loadDate = order.loadingDate;
+      if (d.firstDate == null || loadDate.isBefore(d.firstDate!)) {
+        d.firstDate = loadDate;
+      }
+      if (d.lastDate == null || loadDate.isAfter(d.lastDate!)) {
+        d.lastDate = loadDate;
+      }
+
+      d.varietyQtl[product.name] =
+          (d.varietyQtl[product.name] ?? 0) + item.qtyQtl;
+    }
+
+    // Title Row
+    final cellA1 = sheet.cell(CellIndex.indexByString('A1'));
+    cellA1.value = TextCellValue(
+        'CUSTOMER PURCHASE SUMMARY  -  ${dateFmt.format(DateTime.now())}');
+    cellA1.cellStyle = titleStyle;
+    sheet.merge(CellIndex.indexByString('A1'), CellIndex.indexByString('O1'));
+
+    // Headers
+    final headers = [
+      'SL', 'SHOP NAME', 'OWNER', 'PLACE', 'PHONE', 'GST / TIN',
+      'ORDERS', 'TOTAL QTL', '26 KG BAGS', '10 KG BAGS', '5 KG BAGS',
+      'FIRST ORDER', 'LAST ORDER', 'TOP VARIETY', 'NET AMT',
+    ];
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1));
+      cell.value = TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+    }
+
+    final widths = [5.0, 28.0, 18.0, 15.0, 14.0, 20.0, 8.0, 10.0, 10.0, 10.0, 10.0, 13.0, 13.0, 22.0, 15.0];
+    for (int i = 0; i < widths.length; i++) {
+      sheet.setColumnWidth(i, widths[i]);
+    }
+
+    // Sort by QTL desc
+    final sortedCustomers = List<Customer>.from(customers);
+    sortedCustomers.sort((a, b) {
+      final aQtl = custData[a.id]?.totalQtl ?? 0;
+      final bQtl = custData[b.id]?.totalQtl ?? 0;
+      if (aQtl == 0 && bQtl == 0) {
+        return a.shopName.toLowerCase().compareTo(b.shopName.toLowerCase());
+      }
+      return bQtl.compareTo(aQtl);
+    });
+
+    int rowIdx = 2;
+    int sl = 1;
+    double grandQtl = 0, grandNet = 0;
+    int grandBags26 = 0, grandBags10 = 0, grandBags5 = 0, grandOrders = 0;
+
+    for (final customer in sortedCustomers) {
+      final d = custData[customer.id];
+      final totalOrders = d?.orderIds.length ?? 0;
+      final totalQtl = d?.totalQtl ?? 0.0;
+      final topVariety = d != null && d.varietyQtl.isNotEmpty
+          ? d.varietyQtl.entries.reduce((a, b) => a.value >= b.value ? a : b).key
+          : '-';
+
+      grandQtl += totalQtl;
+      grandNet += d?.totalNetAmount ?? 0;
+      grandBags26 += d?.totalBags26 ?? 0;
+      grandBags10 += d?.totalBags10 ?? 0;
+      grandBags5 += d?.totalBags5 ?? 0;
+      grandOrders += totalOrders;
+
+      final rowData = [
+        sl.toString(),
+        customer.shopName,
+        customer.ownerName ?? '',
+        customer.place ?? '',
+        _sanitizePhone(customer.phone),
+        customer.tinGst ?? '',
+        totalOrders > 0 ? totalOrders.toString() : '0',
+        totalQtl > 0 ? totalQtl.toStringAsFixed(2) : '0',
+        (d?.totalBags26 ?? 0) > 0 ? d!.totalBags26.toString() : '0',
+        (d?.totalBags10 ?? 0) > 0 ? d!.totalBags10.toString() : '0',
+        (d?.totalBags5 ?? 0) > 0 ? d!.totalBags5.toString() : '0',
+        d?.firstDate != null ? dateFmt.format(d!.firstDate!) : '-',
+        d?.lastDate != null ? dateFmt.format(d!.lastDate!) : '-',
+        topVariety,
+        d != null && d.totalNetAmount > 0 ? nf.format(d.totalNetAmount) : '0',
+      ];
+
+      for (int j = 0; j < rowData.length; j++) {
+        final cell = sheet.cell(
+            CellIndex.indexByColumnRow(columnIndex: j, rowIndex: rowIdx));
+        cell.value = TextCellValue(rowData[j]);
+        cell.cellStyle = (j == 1 || j == 2 || j == 3 || j == 13) ? leftStyle : centerStyle;
+      }
+      rowIdx++;
+      sl++;
+    }
+
+    // Grand Totals
+    rowIdx++;
+    final totalLabels = <int, String>{
+      1: 'GRAND TOTAL',
+      6: grandOrders.toString(),
+      7: grandQtl.toStringAsFixed(2),
+      8: grandBags26.toString(),
+      9: grandBags10.toString(),
+      10: grandBags5.toString(),
+      14: nf.format(grandNet),
+    };
+    for (final entry in totalLabels.entries) {
+      final cell = sheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: entry.key, rowIndex: rowIdx));
+      cell.value = TextCellValue(entry.value);
+      cell.cellStyle = totalStyle;
+    }
+
+    // Save
+    final directory = await getApplicationDocumentsDirectory();
+    final dateStr = DateFormat('dd-MM-yyyy').format(DateTime.now());
+    final fileName = 'customer_report_$dateStr.xlsx';
+    final filePath = '${directory.path}/$fileName';
+
+    final fileBytes = excel.save();
+    if (fileBytes != null) {
+      await File(filePath).writeAsBytes(fileBytes);
+    }
+
+    return filePath;
+  }
 }
 
 /// Public data class surfaced by the dry-run preview.
@@ -1951,4 +2157,16 @@ class _PriceUpdateResult {
     if (n < o) return -1;  // down
     return 0;              // same
   }
+}
+
+class _CustExportData {
+  final Set<String> orderIds = {};
+  double totalQtl = 0;
+  int totalBags26 = 0;
+  int totalBags10 = 0;
+  int totalBags5 = 0;
+  double totalNetAmount = 0;
+  DateTime? firstDate;
+  DateTime? lastDate;
+  final Map<String, double> varietyQtl = {};
 }
