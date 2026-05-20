@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
@@ -51,13 +52,22 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   // Cache: customerId → { totalQtl, records }
   Map<String, _CustomerPurchaseData> _purchaseCache = {};
-  bool _purchaseCacheLoaded = false;
+  StreamSubscription<List<OrderItem>>? _orderItemsSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    final db = ref.read(databaseProvider);
+    _orderItemsSubscription = db.select(db.orderItems).watch().listen((_) {
+      _loadPurchaseData(db);
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _orderItemsSubscription?.cancel();
     super.dispose();
-
   }
 
   @override
@@ -65,12 +75,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final db = ref.watch(databaseProvider);
     final theme = Theme.of(context);
     _customersStream ??= db.select(db.customers).watch();
-
-    // Load purchase data lazily (once)
-    if (!_purchaseCacheLoaded) {
-      _purchaseCacheLoaded = true;
-      _loadPurchaseData(db);
-    }
 
 
     return Scaffold(

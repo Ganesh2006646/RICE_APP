@@ -333,6 +333,8 @@ class CustomerCard extends ConsumerWidget {
                                       flex: 3,
                                       child: Text(
                                         dateFormat.format(record.date),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: Theme.of(ctx)
                                             .textTheme
                                             .bodySmall
@@ -347,6 +349,8 @@ class CustomerCard extends ConsumerWidget {
                                       flex: 2,
                                       child: Text(
                                         record.orderNo,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: Theme.of(ctx)
                                             .textTheme
                                             .bodySmall
@@ -382,6 +386,8 @@ class CustomerCard extends ConsumerWidget {
                                                 ? 0
                                                 : 2),
                                         textAlign: TextAlign.right,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: Theme.of(ctx)
                                             .textTheme
                                             .bodyMedium
@@ -494,13 +500,17 @@ class CustomerCard extends ConsumerWidget {
               children: [
                 Icon(icon, size: 12, color: color),
                 const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
-                        color: AppColors.textTertiary,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                      ),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                          color: AppColors.textTertiary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -528,6 +538,8 @@ class CustomerCard extends ConsumerWidget {
       child: Text(
         label,
         textAlign: align,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
               color: AppColors.textTertiary,
               fontWeight: FontWeight.w700,

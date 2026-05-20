@@ -186,7 +186,7 @@ class ExcelService {
 
     // Running totals for the summary row
     double sumQtl26 = 0, sumQtl10 = 0, sumQtl5 = 0;
-    double sumAmc = 0, sumGst = 0, sumNet = 0;
+    double sumNet = 0;
 
     for (var customerId in groupedItems.keys) {
       final customer = customers.firstWhere(
@@ -231,8 +231,6 @@ class ExcelService {
         sumQtl26 += qtl26;
         sumQtl10 += qtl10;
         sumQtl5  += qtl5;
-        sumAmc   += item.amcAmount;
-        sumGst   += item.gstAmount;
         sumNet   += item.netAmount;
 
         // Effective rate shown in RATE column:
@@ -331,13 +329,39 @@ class ExcelService {
     // AMC total
     final totalAmcCell = sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: rowIndex));
-    totalAmcCell.value = TextCellValue(sumAmc > 0 ? nf.format(sumAmc) : '0');
+    totalAmcCell.value = TextCellValue('1%');
     totalAmcCell.cellStyle = totalStyle;
 
     // GST total
     final totalGstCell = sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: rowIndex));
-    totalGstCell.value = TextCellValue(sumGst > 0 ? nf.format(sumGst) : '0');
+    final gstRates = items.map((item) {
+      final product = products.firstWhere(
+        (p) => p.id == item.productId,
+        orElse: () => Product(
+          id: item.productId,
+          name: 'Unknown Rice',
+          defaultPrice: 0,
+          gstRateDefault: 0,
+          unit: 'qtl',
+          isGalaxy: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      return product.gstRateDefault;
+    }).toSet();
+
+    String gstTotalText = '0%';
+    if (gstRates.isNotEmpty) {
+      if (gstRates.length == 1) {
+        gstTotalText = '${gstRates.first.toStringAsFixed(0)}%';
+      } else {
+        final sortedRates = gstRates.toList()..sort();
+        gstTotalText = sortedRates.map((r) => '${r.toStringAsFixed(0)}%').join(' / ');
+      }
+    }
+    totalGstCell.value = TextCellValue(gstTotalText);
     totalGstCell.cellStyle = totalStyle;
 
     // Grand Total
@@ -1917,11 +1941,11 @@ class ExcelService {
     cellA1.value = TextCellValue(
         'CUSTOMER PURCHASE SUMMARY  -  ${dateFmt.format(DateTime.now())}');
     cellA1.cellStyle = titleStyle;
-    sheet.merge(CellIndex.indexByString('A1'), CellIndex.indexByString('O1'));
+    sheet.merge(CellIndex.indexByString('A1'), CellIndex.indexByString('N1'));
 
     // Headers
     final headers = [
-      'SL', 'SHOP NAME', 'OWNER', 'PLACE', 'PHONE', 'GST / TIN',
+      'SL', 'SHOP NAME', 'PLACE', 'PHONE', 'GST / TIN',
       'ORDERS', 'TOTAL QTL', '26 KG BAGS', '10 KG BAGS', '5 KG BAGS',
       'FIRST ORDER', 'LAST ORDER', 'TOP VARIETY', 'NET AMT',
     ];
@@ -1932,7 +1956,7 @@ class ExcelService {
       cell.cellStyle = headerStyle;
     }
 
-    final widths = [5.0, 28.0, 18.0, 15.0, 14.0, 20.0, 8.0, 10.0, 10.0, 10.0, 10.0, 13.0, 13.0, 22.0, 15.0];
+    final widths = [5.0, 28.0, 15.0, 14.0, 20.0, 8.0, 10.0, 10.0, 10.0, 10.0, 13.0, 13.0, 22.0, 15.0];
     for (int i = 0; i < widths.length; i++) {
       sheet.setColumnWidth(i, widths[i]);
     }
@@ -1971,7 +1995,6 @@ class ExcelService {
       final rowData = [
         sl.toString(),
         customer.shopName,
-        customer.ownerName ?? '',
         customer.place ?? '',
         _sanitizePhone(customer.phone),
         customer.tinGst ?? '',
@@ -1990,7 +2013,7 @@ class ExcelService {
         final cell = sheet.cell(
             CellIndex.indexByColumnRow(columnIndex: j, rowIndex: rowIdx));
         cell.value = TextCellValue(rowData[j]);
-        cell.cellStyle = (j == 1 || j == 2 || j == 3 || j == 13) ? leftStyle : centerStyle;
+        cell.cellStyle = (j == 1 || j == 2 || j == 12) ? leftStyle : centerStyle;
       }
       rowIdx++;
       sl++;
@@ -2000,12 +2023,12 @@ class ExcelService {
     rowIdx++;
     final totalLabels = <int, String>{
       1: 'GRAND TOTAL',
-      6: grandOrders.toString(),
-      7: grandQtl.toStringAsFixed(2),
-      8: grandBags26.toString(),
-      9: grandBags10.toString(),
-      10: grandBags5.toString(),
-      14: nf.format(grandNet),
+      5: grandOrders.toString(),
+      6: grandQtl.toStringAsFixed(2),
+      7: grandBags26.toString(),
+      8: grandBags10.toString(),
+      9: grandBags5.toString(),
+      13: nf.format(grandNet),
     };
     for (final entry in totalLabels.entries) {
       final cell = sheet.cell(
