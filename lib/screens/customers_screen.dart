@@ -431,6 +431,28 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Future<void> _exportAllCustomers(AppDatabase db) async {
     final scaffold = ScaffoldMessenger.of(context);
 
+    // 1. Show date range picker
+    final dateRange = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Select Date Range for Export',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (dateRange == null) return; // User cancelled
+    if (!mounted) return;
+
     // Show loading indicator
     showDialog(
       context: context,
@@ -440,19 +462,31 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
     try {
       final customers = await db.select(db.customers).get();
+      
+      // Fetch orders within date range (inclusive of end date till end of day)
+      final endDate = DateTime(dateRange.end.year, dateRange.end.month, dateRange.end.day, 23, 59, 59);
+      final allOrders = await (db.select(db.orders)
+            ..where((tbl) => tbl.loadingDate.isBetweenValues(dateRange.start, endDate)))
+          .get();
+          
+      final validOrderIds = allOrders.map((o) => o.id).toSet();
+
+      // Only include items from those orders
       final allItems = await db.select(db.orderItems).get();
-      final allOrders = await db.select(db.orders).get();
+      final validItems = allItems.where((item) => validOrderIds.contains(item.orderId)).toList();
+
       final allProducts = await db.select(db.products).get();
 
       final filePath = await ExcelService.exportAllCustomerPurchases(
         customers: customers,
-        orderItems: allItems,
+        orderItems: validItems,
         orders: allOrders,
         products: allProducts,
         customPath: ref.read(settingsProvider).excelSavePath,
       );
 
-      if (mounted) Navigator.pop(context); // dismiss loading
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loading
 
       final downloadPath = await ExcelService.copyToDownloads(
         filePath,
@@ -461,14 +495,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
       scaffold.showSnackBar(SnackBar(
         content: Text('Customer report exported: ${downloadPath.split('/').last}'),
-        backgroundColor: AppTheme.success,
+        backgroundColor: AppColors.success,
         duration: const Duration(seconds: 3),
       ));
     } catch (e) {
-      if (mounted) Navigator.pop(context); // dismiss loading
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loading
       scaffold.showSnackBar(SnackBar(
         content: Text('Export failed: $e'),
-        backgroundColor: AppTheme.error,
+        backgroundColor: AppColors.error,
       ));
     }
   }

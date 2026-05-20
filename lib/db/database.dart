@@ -3,6 +3,8 @@ import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'dart:io';
+import '../features/analytics/models/daily_order_stat.dart';
+import '../features/analytics/models/rice_distribution.dart';
 
 part 'database.g.dart';
 
@@ -192,6 +194,104 @@ class AppDatabase extends _$AppDatabase {
         }
       },
     );
+  }
+
+  Future<List<DailyOrderStat>> getOrdersByDay() async {
+    final result = await customSelect(
+      '''
+      SELECT 
+        CASE 
+          WHEN TYPEOF(created_at) = 'integer' THEN DATE(created_at, 'unixepoch', 'localtime') 
+          ELSE DATE(created_at) 
+        END as day,
+        COUNT(*) as total,
+        SUM(total_amount) as revenue
+      FROM orders
+      GROUP BY day
+      ORDER BY day
+      '''
+    ).get();
+
+    return result.map((row) {
+      return DailyOrderStat(
+        day: row.read<String>('day'),
+        totalOrders: row.read<int>('total'),
+        revenue: row.read<double>('revenue'),
+        quantity: 0.0,
+      );
+    }).toList();
+  }
+
+  Stream<List<DailyOrderStat>> watchOrdersByDay() {
+    return customSelect(
+      '''
+      SELECT 
+        CASE 
+          WHEN TYPEOF(created_at) = 'integer' THEN DATE(created_at, 'unixepoch', 'localtime') 
+          ELSE DATE(created_at) 
+        END as day,
+        COUNT(*) as total,
+        SUM(total_amount) as revenue
+      FROM orders
+      GROUP BY day
+      ORDER BY day
+      ''',
+      readsFrom: {orders},
+    ).watch().map((rows) {
+      return rows.map((row) {
+        return DailyOrderStat(
+          day: row.read<String>('day'),
+          totalOrders: row.read<int>('total'),
+          revenue: row.read<double>('revenue'),
+          quantity: 0.0,
+        );
+      }).toList();
+    });
+  }
+
+  Future<List<RiceDistribution>> getRiceDistribution() async {
+    final result = await customSelect(
+      '''
+      SELECT 
+        p.name as variety_name,
+        SUM(oi.qty_qtl) as quantity,
+        SUM(oi.net_amount) as revenue
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      GROUP BY p.name
+      '''
+    ).get();
+
+    return result.map((row) {
+      return RiceDistribution(
+        varietyName: row.read<String>('variety_name'),
+        quantity: row.read<double>('quantity'),
+        revenue: row.read<double>('revenue'),
+      );
+    }).toList();
+  }
+
+  Stream<List<RiceDistribution>> watchRiceDistribution() {
+    return customSelect(
+      '''
+      SELECT 
+        p.name as variety_name,
+        SUM(oi.qty_qtl) as quantity,
+        SUM(oi.net_amount) as revenue
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      GROUP BY p.name
+      ''',
+      readsFrom: {orderItems, products},
+    ).watch().map((rows) {
+      return rows.map((row) {
+        return RiceDistribution(
+          varietyName: row.read<String>('variety_name'),
+          quantity: row.read<double>('quantity'),
+          revenue: row.read<double>('revenue'),
+        );
+      }).toList();
+    });
   }
 }
 

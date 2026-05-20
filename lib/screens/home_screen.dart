@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/analytics_tile.dart';
 import '../widgets/dashboard_card.dart';
 import '../widgets/loading_skeleton.dart';
+import 'analytics_screen.dart';
 import '../widgets/metric_card.dart';
 import '../widgets/section_header.dart';
 import 'customers_screen.dart';
@@ -151,6 +152,10 @@ class _Dashboard extends ConsumerWidget {
                         const SectionHeader(title: 'Business Pulse'),
                         const SizedBox(height: AppSpacing.md),
                         _BusinessPulse(stats: stats),
+                        const SizedBox(height: AppSpacing.xl),
+                        const SectionHeader(title: 'Advanced Analytics'),
+                        const SizedBox(height: AppSpacing.md),
+                        const _AnalyticsPortalCard(),
                         const SizedBox(height: AppSpacing.xl),
                         const SectionHeader(title: 'Gallery'),
                         const SizedBox(height: AppSpacing.md),
@@ -644,4 +649,80 @@ class _ActivityItem {
     required this.subtitle,
     required this.status,
   });
+}
+
+class _AnalyticsPortalCard extends StatelessWidget {
+  const _AnalyticsPortalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AnalyticsScreen()),
+        );
+      },
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withValues(alpha: 0.8),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: AppShadows.card,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.bar_chart_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Interactive Dashboard',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'View daily trends & rice variety demand',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

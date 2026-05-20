@@ -97,6 +97,12 @@ By developing this offline-first mobile solution, I transitioned his entire offi
 - **Professional Aesthetics:** Modern, premium UI equipped with font scaling and multi-language support (English, Telugu, Hindi, Tamil).
 - **Custom Save Location:** All Excel exports (orders, deleted records) saved to user-defined directory from Settings.
 
+### 📊 5. Interactive Business Analytics
+- **Visual Dashboards:** Embedded `fl_chart` integration provides a premium Business Analytics dashboard directly in the app.
+- **Daily Orders & Revenue:** Interactive Bar Charts displaying daily trends, toggleable between Orders, Revenue, and Quantity.
+- **Variety Demand Tracking:** Beautiful Donut Pie Charts illustrating exact rice variety distribution and market demand.
+- **Smart Reactive Filters:** Ultra-fast, in-memory filtering (Last 7/30 Days, Monthly, Yearly) powered by Riverpod and Drift reactive streams.
+
 ---
 ## 🛠️ Tech Stack
 
@@ -145,6 +151,8 @@ lib/
 ├── db/                     # Drift SQLite schema and migrations
 │   ├── database.dart       # Core AppDatabase definition
 │   └── tables.dart         # Table definitions (Products, Customers, Orders)
+├── features/               # Feature-based modular code
+│   └── analytics/          # Business analytics models, providers, and charts
 ├── providers/              # Riverpod state management providers
 │   └── settings_provider.dart # Application settings and active surcharges
 ├── screens/                # Flutter UI screens
@@ -202,9 +210,9 @@ lib/
 - ✅ **WhatsApp Integration** — Lorry summaries & individual PDF invoices with text fallback
 - ✅ **Bulk Discount Engine** — Tiered GALAXY discounts with override logic
 - ✅ **Custom Save Path** — All exports to user-defined location
+- ✅ **Advanced Analytics** — Interactive dashboards for sales trends and variety-wise popularity
 - 🔲 **Cloud Synchronization** — Low-bandwidth sync for multi-device support between field agents and mill desktop
 - 🔲 **Payment Tracking** — Track partial/full payments per customer per order
-- 🔲 **Advanced Analytics** — Sales trends, variety-wise popularity, customer purchase history
 
 ---
 
