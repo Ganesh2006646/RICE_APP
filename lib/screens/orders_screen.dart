@@ -16,6 +16,7 @@ import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/order_card.dart';
+import '../utils/page_transitions.dart';
 
 /// Orders History Screen with filters and actions
 class OrdersScreen extends ConsumerStatefulWidget {
@@ -784,8 +785,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   void _duplicateOrder(OrderWithDetails item) {
     Navigator.push(
         context,
-        MaterialPageRoute(
-            builder: (_) => NewOrderScreen(duplicateOrderId: item.order.id)));
+        fadeSlideRoute(
+            NewOrderScreen(duplicateOrderId: item.order.id)));
   }
 
   Widget _buildEmptyState() {
@@ -797,7 +798,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       actionLabel: 'New Order',
       onAction: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NewOrderScreen()),
+        fadeSlideRoute(const NewOrderScreen()),
       ),
     );
   }

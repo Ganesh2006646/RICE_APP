@@ -15,6 +15,7 @@ import 'new_order_screen.dart';
 import '../services/excel_service.dart';
 import '../providers/settings_provider.dart';
 import '../services/backup_service.dart';
+import '../utils/page_transitions.dart';
 
 String? _validateGstin(String? value) {
   if (value == null || value.isEmpty) return null;
@@ -212,8 +213,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   void _navigateToNewOrder(Customer customer) {
     Navigator.push(
         context,
-        MaterialPageRoute(
-            builder: (_) => NewOrderScreen(preselectedCustomer: customer)));
+        fadeSlideRoute(
+            NewOrderScreen(preselectedCustomer: customer)));
   }
 
   Future<void> _confirmDelete(Customer customer, AppDatabase db) async {
@@ -431,23 +432,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Future<void> _exportAllCustomers(AppDatabase db) async {
     final scaffold = ScaffoldMessenger.of(context);
 
-    // 1. Show date range picker
-    final dateRange = await showDateRangePicker(
+    // 1. Show compact date range bottom sheet with presets
+    final dateRange = await showModalBottomSheet<DateTimeRange>(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'Select Date Range for Export',
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ExportDateSheet(parentContext: context),
     );
 
     if (dateRange == null) return; // User cancelled
@@ -569,4 +559,132 @@ class _CustomerPurchaseData {
   final List<PurchaseRecord> records;
 
   _CustomerPurchaseData({required this.totalQtl, required this.records});
+}
+
+/// Compact bottom sheet for export date range selection
+class _ExportDateSheet extends StatelessWidget {
+  final BuildContext parentContext;
+  const _ExportDateSheet({required this.parentContext});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+
+    final presets = <String, DateTimeRange>{
+      'Last 7 Days': DateTimeRange(
+        start: now.subtract(const Duration(days: 7)),
+        end: now,
+      ),
+      'Last 30 Days': DateTimeRange(
+        start: now.subtract(const Duration(days: 30)),
+        end: now,
+      ),
+      'This Month': DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: now,
+      ),
+      'This Year': DateTimeRange(
+        start: DateTime(now.year, 1, 1),
+        end: now,
+      ),
+    };
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Export Date Range',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Choose a date range for the customer export',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+          ...presets.entries.map((entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, entry.value),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      entry.key,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              )),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final range = await showDateRangePicker(
+                  context: parentContext,
+                  firstDate: DateTime(2020),
+                  lastDate: now.add(const Duration(days: 365)),
+                  builder: (ctx, child) {
+                    return Theme(
+                      data: Theme.of(ctx).copyWith(
+                        colorScheme: Theme.of(ctx).colorScheme.copyWith(
+                              primary: AppColors.primary,
+                              onPrimary: Colors.white,
+                            ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (range != null && context.mounted) {
+                  Navigator.pop(context, range);
+                }
+              },
+              icon: const Icon(Icons.date_range, size: 18),
+              label: const Text('Custom Range'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

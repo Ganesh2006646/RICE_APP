@@ -11,6 +11,7 @@ import '../screens/product_gallery_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+import '../utils/page_transitions.dart';
 
 /// Comprehensive Settings Screen
 /// Settings changes now reflect immediately in the app
@@ -103,6 +104,91 @@ class SettingsScreen extends ConsumerWidget {
                   onChanged: (v) => notifier.setGstPercent(v),
                   suffix: '%',
                 ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // SECTION: BULK DISCOUNT SETTINGS
+            _buildSectionHeader(context, 'Bulk Discount'),
+            _buildSettingsCard(
+              context: context,
+              icon: Icons.discount_outlined,
+              title: 'Auto Bulk Discount',
+              children: [
+                // Master Toggle
+                SafeCard(
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.3),
+                  padding: const EdgeInsets.all(12),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      settings.bulkDiscountEnabled
+                          ? Icons.toggle_on
+                          : Icons.toggle_off,
+                      color: settings.bulkDiscountEnabled
+                          ? theme.primaryColor
+                          : AppTheme.grey,
+                      size: 28,
+                    ),
+                    title: const Text(
+                      'Enable Bulk Discount',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      settings.bulkDiscountEnabled
+                          ? 'Discounts auto-applied to eligible orders'
+                          : 'No automatic discounts will be applied',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppTheme.grey),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                    trailing: Switch(
+                      value: settings.bulkDiscountEnabled,
+                      onChanged: (value) =>
+                          notifier.setBulkDiscountEnabled(value),
+                      activeTrackColor: theme.primaryColor.withAlpha(128),
+                      activeThumbColor: theme.primaryColor,
+                    ),
+                  ),
+                ),
+                // Discount amount fields (only shown when enabled)
+                if (settings.bulkDiscountEnabled) ...[
+                  const SizedBox(height: 16),
+                  _buildNumberField(
+                    context: context,
+                    label: 'Discount for 50+ QTL (₹/Qtl)',
+                    value: settings.discount50Qtl,
+                    onChanged: (v) => notifier.setDiscount50Qtl(v),
+                    suffix: '₹/qtl',
+                    helperText:
+                        'Applied when total order ≥ 50 QTL (Galaxy varieties)',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildNumberField(
+                    context: context,
+                    label: 'Discount for 100+ QTL (₹/Qtl)',
+                    value: settings.discount100Qtl,
+                    onChanged: (v) => notifier.setDiscount100Qtl(v),
+                    suffix: '₹/qtl',
+                    helperText:
+                        'Applied when total order ≥ 100 QTL (Galaxy varieties)',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildNumberField(
+                    context: context,
+                    label: 'Single Variety 100+ QTL (₹/Qtl)',
+                    value: settings.discount100QtlSingleVariety,
+                    onChanged: (v) =>
+                        notifier.setDiscount100QtlSingleVariety(v),
+                    suffix: '₹/qtl',
+                    helperText:
+                        'Applied when any single variety reaches ≥ 100 QTL',
+                  ),
+                ],
               ],
             ),
 
@@ -478,8 +564,7 @@ class SettingsScreen extends ConsumerWidget {
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const ProductGalleryScreen()),
+                      fadeSlideRoute(const ProductGalleryScreen()),
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(

@@ -46,6 +46,12 @@ class AppSettings {
   final double amcPercent;     // AMC percentage (e.g. 1.0 = 1%)
   final double gstPercent;     // GST percentage (e.g. 5.0 = 5%)
 
+  // Bulk Discount Configuration
+  final bool bulkDiscountEnabled;          // Master toggle for auto bulk discounts
+  final double discount50Qtl;              // Discount ₹/Qtl when total ≥ 50 QTL (GALAXY)
+  final double discount100Qtl;             // Discount ₹/Qtl when total ≥ 100 QTL (GALAXY)
+  final double discount100QtlSingleVariety; // Discount ₹/Qtl when single variety ≥ 100 QTL
+
   /// Alias: surcharge applied per quintal for 10 KG packing (same storage as packing10Price)
   double get surcharge10kgPerQtl => packing10Price;
   /// Alias: surcharge applied per quintal for 5 KG packing (same storage as packing5Price)
@@ -67,6 +73,10 @@ class AppSettings {
     this.packing5Price = 250.0,
     this.amcPercent = 1.0,
     this.gstPercent = 5.0,
+    this.bulkDiscountEnabled = true,
+    this.discount50Qtl = 50.0,
+    this.discount100Qtl = 70.0,
+    this.discount100QtlSingleVariety = 100.0,
   });
 
   AppSettings copyWith({
@@ -85,6 +95,10 @@ class AppSettings {
     double? gstPercent,
     String? agentName,
     String? millName,
+    bool? bulkDiscountEnabled,
+    double? discount50Qtl,
+    double? discount100Qtl,
+    double? discount100QtlSingleVariety,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -102,6 +116,10 @@ class AppSettings {
       packing5Price: packing5Price ?? this.packing5Price,
       amcPercent: amcPercent ?? this.amcPercent,
       gstPercent: gstPercent ?? this.gstPercent,
+      bulkDiscountEnabled: bulkDiscountEnabled ?? this.bulkDiscountEnabled,
+      discount50Qtl: discount50Qtl ?? this.discount50Qtl,
+      discount100Qtl: discount100Qtl ?? this.discount100Qtl,
+      discount100QtlSingleVariety: discount100QtlSingleVariety ?? this.discount100QtlSingleVariety,
     );
   }
 
@@ -144,6 +162,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       packing5Price: prefs.getDouble('packing_5_price') ?? 250.0,
       amcPercent: prefs.getDouble('amc_percent') ?? 1.0,
       gstPercent: prefs.getDouble('gst_percent') ?? 5.0,
+      bulkDiscountEnabled: prefs.getBool('bulk_discount_enabled') ?? true,
+      discount50Qtl: prefs.getDouble('discount_50_qtl') ?? 50.0,
+      discount100Qtl: prefs.getDouble('discount_100_qtl') ?? 70.0,
+      discount100QtlSingleVariety: prefs.getDouble('discount_100_qtl_single') ?? 100.0,
     );
   }
 
@@ -235,6 +257,30 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('gst_percent', percent);
     state = state.copyWith(gstPercent: percent);
+  }
+
+  Future<void> setBulkDiscountEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('bulk_discount_enabled', enabled);
+    state = state.copyWith(bulkDiscountEnabled: enabled);
+  }
+
+  Future<void> setDiscount50Qtl(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('discount_50_qtl', value);
+    state = state.copyWith(discount50Qtl: value);
+  }
+
+  Future<void> setDiscount100Qtl(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('discount_100_qtl', value);
+    state = state.copyWith(discount100Qtl: value);
+  }
+
+  Future<void> setDiscount100QtlSingleVariety(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('discount_100_qtl_single', value);
+    state = state.copyWith(discount100QtlSingleVariety: value);
   }
 
   Future<void> resetAll() async {

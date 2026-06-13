@@ -117,6 +117,8 @@ class MetricCard extends StatelessWidget {
                   height: 1.1,
                   letterSpacing: -0.5,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
@@ -127,6 +129,8 @@ class MetricCard extends StatelessWidget {
                   color: AppColors.textSecondary,
                   height: 1.3,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: AppSpacing.xs),
@@ -138,6 +142,8 @@ class MetricCard extends StatelessWidget {
                     color: AppColors.textHint,
                     height: 1.3,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ],

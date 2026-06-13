@@ -373,6 +373,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
   }
 
   void _applyBulkDiscounts({bool showSummary = true}) {
+    // Check if bulk discounts are enabled in settings
+    final settings = ref.read(settingsProvider);
+    if (!settings.bulkDiscountEnabled) return;
+
     final List<String> discountLog = [];
     setState(() {
       for (var customerData in _customers) {
@@ -401,9 +405,9 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
         }
         double discountRate = 0.0;
         if (customerTotalQtl >= 100.0) {
-          discountRate = 70.0;
+          discountRate = settings.discount100Qtl;
         } else if (customerTotalQtl >= 50.0) {
-          discountRate = 50.0;
+          discountRate = settings.discount50Qtl;
         }
         for (var item in customerData.items) {
           if (item.product == null) continue;
@@ -422,7 +426,7 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
           final pid = item.product!.id;
           double itemVarietyQtl = varietyQtl[pid] ?? 0.0;
           if (itemVarietyQtl >= 100.0) {
-            itemDiscount = math.max(itemDiscount, 100.0);
+            itemDiscount = math.max(itemDiscount, settings.discount100QtlSingleVariety);
           }
           if (discountRate > 0 && eligibleVarieties.containsKey(pid)) {
             itemDiscount = math.max(itemDiscount, discountRate);

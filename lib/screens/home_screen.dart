@@ -10,6 +10,7 @@ import '../widgets/analytics_tile.dart';
 import '../widgets/dashboard_card.dart';
 import '../widgets/loading_skeleton.dart';
 import 'analytics_screen.dart';
+import '../utils/page_transitions.dart';
 import '../widgets/metric_card.dart';
 import '../widgets/section_header.dart';
 import 'customers_screen.dart';
@@ -40,13 +41,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _openNewOrder() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const NewOrderScreen()),
+      fadeSlideRoute(const NewOrderScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          setState(() => _selectedIndex = 0);
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       body: IndexedStack(index: _selectedIndex, children: _pages),
       floatingActionButton: _selectedIndex == 4
@@ -96,6 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -348,50 +357,27 @@ class _GalleryButton extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, _) => const ProductGalleryScreen(),
-          transitionsBuilder: (context, animation, _, child) {
-            return FadeTransition(
-              opacity:
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 350),
-        ),
+        fadeSlideRoute(const ProductGalleryScreen()),
       ),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primary.withValues(alpha: 0.9),
-              AppColors.primaryDark,
-            ],
-          ),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.xl),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppShadows.card,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
+                color: AppColors.primarySurface,
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: const Icon(Icons.photo_library_outlined,
-                  size: 28, color: Colors.white),
+                  size: 28, color: AppColors.primary),
             ),
             const SizedBox(width: AppSpacing.lg),
             Expanded(
@@ -402,7 +388,7 @@ class _GalleryButton extends StatelessWidget {
                   Text(
                     'Product Gallery',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                     maxLines: 1,
@@ -411,7 +397,7 @@ class _GalleryButton extends StatelessWidget {
                   Text(
                     'Browse all rice varieties',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.78),
+                          color: AppColors.textSecondary,
                         ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -420,7 +406,7 @@ class _GalleryButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textTertiary),
           ],
         ),
       ),
@@ -660,65 +646,63 @@ class _AnalyticsPortalCard extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const AnalyticsScreen()),
+          fadeSlideRoute(const AnalyticsScreen()),
         );
       },
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primary,
-              AppColors.primary.withValues(alpha: 0.8),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
           boxShadow: AppShadows.card,
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+              decoration: const BoxDecoration(
+                color: AppColors.primarySurface,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.bar_chart_rounded,
-                color: Colors.white,
+                color: AppColors.primary,
                 size: 32,
               ),
             ),
             const SizedBox(width: AppSpacing.lg),
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Interactive Dashboard',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 2),
                   Text(
                     'View daily trends & rice variety demand',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             const Icon(
               Icons.chevron_right_rounded,
-              color: Colors.white,
+              color: AppColors.textTertiary,
             ),
           ],
         ),
